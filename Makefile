@@ -32,7 +32,7 @@ PATH_INSTALL=$(PATH_OCAML_PREFIX)/lib/ocaml/barista
 
 PROJECT_NAME=barista
 OCAMLBUILD=$(PATH_OCAML_PREFIX)/bin/ocamlbuild
-OCAMLBUILD_FLAGS=-classic-display -no-links
+OCAMLBUILD_FLAGS=-classic-display -no-links -use-ocamlfind -cflags -annot
 MODULES_ODOCL=$(PROJECT_NAME).odocl
 MODULES_MLPACK=$(PROJECT_NAME)Library.mlpack
 

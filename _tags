@@ -18,6 +18,7 @@
 
 # Directories
 true: -traverse
+true: debug
 <src/**>: include
 
 # Options

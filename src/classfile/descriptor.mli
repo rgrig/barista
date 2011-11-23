@@ -21,30 +21,19 @@
 
 (** {6 Java types definition} *)
 
+type non_void_java_type =
+  [ `Boolean
+  | `Byte
+  | `Char
+  | `Double
+  | `Float
+  | `Int
+  | `Long
+  | `Short
+  | `Class of Name.for_class
+  | `Array of 'a ] constraint 'a = non_void_java_type
 type java_type =
-  [ `Boolean
-  | `Byte
-  | `Char
-  | `Double
-  | `Float
-  | `Int
-  | `Long
-  | `Short
-  | `Void
-  | `Class of Name.for_class
-  | `Array of 'a ] constraint 'a = non_void_java_type
-and non_void_java_type =
-  [ `Boolean
-  | `Byte
-  | `Char
-  | `Double
-  | `Float
-  | `Int
-  | `Long
-  | `Short
-  | `Class of Name.for_class
-  | `Array of 'a ] constraint 'a = non_void_java_type
-(** Definition of Java types. *)
+  [ non_void_java_type | `Void ]
 
 type array_type =
   [ `Array of 'a ] constraint 'a = [ `Boolean
