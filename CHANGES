@@ -1,0 +1,70 @@
+Version 2.0-alpha (2011-07-15):
+-------------------------------
+  - update for Objective Caml 3.12.1
+  - update for Camomile 0.8.3
+  - new build system (ocamlbuild-based)
+  - reorganization of 'src' directory
+  - support for Unicode in 'src/utf8' directory
+  - major refactoring of code (with impact on API)
+  - executable names changed to 'barista.byte' and 'barista.native'
+  - peephole optimizations
+  - optimization of stack frames
+  - optimization of exception tables
+  - optimization of 'transitive' jumps
+  - new '-optimize' command-line switch to enable peephole/jump optimizations
+  - support for 'invodynamic' (JSR 292)
+  - preliminary support for type annotations (JSR 308)
+  - preliminary support for Java modules (project Jigsaw / JSR 294)
+  - support for 'package-info' and 'module-info' class files
+  - support for Java serialization protocol (version 2 only)
+  - new implementation for i/o operations
+  - improved manual
+  - Java API has been removed
+
+Version 1.4 (2010-02-06):
+-------------------------
+  - new 'StackState' module for stack/locals manipulation
+  - new 'ControlFlow' module for control flow information (as a graph)
+  - new 'Code' module for computation of stack/locals from instructions
+  - new '-flow' command-line switch to generate flow graph for a method
+  - new '-generate-stack-infos' command-line switch to generate stack elements
+  - switch to OCaml 3.11.2
+  - bug #28: support for ocamlfind
+  - bug #46: invalid padding size for switch instructions
+  - bug #47: invalid handling of '@LineNumber'
+
+Version 1.3 (2009-09-19):
+-------------------------
+  - new 'Traversal' module (mappers and iterators over class definitions)
+  - handling of class file format versions
+
+Version 1.2 (2009-04-17):
+-------------------------
+  - bug fix for LDC, LDC_W and INVOKEVIRTUAL instructions
+    (results in a change in the definition of the Instruction.t type)
+  - various fixes in Java sources (both code and documentation)
+  - enhanced tests
+  - now able to load all classes from the JDK 1.6
+
+Version 1.1 (2008-11-09):
+-------------------------
+  - move from Java 1.5 to Java 1.6
+  - support for stack frames (StackMapTable atribute)
+  - support for Bisect coverage
+  - bug fixes
+
+Version 1.0 (2008-05-27):
+-------------------------
+  - enhanced tests
+  - main OCaml module renamed from 'Barista' to 'BaristaLibrary'
+  - Ant tasks
+
+Version 1.0-beta (2008-02-29):
+------------------------------
+  - minor API changes
+  - minor grammar changes
+  - Java API
+
+Version 1.0-alpha (2007-09-09):
+-------------------------------
+  - first public version

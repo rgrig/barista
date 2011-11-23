@@ -1,0 +1,17 @@
+--- pack.TestGen --------------------------------------------------------------
+public class pack.TestGen<A extends java.lang.Number, B extends java.lang.Exception & java.lang.Comparable<B>> extends java.lang.Object {
+  public A field;
+  public pack.TestGen();
+  public static <T extends java.lang.Object & java.lang.Comparable<? extends T>> void f_extends(T);
+  public static <T extends java.lang.Object & java.lang.Comparable<?>> void f_star(T);
+  public static <T extends java.lang.Object & java.lang.Comparable<? super T>> void f_super(T);
+}
+--- pack.TestAnnot ------------------------------------------------------------
+@java.lang.Deprecated
+public class pack.TestAnnot extends java.lang.Object {
+  public pack.TestAnnot();
+  @java.lang.Deprecated
+  public static void f();
+  @pack.MyAnnotation(a="xyz", b=3.1400001049, c=[5], e=pack.MyAnnotation.E.E3)
+  public static void g();
+}

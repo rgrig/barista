@@ -1,0 +1,3 @@
+- full support for class file format up to version 1.7
+- experimental support for 'future' features (e. g. modules)
+- can be used as a library, or as a command-line [dis]assembler

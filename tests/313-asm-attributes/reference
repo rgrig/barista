@@ -1,0 +1,59 @@
+public final class pack.Test extends java.lang.Object
+  minor version: 0
+  major version: 50
+  Constant pool:
+const #1 = Asciz	pack/Test;
+const #2 = class	#1;	//  pack/Test
+const #3 = Asciz	java/lang/Object;
+const #4 = class	#3;	//  java/lang/Object
+const #5 = Asciz	main;
+const #6 = Asciz	([Ljava/lang/String;)V;
+const #7 = Asciz	java/lang/System;
+const #8 = class	#7;	//  java/lang/System
+const #9 = Asciz	out;
+const #10 = Asciz	Ljava/io/PrintStream;;
+const #11 = NameAndType	#9:#10;//  out:Ljava/io/PrintStream;
+const #12 = Field	#8.#11;	//  java/lang/System.out:Ljava/io/PrintStream;
+const #13 = Asciz	hello;
+const #14 = String	#13;	//  hello
+const #15 = Asciz	java/io/PrintStream;
+const #16 = class	#15;	//  java/io/PrintStream
+const #17 = Asciz	println;
+const #18 = Asciz	(Ljava/lang/String;)V;
+const #19 = NameAndType	#17:#18;//  println:(Ljava/lang/String;)V
+const #20 = Method	#16.#19;	//  java/io/PrintStream.println:(Ljava/lang/String;)V
+const #21 = Asciz	LineNumberTable;
+const #22 = Asciz	args;
+const #23 = Asciz	[Ljava/lang/String;;
+const #24 = Asciz	LocalVariableTable;
+const #25 = Asciz	Code;
+const #26 = Asciz	Deprecated;
+const #27 = Asciz	java/io/IOException;
+const #28 = class	#27;	//  java/io/IOException
+const #29 = Asciz	java/lang/RuntimeException;
+const #30 = class	#29;	//  java/lang/RuntimeException
+const #31 = Asciz	Exceptions;
+
+{
+public static void main(java.lang.String[])   throws java.io.IOException, java.lang.RuntimeException;
+  Code:
+   Stack=4, Locals=4, Args_size=1
+   0:	getstatic	#12; //Field java/lang/System.out:Ljava/io/PrintStream;
+   3:	ldc	#14; //String hello
+   5:	invokevirtual	#20; //Method java/io/PrintStream.println:(Ljava/lang/String;)V
+   8:	return
+  LineNumberTable: 
+   line 10: 0
+   line 20: 3
+   line 30: 5
+   line 40: 8
+
+  LocalVariableTable: 
+   Start  Length  Slot  Name   Signature
+   0      9      0    args       [Ljava/lang/String;
+
+  Deprecated: true
+  Exceptions: 
+   throws java.io.IOException, java.lang.RuntimeException
+}
+

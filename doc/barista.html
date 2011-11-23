@@ -1,0 +1,3775 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"
+            "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+<HEAD>
+<TITLE>Barista 2.0-alpha 
+Reference Manual
+</TITLE>
+
+<META http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<META name="GENERATOR" content="hevea 1.10">
+<STYLE type="text/css">
+.li-itemize{margin:1ex 0ex;}
+.thefootnotes{text-align:left;margin:0ex;}
+.dt-thefootnotes{margin:0em;}
+.dd-thefootnotes{margin:0em 0em 0em 2em;}
+.caption{padding-left:2ex; padding-right:2ex; margin-left:auto; margin-right:auto}
+.title{margin:2ex auto;text-align:center}
+.center{text-align:center;margin-left:auto;margin-right:auto;}
+DIV TABLE{margin-left:inherit;margin-right:inherit;}
+PRE{text-align:left;margin-left:0ex;margin-right:auto;}
+BLOCKQUOTE{margin-left:4ex;margin-right:4ex;text-align:left;}
+TD P{margin:0px;}
+.hbar{border:none;height:2px;width:100%;background-color:black;}
+.figure{border-top: thin solid black; border-bottom: thin solid black;}
+.caption{border-bottom: thin solid black;}
+BODY{background:white;}
+.title{padding:1ex;background:white;}
+.titlemain{padding:1ex;background:white;}
+.titlerest{padding:1ex;background:white;}
+.section{padding:.5ex;background:#7F7F7F;}
+.subsection{padding:0.3ex;background:#B2B2B2;}
+.chapter{padding:0.5ex;background:#7F7F7F;}
+.ffootnoterule{border:none;margin:1em auto 1em 0px;width:50%;background:#7F7F7F;}
+.ftoc1{list-style:none;margin:0ex 1ex;padding:0ex 1ex;border-left:1ex solid #7F7F7F;}
+.ftoc2{list-style:none;margin:1ex 1ex;padding:0ex 1ex;border-left:1ex solid #7F7F7F;}
+.ftoc3{list-style:none;margin:0ex 1ex;padding:0ex 1ex;border-left:1ex solid #7F7F7F;}
+</STYLE>
+</HEAD>
+<BODY >
+<!--HEVEA command line is: hevea -fix -O -exec /usr/local/lib/hevea/xxdate.exe book.hva -o barista.html article.hva fancysection.hva barista.tex -->
+<!--CUT DEF chapter 1 --><TABLE CLASS="title"><TR><TD><H1 CLASS="titlemain">Barista 2.0-alpha<BR>
+Reference Manual</H1><H3 CLASS="titlerest">Copyright &#XA9; 2007-2011 Xavier Clerc &#X2013; <A HREF="mailto:barista@x9c.fr">barista@x9c.fr</A><BR>
+Released under the LGPL v3</H3><H3 CLASS="titlerest">July&#XA0;14, 2011</H3></TD></TR>
+</TABLE><!--TOC chapter Abstract-->
+<H1 CLASS="chapter"><!--SEC ANCHOR -->Abstract</H1><!--SEC END --><P>
+This document presents Barista, the command-line program as well as the underlying Objective Caml library. The purpose of both is to allow easy manipulation of Java<SUP>&#X2122;</SUP> class files in their compiled (<I>a.k.a.&#XA0;</I>bytecode form).<BR>
+
+The program allows one to asssemble and disassemble class file, respectively from and to a source format called assembler (which is essentially a human-readable form of the bytecode). The program also allows one to retrieve information about a classfile, by printing either the contents of a class or the control flow of a method.<BR>
+
+The Objective Caml library (upon which the program is built) allows more sophisticate analysis and manipulation of class file (and also package and module files). Its primary goal is to be used as the back-end for code generation in the OCaml-Java project (<TT><A HREF="http://ocamljava.x9c.fr">http://ocamljava.x9c.fr</A></TT>), which provides a compiler from Objective Caml sources into Java<SUP>&#X2122;</SUP> class files.<BR>
+
+<BR>
+<BR>
+<BR>
+</P><P>This manual is structured in five chapters, and three appendixes.<BR>
+After a first chapter providing an overview of the Barista project, the second chapter explains how Barista can be built from sources and details its dependencies. Then, chapter three introduces the Barista program and how it can be executed, while chapter four introduces the the format of so-called <I>assembler</I> source file. The last chapter shed light on Barista as an Objective Caml library and provides entry points to its API. Finally, the three appendixes summarize all the instructions recognized by the Barista assembler, classified under three different ways (namely: alphabetically, by categories, and by opcode number) for easy reference.
+
+</P><!--TOC chapter Contents-->
+<H1 CLASS="chapter"><!--SEC ANCHOR -->Contents</H1><!--SEC END --><UL CLASS="ftoc1"><LI CLASS="li-toc">
+<A HREF="#htoc1">Chapter&#XA0;1&#XA0;&#XA0;Overview</A>
+<UL CLASS="ftoc2"><LI CLASS="li-toc">
+<A HREF="#htoc2">1.1&#XA0;&#XA0;Current state</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc3">1.2&#XA0;&#XA0;Some history</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc4">1.3&#XA0;&#XA0;Glimpse of the assembler syntax</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc5">1.4&#XA0;&#XA0;Contributions</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc6">Chapter&#XA0;2&#XA0;&#XA0;Building Barista from sources</A>
+<UL CLASS="ftoc2"><LI CLASS="li-toc">
+<A HREF="#htoc7">2.1&#XA0;&#XA0;Dependencies</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc8">2.2&#XA0;&#XA0;Configuration</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc9">2.3&#XA0;&#XA0;Compilation</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc10">2.4&#XA0;&#XA0;Installation</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc11">Chapter&#XA0;3&#XA0;&#XA0;Using Barista as a command-line program</A>
+<UL CLASS="ftoc2"><LI CLASS="li-toc">
+<A HREF="#htoc12">3.1&#XA0;&#XA0;The <TT>assemble</TT> subcommand (alias: <TT>asm</TT>)</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc13">3.2&#XA0;&#XA0;The <TT>disassemble</TT> subcommand (alias: <TT>dasm</TT>)</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc14">3.3&#XA0;&#XA0;The <TT>flow</TT> subcommand</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc15">3.4&#XA0;&#XA0;The <TT>print</TT> subcommand</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc16">3.5&#XA0;&#XA0;The <TT>version</TT> subcommand</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc17">3.6&#XA0;&#XA0;The <TT>help</TT> subcommand</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc18">Chapter&#XA0;4&#XA0;&#XA0;Programming in Barista assembler language</A>
+<UL CLASS="ftoc2"><LI CLASS="li-toc">
+<A HREF="#htoc19">4.1&#XA0;&#XA0;Lexical elements</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc20">4.2&#XA0;&#XA0;Assembler directives</A>
+<UL CLASS="ftoc3"><LI CLASS="li-toc">
+<A HREF="#htoc21">4.2.1&#XA0;&#XA0;The <TT>class</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc22">4.2.2&#XA0;&#XA0;The <TT>extends</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc23">4.2.3&#XA0;&#XA0;The <TT>implements</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc24">4.2.4&#XA0;&#XA0;The <TT>field</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc25">4.2.5&#XA0;&#XA0;The <TT>method</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc26">4.2.6&#XA0;&#XA0;The <TT>max_stack</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc27">4.2.7&#XA0;&#XA0;The <TT>max_locals</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc28">4.2.8&#XA0;&#XA0;The <TT>catch</TT> directive</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc29">4.2.9&#XA0;&#XA0;The <TT>frame</TT> directive</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc30">4.3&#XA0;&#XA0;Attributes</A>
+<UL CLASS="ftoc3"><LI CLASS="li-toc">
+<A HREF="#htoc31">4.3.1&#XA0;&#XA0;The <TT>ConstantValue</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc32">4.3.2&#XA0;&#XA0;The <TT>Exceptions</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc33">4.3.3&#XA0;&#XA0;The <TT>InnerClasses</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc34">4.3.4&#XA0;&#XA0;The <TT>EnclosingMethod</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc35">4.3.5&#XA0;&#XA0;The <TT>Synthetic</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc36">4.3.6&#XA0;&#XA0;The <TT>Signature</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc37">4.3.7&#XA0;&#XA0;The <TT>SourceFile</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc38">4.3.8&#XA0;&#XA0;The <TT>SourceDebugExtension</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc39">4.3.9&#XA0;&#XA0;The <TT>Deprecated</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc40">4.3.10&#XA0;&#XA0;The <TT>RuntimeVisibleAnnotations</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc41">4.3.11&#XA0;&#XA0;The <TT>RuntimeInvisibleAnnotations</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc42">4.3.12&#XA0;&#XA0;The <TT>RuntimeVisibleParameterAnnotations</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc43">4.3.13&#XA0;&#XA0;The <TT>RuntimeInvisibleParameterAnnotations</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc44">4.3.14&#XA0;&#XA0;The <TT>AnnotationDefault</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc45">4.3.15&#XA0;&#XA0;The <TT>LineNumberTable</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc46">4.3.16&#XA0;&#XA0;The <TT>LocalVariableTable</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc47">4.3.17&#XA0;&#XA0;The <TT>LocalVariableTypeTable</TT> attribute</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc48">4.3.18&#XA0;&#XA0;The <TT>Unknown</TT> attribute</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc49">4.4&#XA0;&#XA0;Annotations</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc50">4.5&#XA0;&#XA0;Annotation defaults</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc51">4.6&#XA0;&#XA0;Instructions</A>
+<UL CLASS="ftoc3"><LI CLASS="li-toc">
+<A HREF="#htoc52">4.6.1&#XA0;&#XA0;The switch instructions</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc53">4.6.2&#XA0;&#XA0;The <TT>invokedynamic</TT> instruction</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc54">4.7&#XA0;&#XA0;Example</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc55">Chapter&#XA0;5&#XA0;&#XA0;Using Barista as an Objective Caml library</A>
+<UL CLASS="ftoc2"><LI CLASS="li-toc">
+<A HREF="#htoc56">5.1&#XA0;&#XA0;Compilation</A>
+<UL CLASS="ftoc3"><LI CLASS="li-toc">
+<A HREF="#htoc57">5.1.1&#XA0;&#XA0;Under <I>classical</I> installation</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc58">5.1.2&#XA0;&#XA0;Under <TT>ocamlfind</TT> installation</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc59">5.2&#XA0;&#XA0;Overview of the library</A>
+<UL CLASS="ftoc3"><LI CLASS="li-toc">
+<A HREF="#htoc60">5.2.1&#XA0;&#XA0;Organization of the source base</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc61">5.2.2&#XA0;&#XA0;Description of the main modules</A>
+</LI></UL>
+</LI><LI CLASS="li-toc"><A HREF="#htoc62">5.3&#XA0;&#XA0;Complete example</A>
+</LI></UL>
+</LI></UL><UL CLASS="ftoc1"><LI CLASS="li-toc">
+Appendixes
+<UL CLASS="ftoc2"><LI CLASS="li-toc">
+<A HREF="#htoc63">Appendix&#XA0;A&#XA0;&#XA0;Instructions and related parameters</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc64">Appendix&#XA0;B&#XA0;&#XA0;Instructions by categories</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc65">Appendix&#XA0;C&#XA0;&#XA0;Instructions by opcode</A>
+</LI></UL>
+</LI></UL><!--TOC chapter Overview-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc1">Chapter&#XA0;1</A>&#XA0;&#XA0;Overview</H1><!--SEC END --><P>
+<A NAME="ch:overview"></A></P><P>This chapter presents some elements about the Barista project: its contents and objectives, its evolution, and also its management.</P><!--TOC section Current state-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc2">1.1</A>&#XA0;&#XA0;Current state</H2><!--SEC END --><P>
+Barista is initially an Objective Caml<SUP><A NAME="text1" HREF="#note1">1</A></SUP> library designed to load, construct, manipulate and save Java<SUP>&#X2122;<A NAME="text2" HREF="#note2">2</A></SUP> class files. The library supports the whole class file format as defined by Oracle<SUP>&#XAE;</SUP>(formerly Sun<SUP>&#XAE;</SUP>). The Barista library was designed to be used in the OCaml-Java project (available at <TT><A HREF="http://ocamljava.x9c.fr">http://ocamljava.x9c.fr</A></TT>) for code generation.<BR>
+
+Upon the library, a command-line utility (also named &#X201C;barista&#X201D;) has been developped: both an assembler and a disassembler for the Java<SUP>&#X2122;</SUP> platform. In its 2.0-alpha version, Barista supports Java<SUP>&#X2122;</SUP> 1.7 and needs Objective Caml 3.12.1 to build. Code sample&#XA0;<A HREF="#hello-world">1.1</A> below shows the canonical basic example coded in the Barista assembler; the assembler will turn it into a class file to be run into ja Java<SUP>&#X2122;</SUP> virtual machine. Chapter&#XA0;<A HREF="#ch:programming-assembler-language">3.3</A> describes the format of such assembler sources.<BR>
+The disassembler does the same work in the opposite direction: it takes the fully qualified name of a Java<SUP>&#X2122;</SUP> bytecode class file present in the classpath, and transforms it into an assembler source. Two other utility allow to inspect the contents of a bytecode file; it is possible to just print the list of methods of a given class, and also to print the control flow of a given method as a graph.<BR>
+
+</P><!--TOC section Some history-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc3">1.2</A>&#XA0;&#XA0;Some history</H2><!--SEC END --><P>
+From version 1.0&#X3B2; to 1.4, Barista also featured a Java<SUP>&#X2122;</SUP> API allowing to use Barista directly from Java<SUP>&#X2122;</SUP>. This API has been removed as of version 2.0. This removal was motivated by the following three reasons, sorted from most to least valuable. First, it introduced a circular dependency between Barista and the rest of the OCaml-Java project, intricating both. Second, it was a burden to manually update the API in order to keep it a Java<I><SUP>&#X2122;</SUP></I> look and feel. Third, it was pretty unused; those who actually want to use Barista from Java<SUP>&#X2122;</SUP> should take a look at the OCaml-Java project, and the ways it provides to interface Objective Caml and Java<SUP>&#X2122;</SUP> codes.<BR>
+
+The 2.0 version of Barista is quite a leap forward: it claims full support for Java<SUP>&#X2122;</SUP> 1.7 (including serialization, various optimization on produced class files, and handling of package files), and has seen a major overhaul of the API to make it as simple, readable, and type-safe as can be. Of course, this induced backward-incompatible changes which motivated the jump in version numbering from 1.4 to 2.0.</P><!--TOC section Glimpse of the assembler syntax-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc4">1.3</A>&#XA0;&#XA0;Glimpse of the assembler syntax</H2><!--SEC END --><P>
+Before dwelling upon technical issues in the next two chapters, here is the classical hello world example as it should be programmed in the Barista assembler (see code sample&#XA0;<A HREF="#hello-world">1.1</A>).</P><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 1.1: <A NAME="hello-world"></A>The classical &#X201C;hello world&#X201D; in Barista assembler.</TD></TR>
+</TABLE></DIV>
+<PRE CLASS="verbatim">
+
+.class public final pack.Test
+.extends java.lang.Object
+
+.method public static void main(java.lang.String[])
+        getstatic java.lang.System.out : java.io.PrintStream
+        ldc "hello world.\n"
+        invokevirtual java.io.PrintStream.println(java.lang.String):void
+</PRE>
+</BLOCKQUOTE><P>As in most so-called assembly languages, the source format is line-oriented (meaning that in most cases an instruction cannot be split over multiple lines), and <I>directives</I> (how to interpret things) are discriminated from <I>instructions</I> (what things should be done) by prefixing the directive with a &#X201C;<TT>.</TT>&#X201D; character (<I>i.e.&#XA0;</I>a dot).<BR>
+
+To be able to use the assembler, and to understand this very manual, good familiarity with Java<SUP>&#X2122;</SUP> in general and with the class file format in particular is assumed. One should refer to the documentation published by Oracle<SUP>&#XAE;</SUP> for more information (a good entry point for the JVM specification being <TT><A HREF="http://java.sun.com/docs/books/jvms/">http://java.sun.com/docs/books/jvms/</A></TT>).</P><!--TOC section Contributions-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc5">1.4</A>&#XA0;&#XA0;Contributions</H2><!--SEC END --><P>
+In order to improve the project, I am primarily looking for testers and bug reporters. Pointing errors in documentation and indicating where it should be enhanced is also very helpful.<BR>
+Bug reports can be made at <TT><A HREF="http://bugs.x9c.fr">http://bugs.x9c.fr</A></TT>.<BR>
+Other requests can be sent to <A HREF="mailto:barista@x9c.fr">barista@x9c.fr</A>.
+
+</P><!--BEGIN NOTES chapter-->
+<HR CLASS="ffootnoterule"><DL CLASS="thefootnotes"><DT CLASS="dt-thefootnotes">
+<A NAME="note1" HREF="#text1">1</A></DT><DD CLASS="dd-thefootnotes">The official Objective Caml website can be reached at <TT><A HREF="http://caml.inria.fr">http://caml.inria.fr</A></TT> and contains the full development suite (compilers, tools, virtual machine, <I>etc.</I>) as well as links to third-party contributions.
+</DD><DT CLASS="dt-thefootnotes"><A NAME="note2" HREF="#text2">2</A></DT><DD CLASS="dd-thefootnotes">The official Java<SUP>&#X2122;</SUP> website can be reached at <TT><A HREF="http://java.sun.com">http://java.sun.com</A></TT> where most of official Java<SUP>&#X2122;</SUP> information can be found.
+</DD></DL>
+<!--END NOTES-->
+<!--TOC chapter Building Barista from sources-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc6">Chapter&#XA0;2</A>&#XA0;&#XA0;Building Barista from sources</H1><!--SEC END --><P>
+<A NAME="ch:building-from-sources"></A></P><P>This chapter first lists the various libraries and tools Barista depends upon. Then, the following sections explains the steps to follow in order to build, and then install Barista (both the program and the library) from sources. </P><!--TOC section Dependencies-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc7">2.1</A>&#XA0;&#XA0;Dependencies</H2><!--SEC END --><P>
+In order to compile the Barista sources, one needs Objective Caml 3.12.1, and GNU make 3.81. Compilation is actually realized by the <TT>ocamlbuild</TT> tool, although launched through the targets of a <TT>Makefile</TT>. Additionally, Barista depends upon the following Objective Caml libraries that should hence be installed before build:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<B>bigarray</B>, <B>str</B>, <B>unix</B> available in the Objective Caml standard distribution;
+</LI><LI CLASS="li-itemize"><B>camlzip</B> (zip/gzip/jar library), at least version 1.04<BR>
+ available at: <TT><A HREF="http://cristal.inria.fr/~xleroy/software.html">http://cristal.inria.fr/~xleroy/software.html</A></TT>;
+</LI><LI CLASS="li-itemize"><B>camomile</B> (Unicode library), at least version 0.8.3<BR>
+ available at: <TT><A HREF="http://camomile.sourceforge.net">http://camomile.sourceforge.net</A></TT>.
+</LI></UL><!--TOC section Configuration-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc8">2.2</A>&#XA0;&#XA0;Configuration</H2><!--SEC END --><P>
+Before the actual compilation could be launched, it is necessary to configure the build process to the actuel machine and system used. To this end, one should execute the <TT>configure</TT> script (<I>e.g.&#XA0;</I>by running <TT>sh configure</TT>). This script recognizes the following command-line options, that can be used to supersede the autodetection the script performs:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>-ocaml-prefix</TT> to indicate where Objective Caml should actually be found (it should hence be the same value as the one passed to Objective Caml&#X2019;s <TT>configure</TT> script through the <TT>-prefix</TT> option);
+</LI><LI CLASS="li-itemize"><TT>-ocamlfind</TT> to indicate the path to the <TT>ocamlfind</TT><SUP><A NAME="text3" HREF="#note3">1</A></SUP> program (setting it to the empty string will disable the use of <TT>ocamlfind</TT>).
+</LI></UL><P>Upon sucessful execution, a <TT>Makefile.config</TT> file is produced which contains the information either inferred by or passed to the script.</P><!--TOC section Compilation-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc9">2.3</A>&#XA0;&#XA0;Compilation</H2><!--SEC END --><P>
+Once configured, Barista can be built by calling the <TT>make</TT> program.<BR>
+The following targets are available:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+ <TT>all</TT> compiles all files
+</LI><LI CLASS="li-itemize"><TT>doc</TT> generates ocamldoc documentations
+</LI><LI CLASS="li-itemize"><TT>tests</TT> runs tests
+</LI><LI CLASS="li-itemize"><TT>clean</TT> deletes all produced files (excluding documentation)
+</LI><LI CLASS="li-itemize"><TT>veryclean</TT> deletes all produced files (including documentation)
+</LI><LI CLASS="li-itemize"><TT>install</TT> copies executable and library files
+</LI><LI CLASS="li-itemize"><TT>generate</TT> generates files needed for build
+
+</LI></UL><!--TOC section Installation-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc10">2.4</A>&#XA0;&#XA0;Installation</H2><!--SEC END --><P>
+Finally, as shown in the previous section, the installation of Barista is done by calling <TT>make install</TT>.
+However, two important things should be noted about installation.<BR>
+
+First, the actual installation path depends on whether <TT>ocamlfind</TT> is enabled: if so, every file will be installed in the <TT>ocamlfind</TT> hierarchy; otherwise, the library will be installed in the &#X2026;<TT>/lib/ocaml/barista</TT> directory, and the program executables will be installed in the same directory as the Objective Caml compilers.<BR>
+
+Second, to install the files to their final destination, the user may need to have to acquire privileged rights; this is usually done through the <TT>sudo</TT> command, leading to a full installation command of <TT>sudo make install</TT>.
+
+</P><!--BEGIN NOTES chapter-->
+<HR CLASS="ffootnoterule"><DL CLASS="thefootnotes"><DT CLASS="dt-thefootnotes">
+<A NAME="note3" HREF="#text3">1</A></DT><DD CLASS="dd-thefootnotes">Findlib, a library manager for Objective Caml, is available at <TT><A HREF="http://projects.camlcity.org/projects/findlib.html">http://projects.camlcity.org/projects/findlib.html</A></TT>
+</DD></DL>
+<!--END NOTES-->
+<!--TOC chapter Using Barista as a command-line program-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc11">Chapter&#XA0;3</A>&#XA0;&#XA0;Using Barista as a command-line program</H1><!--SEC END --><P>
+<A NAME="ch:using-command-line"></A>
+The Barista program exists under two or three forms: <TT>barista.byte</TT>, <TT>barista.native</TT>, and optionally <TT>barista.jar</TT>. The first one is an Objective Caml bytecode file, the second one is a native executable, and the third one is an executable jar file compiled only if the <TT>ocamljava</TT> compiler is present. All three programs should behave the same way, only differing in execution speed.<BR>
+
+For convenience, at installation a symbolic link is created from <TT>barista</TT> to either <TT>barista.native</TT> or <TT>barista.byte</TT> in the installation directory. This allows one to only refer to <TT>barista</TT> in order to launch the faster version of the program.<BR>
+
+Since version 2.0, Barista uses the concept of <I>subcommands</I> (as usually found <I>e.g.&#XA0;</I>in version management systems) to let the user indicate which action to perform. As natural in this kind of settings, the command-line switches recognized depend on the subcommand that is passed immediatly after the name of the executable.
+As an example, this means that invoking Barista to assemble a file is done by the following command line:
+</P><DIV CLASS="center">
+<TT>barista assemble source.j</TT>
+</DIV><P>The following sections presents the various available commands. All commands invoving a classpath set by default this value to the value of the environment variable named <TT>CLASSPATH</TT> if it exists, to &#X201C;<TT>.</TT>&#X201D; (<I>a.k.a.&#XA0;</I>dot) otherwise.</P><!--TOC section The <TT>assemble</TT> subcommand (alias: <TT>asm</TT>)-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc12">3.1</A>&#XA0;&#XA0;The <TT>assemble</TT> subcommand (alias: <TT>asm</TT>)</H2><!--SEC END --><P>
+Assembles (<I>i.e.&#XA0;</I>compiles) the passed assembler files into Java<SUP>&#X2122;</SUP> bytecode class files.<BR>
+
+The <TT>assemble</TT> subcommand recognizes the following parameters:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>-cp</TT> &#X27E8;path&#X27E9; add to classpath
+</LI><LI CLASS="li-itemize"><TT>-classpath</TT> &#X27E8;colon-separated-list&#X27E9; set classpath
+</LI><LI CLASS="li-itemize"><TT>-compute-stacks</TT> computes stack elements (max_locals, max_stacks, and frames)
+</LI><LI CLASS="li-itemize"><TT>-d</TT> &#X27E8;path&#X27E9; output path for generated class files
+</LI><LI CLASS="li-itemize"><TT>-destination</TT> &#X27E8;path&#X27E9; output path for generated class files
+</LI><LI CLASS="li-itemize"><TT>-optimize</TT> optimize bytecode
+</LI><LI CLASS="li-itemize"><TT>-target</TT> target version for generated class files (possible values being: <TT>1.0</TT>, <TT>1.1</TT>, <TT>1.2</TT>, <TT>1.3</TT>, <TT>1.4</TT>, <TT>1.5</TT>, <TT>1.6</TT>, <TT>1.7</TT>, <TT>1.8</TT>)
+</LI></UL><!--TOC section The <TT>disassemble</TT> subcommand (alias: <TT>dasm</TT>)-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc13">3.2</A>&#XA0;&#XA0;The <TT>disassemble</TT> subcommand (alias: <TT>dasm</TT>)</H2><!--SEC END --><P>
+Disassembles (<I>i.e.&#XA0;</I>decompiles) the passed Java<SUP>&#X2122;</SUP> bytecode class files into assembler files.<BR>
+
+The <TT>disassemble</TT> subcommand recognizes the following parameters:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>-cp</TT> &#X27E8;path&#X27E9; add to classpath
+</LI><LI CLASS="li-itemize"><TT>-classpath</TT> &#X27E8;colon-separated-list&#X27E9; set classpath
+</LI></UL><!--TOC section The <TT>flow</TT> subcommand-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc14">3.3</A>&#XA0;&#XA0;The <TT>flow</TT> subcommand</H2><!--SEC END --><P>
+Prints onto the standard output the control flow of the passed methods. The output format is the dot format<SUP><A NAME="text4" HREF="#note4">1</A></SUP>. The passed methods should follow the format for method signatures as presented in chapter <A NAME="ch:programming-assembler-language"></A>. As an example, printing the control flow for the <TT>toString</TT> method is done by the following command line:</P><DIV CLASS="center"> <TT>barista flow &#X2019;java.lang.Object.toString():java.lang.String&#X2019;</TT></DIV><P>It is important to enclose the signature of the method inside quotes, as otherwise the shell whould interpret the parentheses.<BR>
+
+The <TT>flow</TT> subcommand recognizes the following parameters:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>-cp</TT> &#X27E8;path&#X27E9; add to classpath
+</LI><LI CLASS="li-itemize"><TT>-classpath</TT> &#X27E8;colon-separated-list&#X27E9; set classpath
+</LI></UL><!--TOC section The <TT>print</TT> subcommand-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc15">3.4</A>&#XA0;&#XA0;The <TT>print</TT> subcommand</H2><!--SEC END --><P>
+Prints the contents of the passed Java<SUP>&#X2122;</SUP> bytecode class files onto the standard output.<BR>
+
+The <TT>print</TT> subcommand recognizes the following parameters:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>-cp</TT> &#X27E8;path&#X27E9; add to classpath
+</LI><LI CLASS="li-itemize"><TT>-classpath</TT> &#X27E8;colon-separated-list&#X27E9; set classpath
+</LI></UL><!--TOC section The <TT>version</TT> subcommand-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc16">3.5</A>&#XA0;&#XA0;The <TT>version</TT> subcommand</H2><!--SEC END --><P>
+Prints the current Barista version onto the standard output.<BR>
+
+The <TT>version</TT> subcommand recognizes no parameter.
+</P><!--TOC section The <TT>help</TT> subcommand-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc17">3.6</A>&#XA0;&#XA0;The <TT>help</TT> subcommand</H2><!--SEC END --><P>
+The <TT>help</TT> subcommand basically writes on the standard error stream all the information contained in the previous sections of this chapter.
+
+</P><!--BEGIN NOTES chapter-->
+<HR CLASS="ffootnoterule"><DL CLASS="thefootnotes"><DT CLASS="dt-thefootnotes">
+<A NAME="note4" HREF="#text4">1</A></DT><DD CLASS="dd-thefootnotes"><TT><A HREF="http://www.graphviz.org/doc/info/lang.html">http://www.graphviz.org/doc/info/lang.html</A></TT>
+</DD></DL>
+<!--END NOTES-->
+<!--TOC chapter Programming in Barista assembler language-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc18">Chapter&#XA0;4</A>&#XA0;&#XA0;Programming in Barista assembler language</H1><!--SEC END --><P>
+<A NAME="ch:programming-assembler-language"></A></P><P>This chapter describes the format of the source files that the Barista assembler accepts. The very same format is used by the Barista disassembler as its output format. This makes it easy to disassemble a class, modify the disassembled source, and then reassemble it. Each file will be assembled to a single class file.</P><!--TOC section Lexical elements-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc19">4.1</A>&#XA0;&#XA0;Lexical elements</H2><!--SEC END --><P>
+The source files used by the Barista assembler are line-oriented (this means that source elements are analyzed line by line). Over a line, elements are whitespace-separated, meaning that whitespaces are meaningful. The different lexical elements are presented below.</P><!--TOC paragraph Comments-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Comments</H5><!--SEC END --><P> are introduced by the <TT>#</TT> (sharp) character and terminate at the end of the line.</P><!--TOC paragraph Assembler directives-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Assembler directives</H5><!--SEC END --><P> are introduced by the <TT>.</TT> (dot) character followed by a non-empty sequence of lowercase letters or underscores <I>e.g.&#XA0;</I><TT>.class</TT>.</P><!--TOC paragraph Element attributes-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Element attributes</H5><!--SEC END --><P> are introduced by the <TT>@</TT> (at) character followed by a non-empty capitalized sequence of letters <I>e.g.&#XA0;</I><TT>@ConstantValue</TT>.</P><!--TOC paragraph Labels-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Labels</H5><!--SEC END --><P> are non-empty sequences of letters and digits beginning with a letter and ending with a colon <I>e.g.&#XA0;</I><TT>aLabel3:</TT>.</P><!--TOC paragraph Integer constants-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Integer constants</H5><!--SEC END --><P> follow the Objective Caml conventions and thus support decimal notation (<I>e.g.&#XA0;</I><TT>15</TT>), hexadecimal notation (<I>e.g.&#XA0;</I><TT>0x0F</TT>), octal notation (<I>e.g.&#XA0;</I><TT>0o17</TT>) and binary notation (<I>e.g.&#XA0;</I><TT>0b1111</TT>). All notations support embedded underscore characters used for increased readability (such underscore characters are ignored). Integer constants can also be defined using the character notation (<I>e.g.&#XA0;</I><TT>&#X2019;a&#X2019;</TT>); this notation supports escaped sequence for ASCII characters (<I>e.g.&#XA0;</I><TT>&#X2019;\t&#X2019;</TT>, <TT>&#X2019;\n&#X2019;</TT>, or <TT>&#X2019;\\&#X2019;</TT>) as well as for Unicode character in short (<I>e.g.&#XA0;</I><TT>&#X2019;\u1234&#X2019;</TT>) and long formats (<I>e.g.&#XA0;</I><TT>&#X2019;\U12345678&#X2019;</TT>).</P><!--TOC paragraph Floating-point constants-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Floating-point constants</H5><!--SEC END --><P> follow the Objective Caml conventions and thus consist of three part: an integral part, a decimal part and an optional exponent part (<I>e.g.&#XA0;</I><TT>-1.234e+2</TT>). As for integer constants, embedded underscore characters can be used for readability.</P><!--TOC paragraph String constants-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->String constants</H5><!--SEC END --><P> are presented between <TT>"</TT> quotes, and support the escaped sequences presented for integer character constants <I>e.g.&#XA0;</I><TT>"abc\tdef"</TT>.</P><!--TOC paragraph Class names-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Class names</H5><!--SEC END --><P> should be given in <I>external</I> format, that is using dots between packages/classes and dollars between inner classes (<I>e.g.&#XA0;</I><TT>pack.Cls$Inn</TT> for an inner-class <I>Inn</I> of a class named <I>Cls</I> in package <I>pack</I>).</P><!--TOC paragraph Primitive names-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Primitive names</H5><!--SEC END --><P> should appear as they would be in a Java<SUP>&#X2122;</SUP> source file (<I>e.g.&#XA0;</I><TT>boolean</TT>).</P><!--TOC paragraph Array types-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Array types</H5><!--SEC END --><P> are either a class name or a primitive type name followed by a non-empty list of square brackets <TT>[]</TT> pairs (<I>e.g.&#XA0;</I><TT>int[][]</TT> or <TT>java.lang.String[]</TT>).</P><!--TOC paragraph Field references-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Field references</H5><!--SEC END --><P> are defined by a qualified field name followed by a colon and the field type (<I>e.g.&#XA0;</I><TT>java.lang.String.CASE_SENSITIVE_ORDER:java.util.Comparator</TT>).</P><!--TOC paragraph Dynamic method references-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Dynamic method references</H5><!--SEC END --><P> are defined by an unqualified method name followed by the parameters between paretheses, then followed by a colon and the return type<BR>
+<I>e.g.&#XA0;</I><TT>toString():java.lang.String</TT>.</P><!--TOC paragraph Method references-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Method references</H5><!--SEC END --><P><A NAME="method-reference"></A> are defined by a qualified method name followed by the parameter types between parentheses, then followed by a colon and the return type<BR>
+<I>e.g.&#XA0;</I><TT>java.lang.Object.toString():java.lang.String</TT> or <TT>int[].toString():java.lang.String</TT>.</P><!--TOC paragraph Method signatures-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Method signatures</H5><!--SEC END --><P> are defined by an unqualified method name followed by the parameter types between parentheses <I>e.g.&#XA0;</I><TT>toString()</TT>.</P><!--TOC paragraph Method types-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Method types</H5><!--SEC END --><P> are defined by the parameter types between parentheses, then followed by a colon and the return type <I>e.g.&#XA0;</I><TT>(int,int):void</TT>.</P><!--TOC paragraph Method handles-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Method handles</H5><!--SEC END --><P> are defined by a prefix and a suffix separated by a <CODE>%</CODE> character. The prefix defines the kind of entity pointed by the handle, while the suffix defines an actual reference to the entity. The possible prefix/suffix combinations are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>getField</TT> followed by a field reference;
+</LI><LI CLASS="li-itemize"><TT>getStatic</TT> followed by a field reference;
+</LI><LI CLASS="li-itemize"><TT>putField</TT> followed by a field reference;
+</LI><LI CLASS="li-itemize"><TT>putStatic</TT> followed by a field reference;
+</LI><LI CLASS="li-itemize"><TT>invokeVirtual</TT> followed by a method reference;
+</LI><LI CLASS="li-itemize"><TT>invokeStatic</TT> followed by a method reference;
+</LI><LI CLASS="li-itemize"><TT>invokeSpecial</TT> followed by a method reference;
+</LI><LI CLASS="li-itemize"><TT>newInvokeSpecial</TT> followed by a method reference;
+</LI><LI CLASS="li-itemize"><TT>invokeInterface</TT> followed by a method reference.
+</LI></UL><P>
+Examples:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>getStatic%java.lang.String.CASE_SENSITIVE_ORDER:java.util.Comparator</TT>
+</LI><LI CLASS="li-itemize"><TT>invokeVirtual%java.lang.Object.toString():java.lang.String</TT>
+</LI></UL><!--TOC paragraph Identifiers-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Identifiers</H5><!--SEC END --><P> are non-empty sequences of letters and digits beginning with a letter <I>e.g.&#XA0;</I><TT>anIdent2</TT>.</P><!--TOC paragraph Arrows-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Arrows</H5><!--SEC END --><P> are simply the character sequence <TT>=&gt;</TT>, and are used for the encoding of the <TT>lookupswitch</TT>, and <TT>tableswitch</TT> cases.</P><!--TOC paragraph Tildes-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Tildes</H5><!--SEC END --><P> are simply the character <CODE>~</CODE>, and are used as a separator between stack elements and locals in stack frames.</P><!--TOC section Assembler directives-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc20">4.2</A>&#XA0;&#XA0;Assembler directives</H2><!--SEC END --><P>
+The assembler directives define the elements of a Java<SUP>&#X2122;</SUP> class as well as their main properties. They are used by the programmer to tell the assembler which elements are part of a class file. The different assembler directives are presented below.</P><!--TOC subsection The <TT>class</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc21">4.2.1</A>&#XA0;&#XA0;The <TT>class</TT> directive</H3><!--SEC END --><P>
+Written <TT>.class <I>flags name</I></TT> where <I>flags</I> is a list of class flags<SUP><A NAME="text5" HREF="#note5">1</A></SUP> (among <TT>public</TT>, <TT>final</TT>, <TT>super</TT>, <TT>interface</TT>, <TT>abstract</TT>, <TT>synthetic</TT>, <TT>annotation</TT>, <TT>enum</TT>), and <I>name</I> is a fully qualified class name. This directive should be the first one of the source file.</P><!--TOC subsection The <TT>extends</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc22">4.2.2</A>&#XA0;&#XA0;The <TT>extends</TT> directive</H3><!--SEC END --><P>
+Written <TT>.extends <I>name</I></TT> where <I>name</I> is a fully qualified class name. This directive sets the class parent and should be present even if the parent is <TT>java.lang.Object</TT>; this directive may be missing if and only if the class defined by the source file has no parent (it should only be true for the <TT>java.lang.Object</TT> class).</P><!--TOC subsection The <TT>implements</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc23">4.2.3</A>&#XA0;&#XA0;The <TT>implements</TT> directive</H3><!--SEC END --><P>
+Written <TT>.implements <I>name</I></TT> where <I>name</I> is a fully qualified class name (that should be an interface).</P><!--TOC subsection The <TT>field</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc24">4.2.4</A>&#XA0;&#XA0;The <TT>field</TT> directive</H3><!--SEC END --><P>
+Written <TT>.field <I>flags type name</I></TT> where <I>flags</I> is a list of field flags (among <TT>public</TT>, <TT>private</TT>, <TT>protected</TT>, <TT>static</TT>, <TT>final</TT>, <TT>volatile</TT>, <TT>transient</TT>, <TT>synthetic</TT>, <TT>enum</TT>), <I>type</I> is either a primitive, a fully qualified class name or an array type, and <I>name</I> is a field name. This directive adds a field to the class.</P><!--TOC subsection The <TT>method</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc25">4.2.5</A>&#XA0;&#XA0;The <TT>method</TT> directive</H3><!--SEC END --><P>
+Written <TT>.method <I>flags returntype signature</I></TT> where <I>flags</I> is a list of method class flags (among <TT>public</TT>, <TT>private</TT>, <TT>protected</TT>, <TT>static</TT>, <TT>final</TT>, <TT>synchronized</TT>, <TT>bridge</TT>, <TT>varargs</TT>, <TT>native</TT>, <TT>abstract</TT>, <TT>strict</TT>, <TT>synthetic</TT>), <I>returntype</I> is either a primitive, a fully qualified class name, or an array type, and <I>signature</I> is a method signature. This directive adds a method to the class.</P><!--TOC subsection The <TT>max_stack</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc26">4.2.6</A>&#XA0;&#XA0;The <TT>max_stack</TT> directive</H3><!--SEC END --><P>
+Written <TT>.max_stack <I>n</I></TT> where <I>n</I> is an integer in the interval from 0 to 65535 (both inclusive). This directive sets the maximum stack size for the current method.</P><!--TOC subsection The <TT>max_locals</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc27">4.2.7</A>&#XA0;&#XA0;The <TT>max_locals</TT> directive</H3><!--SEC END --><P>
+Written <TT>.max_locals <I>n</I></TT> where <I>n</I> is an integer in the interval from 0 to 65535 (both inclusive). This directive sets the maximum local size for the current method.</P><!--TOC subsection The <TT>catch</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc28">4.2.8</A>&#XA0;&#XA0;The <TT>catch</TT> directive</H3><!--SEC END --><P>
+Written <TT>.catch <I>start end handler</I> [<I>name</I>]</TT> where <I>start</I>, <I>end</I> and <I>handler</I> are labels refering to respectively the begin and the end of the protected code area, and to the associated exception handler. The optional <I>name</I> is a fully qualified class name giving the name of the exception class to be handled by the code located at handler label; if this name is missing, all exceptions will be caught.</P><!--TOC subsection The <TT>frame</TT> directive-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc29">4.2.9</A>&#XA0;&#XA0;The <TT>frame</TT> directive</H3><!--SEC END --><P>
+Written <TT>.frame <I>l def</I></TT> where <I>l</I> is the label where the frame definition <I>def</I> applies. This directive allows to specify elements for the <TT>StackMapFrame</TT> attributes of the class file. The frame definition (noted <I><TT>def</TT></I> above) can take of of the following forms:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>same</TT> to indicate that the frame definition is the same as the previous one;
+</LI><LI CLASS="li-itemize"><TT>same_locals <I>t</I></TT> to indicate that the frame definition is the same as the previous one regarding locals and has one element on the stack whose type is <I>t</I>;
+</LI><LI CLASS="li-itemize"><TT>chop <I>n</I></TT> to indicate that the frame definition is the same as the previous one, chopped by <I>n</I> elements (<I>n</I> should be <TT>1</TT>, <TT>2</TT>, or <TT>3</TT>);
+</LI><LI CLASS="li-itemize"><TT>append <I>t</I><SUB>1</SUB> [<I>t</I><SUB>2</SUB> [<I>t</I><SUB>3</SUB>]]</TT> indicate that the frame definition is the same as the previous one, with one to three elements appended (whose types are given by the <I>t<SUB>i</SUB></I>);
+</LI><LI CLASS="li-itemize"><TT>full <I>t</I><SUB>1</SUB> ... <I>t<SUB>n</SUB></I></TT> <CODE>~</CODE> <TT><I>t</I>&#X2032;<SUB>1</SUB> ... <I>t</I>&#X2032;<SUB><I>m</I></SUB></TT> to define a frame with no reference to the previous one, the <I>t<SUB>i</SUB></I> are the types for locals while the <I>t</I>&#X2032;<I><SUB>j</SUB></I> ones are the types for stack elements (the tilde symbol separating the two lists);
+</LI></UL><P>
+The <I>t</I>, <I>t<SUB>i</SUB></I>, and <I>t</I>&#X2032;<I><SUB>j</SUB></I> are type definitions whose possible values are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>top</TT> for the <I>top</I> type;
+</LI><LI CLASS="li-itemize"><TT>int</TT> for the <TT>int</TT> type;
+</LI><LI CLASS="li-itemize"><TT>float</TT> for the <TT>float</TT> type;
+</LI><LI CLASS="li-itemize"><TT>long</TT> for the <TT>long</TT> type;
+</LI><LI CLASS="li-itemize"><TT>double</TT> for the <TT>double</TT> type;
+</LI><LI CLASS="li-itemize"><TT>null</TT> for the type associated to the <I>null</I> value;
+</LI><LI CLASS="li-itemize"><TT>uninit_this</TT> for the uninitialized <I>this</I> reference;
+</LI><LI CLASS="li-itemize"><TT>uninit <I>l</I></TT> for an uninitialized reference whose related <TT>new</TT> instruction is located at the offset given by label <I>l</I>;
+</LI><LI CLASS="li-itemize">a fully-qualified class name for the type associated to this class.
+</LI></UL><!--TOC section Attributes-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc30">4.3</A>&#XA0;&#XA0;Attributes</H2><!--SEC END --><P>
+The assembler attributes define the properties of a Java<SUP>&#X2122;</SUP> element. An attribute is applied to the latest defined Java<SUP>&#X2122;</SUP> element by a <TT>.class</TT>, <TT>.field</TT> or <TT>.method</TT> directive. (one should notice that some attributes are only used inside a given element kind). The different elements attributes are presented below.</P><!--TOC subsection The <TT>ConstantValue</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc31">4.3.1</A>&#XA0;&#XA0;The <TT>ConstantValue</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@ConstantValue <I>value</I></TT> (for fields only), it defines the initial value of the field. <I>value</I> should be compatible with the field type and can be a float, an integer or a string. A <TT>false</TT> boolean is coded by a <TT>0</TT> integer while every other values code a <TT>true</TT> boolean</P><!--TOC subsection The <TT>Exceptions</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc32">4.3.2</A>&#XA0;&#XA0;The <TT>Exceptions</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@Exceptions <I>non</I></TT>-<I><TT>empty</TT></I>-<I><TT>list</TT></I> (for methods only), it defines the list of exceptions (as fully qualified class names) that the method can throw</P><!--TOC subsection The <TT>InnerClasses</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc33">4.3.3</A>&#XA0;&#XA0;The <TT>InnerClasses</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@InnerClasses <I>ic oc n flags</I></TT> (for classes only), it adds an inner-class information. <I>ic</I> is the fully qualified name of the inner-class (or <TT>0</TT> if this information is missing), <I>oc</I> is the fully qualified name of the outer-class (or <TT>0</TT> if this information is missing), <I>n</I> is the name of the inner-class in the outer-class (or <TT>0</TT> if this information is missing), <I>flags</I> is a list of inner-class flags (among <TT>public</TT>, <TT>private</TT>, <TT>protected</TT>, <TT>static</TT>, <TT>final</TT>, <TT>super</TT>, <TT>interface</TT>, <TT>abstract</TT>, <TT>synthetic</TT>, <TT>annotation</TT>, <TT>enum</TT>)</P><!--TOC subsection The <TT>EnclosingMethod</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc34">4.3.4</A>&#XA0;&#XA0;The <TT>EnclosingMethod</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@EnclosingMethod <I>name meth</I></TT> (for classes only), it adds an enlosing-method information. <I>name</I> is the fully qualified name of the enclosed class, <I>meth</I> is the enclosing method specified as a dynamic method (or <TT>0</TT> if this information is missing)</P><!--TOC subsection The <TT>Synthetic</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc35">4.3.5</A>&#XA0;&#XA0;The <TT>Synthetic</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@Synthetic</TT> (for classes, fields, and methods), it marks the element as synthetic (<I>i.e.&#XA0;</I>compiler-generated)</P><!--TOC subsection The <TT>Signature</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc36">4.3.6</A>&#XA0;&#XA0;The <TT>Signature</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@Signature <I>string</I></TT> (for classes, fields, and methods), it sets the signature of the element</P><!--TOC subsection The <TT>SourceFile</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc37">4.3.7</A>&#XA0;&#XA0;The <TT>SourceFile</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@SourceFile <I>string</I></TT> (for classes only), it sets the source file name</P><!--TOC subsection The <TT>SourceDebugExtension</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc38">4.3.8</A>&#XA0;&#XA0;The <TT>SourceDebugExtension</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@SourceDebugExtension <I>string</I></TT> (for classes only), it sets the source debug extension</P><!--TOC subsection The <TT>Deprecated</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc39">4.3.9</A>&#XA0;&#XA0;The <TT>Deprecated</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@Deprecated</TT> (for classes, fields, and methods), it marks the element as deprecated</P><!--TOC subsection The <TT>RuntimeVisibleAnnotations</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc40">4.3.10</A>&#XA0;&#XA0;The <TT>RuntimeVisibleAnnotations</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@RuntimeVisibleAnnotations <I>elems</I></TT> (for classes, fields, and methods), it adds an annotation to the element (the format of annotations is discussed below)</P><!--TOC subsection The <TT>RuntimeInvisibleAnnotations</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc41">4.3.11</A>&#XA0;&#XA0;The <TT>RuntimeInvisibleAnnotations</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@RuntimeInvisibleAnnotations <I>elems</I></TT> (for classes, fields, and methods), it adds an annotation to the element (the format of annotations is discussed below)</P><!--TOC subsection The <TT>RuntimeVisibleParameterAnnotations</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc42">4.3.12</A>&#XA0;&#XA0;The <TT>RuntimeVisibleParameterAnnotations</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@RuntimeVisibleParameterAnnotations <I>n elems</I></TT> (for methods only), it adds an annotation to the element for the parameter at index <I>n</I> (the format of annotations is discussed below)</P><!--TOC subsection The <TT>RuntimeInvisibleParameterAnnotations</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc43">4.3.13</A>&#XA0;&#XA0;The <TT>RuntimeInvisibleParameterAnnotations</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@RuntimeInvisibleParameterAnnotations <I>n elems</I></TT> (for methods only), it adds an annotation to the element for the parameter at index <I>n</I> (the format of annotations is discussed below)</P><!--TOC subsection The <TT>AnnotationDefault</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc44">4.3.14</A>&#XA0;&#XA0;The <TT>AnnotationDefault</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@AnnotationDefault <I>elems</I></TT> (for methods only), it adds an annotation default to the element (the format of annotation defaults is discussed below)</P><!--TOC subsection The <TT>LineNumberTable</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc45">4.3.15</A>&#XA0;&#XA0;The <TT>LineNumberTable</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@LineNumberTable [<I>n</I>]</TT> (for methods only), it maps the current code offset to a line number. The line number is <I>n</I> if provided, otherwise it is the current line of the Barista source file</P><!--TOC subsection The <TT>LocalVariableTable</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc46">4.3.16</A>&#XA0;&#XA0;The <TT>LocalVariableTable</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@LocalVariableTable <I>start end id t idx</I></TT> (for methods only), it adds a type information for a local variable. <I>id</I> and <I>t</I> are the variable identifier and type, <I>idx</I> is its position in the locals, and <I>start</I> (inclusive) and <I>end</I> (exclusive) are labels defining the portion of code where this variable is defined</P><!--TOC subsection The <TT>LocalVariableTypeTable</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc47">4.3.17</A>&#XA0;&#XA0;The <TT>LocalVariableTypeTable</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@LocalVariableTypeTable <I>start end id s idx</I></TT> (for methods only), it adds a type information for a local variable. <I>id</I> and <I>s</I> are the variable identifier and signature, <I>idx</I> is its position in the locals, and <I>start</I> (inclusive) and <I>end</I> (exclusive) are labels defining the portion of code where this variable is defined</P><!--TOC subsection The <TT>Unknown</TT> attribute-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc48">4.3.18</A>&#XA0;&#XA0;The <TT>Unknown</TT> attribute</H3><!--SEC END --><P>
+Written <TT>@Unknown <I>string</I>1 <I>string</I>2</TT> (for classes, fields, and methods), it adds an unknown (<I>i.e.&#XA0;</I>implementation-dependent) attributes to the element. <I>string</I>1 is the identifier of the attribute while <I>string</I>2 is its value</P><!--TOC section Annotations-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc49">4.4</A>&#XA0;&#XA0;Annotations</H2><!--SEC END --><P>
+Annotations with their key-value attributes and possibly embedded annotations form a tree-like structure. The Barista assembler sources being line-oriented, annotations are organized in a way such that lines with the same prefix gives informations for the same subtree.<BR>
+
+On a line defining an annotation, the first element should be the class of the annotation. This fully qualified class name is followed by the key identifier and its associated value. The value is itself a couple; the first component is the value type while the second component is the actual value. Code sample <A HREF="#annotation-example-1">4.1</A> shows an annotation (whose class is <TT>pack.AnnotationClass</TT>) with two parameters:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+parameter <TT>a</TT> whose type is <I>string</I> and value <TT>"xyz"</TT>;
+</LI><LI CLASS="li-itemize">parameter <TT>b</TT> whose type is <I>float</I> and value <TT>3.14</TT>.
+</LI></UL><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 4.1: <A NAME="annotation-example-1"></A>Annotation example.</TD></TR>
+</TABLE></DIV><PRE CLASS="verbatim">
+@RuntimeVisibleAnnotation pack.AnnotationClass a string "xzy"
+@RuntimeVisibleAnnotation pack.AnnotationClass b float 3.14
+</PRE></BLOCKQUOTE><P>The possible types for an annotation attribute are the Java<SUP>&#X2122;</SUP> primitive types, extended with the following ones:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>string</TT> for string values (using the format of string constants discussed above);
+</LI><LI CLASS="li-itemize"><TT>enum</TT> for enum values (defined by the fully qualified name of the enum class followed by the identifier of the enum value);
+</LI><LI CLASS="li-itemize"><TT>class</TT> for reference to a given class (followed by the fully qualified name of the class);
+</LI><LI CLASS="li-itemize"><TT>annotation</TT> for embedded annotation (followed by an annotation value using the format explained in this very section);
+</LI><LI CLASS="li-itemize">an array is not introduced by any keyword, each value being introduced by its index<SUP><A NAME="text6" HREF="#note6">2</A></SUP> (as an integer). The type of each embedded element should be repeated.
+</LI></UL><!--TOC paragraph -->
+<H5 CLASS="paragraph"><!--SEC ANCHOR --></H5><!--SEC END --><P>
+Code sample <A HREF="#annotation-example-2">4.2</A> shows the previous annotation enriched with three values:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+parameter <TT>c</TT> whose type is <I>array</I> and value is a two-element array containing <TT>5</TT> and <TT>7</TT>;
+</LI><LI CLASS="li-itemize">parameter <TT>d</TT> whose type is <I>annotation</I> and value <TT>java.lang.Deprecated</TT>;
+</LI><LI CLASS="li-itemize">parameter <TT>e</TT> whose type is <I>enum</I> and value <TT>pack.EnumClass.E1</TT>.
+</LI></UL><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 4.2: <A NAME="annotation-example-2"></A>Annotation example.</TD></TR>
+</TABLE></DIV><PRE CLASS="verbatim">
+@RuntimeVisibleAnnotation pack.AnnotationClass a string "xzy"
+@RuntimeVisibleAnnotation pack.AnnotationClass b float 3.14
+@RuntimeVisibleAnnotation pack.AnnotationClass c 0 int 5
+@RuntimeVisibleAnnotation pack.AnnotationClass c 1 int 7
+@RuntimeVisibleAnnotation pack.AnnotationClass d annotation java.lang.Deprecated
+@RuntimeVisibleAnnotation pack.AnnotationClass e enum pack.EnumClass E1
+</PRE></BLOCKQUOTE><!--TOC section Annotation defaults-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc50">4.5</A>&#XA0;&#XA0;Annotation defaults</H2><!--SEC END --><P>
+Annotation defaults closely follow the notation used for annotation, except that leading annotation class name as well as attribute name should be omitted. Code sample <A HREF="#annotation-default">4.3</A> defines an annotation default whose value is the <TT>"xyz"</TT> string.</P><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 4.3: <A NAME="annotation-default"></A>Annotation default example.</TD></TR>
+</TABLE></DIV><PRE CLASS="verbatim">
+@AnnotationDefault string "xyz"
+</PRE></BLOCKQUOTE><!--TOC section Instructions-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc51">4.6</A>&#XA0;&#XA0;Instructions</H2><!--SEC END --><P>
+Instructions may, of course, be used only inside methods. An instruction line may contain either a label, or an instruction (along with its parameters), or both. One should refer to the JVM specification for the list of available instructions; this specification also defines the parameters waited by each instruction. The translation of parameters from the specification to their Barista counterpart is straightforward and only detailed in the appendix (one may also read examples and tests cases for samples). When using the <I>wide</I> version of an instruction, one has to use the <TT>wide</TT> keyword before the instruction.</P><!--TOC subsection The switch instructions-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc52">4.6.1</A>&#XA0;&#XA0;The switch instructions</H3><!--SEC END --><P>
+Almost all instructions are declared on one line but <I>switch</I> instructions are multi-line ones. Code sample <A HREF="#switch-examples">4.4</A> shows the syntax used by the <TT>tableswitch</TT> and <TT>lookupswitch</TT> instructions. A <TT>tableswitch</TT> instruction accepts three parameters: a label, and lower and upper bounds. The label is the destination for the default case; the following lines define the destination for the lower bound, the lower bound plus one, and so on until the upper bound.<BR>
+A <TT>lookupswitch</TT> instruction accepts two parameters: a label and a number of matchings. The label is the destination for the default case; the following lines define the matchings in the <I>value</I> <TT>=&gt;</TT> <I>label</I> form.</P><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 4.4: <A NAME="switch-examples"></A>Switch examples.</TD></TR>
+</TABLE></DIV><PRE CLASS="verbatim">
+tableswitch default: 0 2
+        =&gt; zero:
+        =&gt; one:
+        =&gt; two:
+
+lookupswitch default: 3
+        0 =&gt; zero:
+        1 =&gt; one:
+        2 =&gt; two:
+</PRE></BLOCKQUOTE><!--TOC subsection The <TT>invokedynamic</TT> instruction-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc53">4.6.2</A>&#XA0;&#XA0;The <TT>invokedynamic</TT> instruction</H3><!--SEC END --><P>
+The <TT>invokedynamic</TT> instruction is also different from the other ones. Although it is written on one single line, it is particular because unlike others it accepts a variable number of arguments.
+</P><DIV CLASS="center">
+<TT>invokedynamic <I>bsm bsa</I><SUB>0</SUB> &#X2026; <I>bsa<SUB>n</SUB> mr</I></TT>
+</DIV><P>
+where:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<I>bsm</I> is a method handle to the bootstrap method;
+</LI><LI CLASS="li-itemize"><I>bsa<SUB>i</SUB></I> are arguments to the bootstrap method;
+</LI><LI CLASS="li-itemize"><I>mr</I> is the method reference to be actually invoked.
+</LI></UL><!--TOC section Example-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc54">4.7</A>&#XA0;&#XA0;Example</H2><!--SEC END --><P>
+Code sample <A HREF="#assembler-example">4.5</A> shows an example of a Barista source file coding a Java<SUP>&#X2122;</SUP> class named <TT>pack.Test</TT>. This class contains two fields (the constants named <TT>PREFIX</TT> and <TT>SUFFIX</TT>) as well as two methods (<TT>print</TT> and <TT>main</TT>). The <TT>main</TT> method prints the classical hello world message and then iterates over the elements of the passed string array by applying the <TT>print</TT> method to each element. In turn, the <TT>print</TT> method prints each string with the prefix and suffix specified by the <TT>PREFIX</TT> and <TT>SUFFIX</TT> field values.</P><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 4.5: <A NAME="assembler-example"></A>Example of a Barista-coded class file.</TD></TR>
+</TABLE></DIV><PRE CLASS="verbatim">
+
+.class public final pack.Test
+.extends java.lang.Object
+
+.field private static final java.lang.String PREFIX
+        @ConstantValue "  - &lt;&lt; "
+
+.field private static final java.lang.String SUFFIX
+        @ConstantValue " &gt;&gt;"
+
+.method public static void print(java.lang.String)
+        getstatic java.lang.System.out:java.io.PrintStream
+        dup
+        dup
+        getstatic pack.Test.PREFIX: java.lang.String
+        invokevirtual java.io.PrintStream.print(java.lang.String): void
+        aload_0
+        invokevirtual java.io.PrintStream.print(java.lang.String) :void
+        getstatic pack.Test.SUFFIX :java.lang.String
+        invokevirtual java.io.PrintStream.println(java.lang.String) : void
+        return
+
+.method public static void main(java.lang.String[])
+        nop
+        getstatic java.lang.System.out : java.io.PrintStream
+        ldc "hello\t... \n\t... \"world\""
+        invokevirtual java.io.PrintStream.println(java.lang.String):void
+
+        iconst_0
+        istore_1
+        aload_0
+        arraylength
+        istore_2
+loop:
+        iload_1
+        iload_2
+        if_icmpeq end:
+        aload_0
+        iload_1
+        aaload
+        invokestatic pack.Test.print(java.lang.String):void
+        iinc 1 1
+        goto loop:
+end:
+        return
+</PRE></BLOCKQUOTE><!--BEGIN NOTES chapter-->
+<HR CLASS="ffootnoterule"><DL CLASS="thefootnotes"><DT CLASS="dt-thefootnotes">
+<A NAME="note5" HREF="#text5">1</A></DT><DD CLASS="dd-thefootnotes">One should notice that flags discussed in this document are JVM-level flags, and not Java<SUP>&#X2122;</SUP> language-level flags. Hence the presence of flag that cannot occur in Java<SUP>&#X2122;</SUP> sources.
+</DD><DT CLASS="dt-thefootnotes"><A NAME="note6" HREF="#text6">2</A></DT><DD CLASS="dd-thefootnotes">These indexes do not need to be successive, they are only used to sort the values in order to produce the array.
+</DD></DL>
+<!--END NOTES-->
+<!--TOC chapter Using Barista as an Objective Caml library-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc55">Chapter&#XA0;5</A>&#XA0;&#XA0;Using Barista as an Objective Caml library</H1><!--SEC END --><P>
+<A NAME="ch:using-ocaml-library"></A></P><P>This chapter sheds light on the way the Barista library is organized, and its main modules. First, it explain how to compile a Barista-based application. Then, the library contents is explored. Finally, a complete example demonstrates a practical use of the library.</P><!--TOC section Compilation-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc56">5.1</A>&#XA0;&#XA0;Compilation</H2><!--SEC END --><P>
+In order to use Barista as a library, it is sufficient to link the program with either <TT>baristaLibrary.cma</TT> (bytecode version), <TT>baristaLibrary.cmxa</TT> (native version), or <TT>baristaLibrary.cmja</TT> (Java<SUP>&#X2122;</SUP>-compiled version). These libraries are crafted in such a way that there is only one top-level module called <TT>BaristaLibrary</TT> that contains all the modules described by the <TT>ocamldoc</TT>-generated documentation.<BR>
+
+As there are two ways to install Barista (classical installation, and <TT>ocamlfind</TT>-based installation), there are two ways to compile a program which are explained in the following two section.</P><!--TOC subsection Under <I>classical</I> installation-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc57">5.1.1</A>&#XA0;&#XA0;Under <I>classical</I> installation</H3><!--SEC END --><P>
+In order to compile the source files presented in this chapter, one of the following commands should be used (where &#X201C;<TT>source.ml</TT>&#X201D; is the program to be compiled):
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>ocamlc -I +barista -I +zip bigarray.cma camomile.cma unix.cma zip.cma str.cma baristaLibrary.cma source.ml</TT>
+</LI><LI CLASS="li-itemize"><TT>ocamlopt -I +barista -I +zip bigarray.cmxa camomile.cmxa unix.cmxa zip.cmxa str.cmxa baristaLibrary.cmxa source.ml</TT>
+</LI><LI CLASS="li-itemize"><TT>ocamljava -I +barista -I +zip bigarray.cmja camomile.cmja unix.cmja zip.cmja str.cmja baristaLibrary.cmja source.ml</TT>
+</LI></UL><!--TOC subsection Under <TT>ocamlfind</TT> installation-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc58">5.1.2</A>&#XA0;&#XA0;Under <TT>ocamlfind</TT> installation</H3><!--SEC END --><P>
+In order to compile the source files presented in this chapter, one of the following commands should be used:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>ocamlfind ocamlc -package bigarray,unix,str,camomile,zip,barista source.ml</TT>
+</LI><LI CLASS="li-itemize"><TT>ocamlfind ocamlopt -package bigarray,unix,str,camomile,zip,barista source.ml</TT>
+</LI><LI CLASS="li-itemize"><TT>ocamlfind ocamljava -package bigarray,unix,str,camomile,zip,barista source.ml</TT>
+</LI></UL><!--TOC section Overview of the library-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc59">5.2</A>&#XA0;&#XA0;Overview of the library</H2><!--SEC END --><!--TOC subsection Organization of the source base-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc60">5.2.1</A>&#XA0;&#XA0;Organization of the source base</H3><!--SEC END --><P>
+Although all modules are packed into one, namely <TT>BaristaLibrary</TT>, the source directory is organized in subsdirectories corresponding to the areas covered by the library.<BR>
+These directories are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>common</TT> that contains various utility modules of general use;
+</LI><LI CLASS="li-itemize"><TT>helpers</TT> that contains various utility modules for lexing and class loading;
+</LI><LI CLASS="li-itemize"><TT>classfile</TT> that contains the modules defining class files;
+</LI><LI CLASS="li-itemize"><TT>analysis</TT> that contains some modules for both analysis and optimization of bytecode;
+</LI><LI CLASS="li-itemize"><TT>commands</TT>, and <TT>driver</TT> that contain the definition of command-line subcommands and the definition of main program;
+</LI><LI CLASS="li-itemize"><TT>tools</TT> that contains the actual implementation of command-line subcommands;
+</LI><LI CLASS="li-itemize"><TT>utf8</TT> that contains a Camomile-based UTF8 implementation.
+</LI></UL><!--TOC subsection Description of the main modules-->
+<H3 CLASS="subsection"><!--SEC ANCHOR --><A NAME="htoc61">5.2.2</A>&#XA0;&#XA0;Description of the main modules</H3><!--SEC END --><P>
+The complete documentation for the library can be generated by issuing <TT>make doc</TT> after a successful compilation; the produced documentation is located in the <TT>ocamldoc</TT> subdirectory. The remainder of this section provides a quick overview of the main modules in the different areas.<BR>
+
+The main utility modules in <TT>common</TT> are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>Utils</TT> providing Unicode functions (based on the Camomile library);
+</LI><LI CLASS="li-itemize"><TT>InputStream</TT> providing various implementation of input streams;
+</LI><LI CLASS="li-itemize"><TT>OutputStream</TT> providing various implementation of output streams;
+</LI><LI CLASS="li-itemize"><TT>Consts</TT> providing the Unicode constants for the whole project.
+</LI></UL><P>The main utility modules in <TT>helpers</TT> are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>ClassPath</TT> providing definition for a classpath;
+</LI><LI CLASS="li-itemize"><TT>ClassLoader</TT> providing functions for loading class, package, and module files.
+</LI></UL><P>The main utility modules in <TT>classfile</TT> are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>Name</TT> defines the names for the various kinds of Java<SUP>&#X2122;</SUP> elements;
+</LI><LI CLASS="li-itemize"><TT>Descriptor</TT> defines the descriptors (<I>i.e.&#XA0;</I>type informations) for the various kinds of Java<SUP>&#X2122;</SUP> elements;
+</LI><LI CLASS="li-itemize"><TT>Signature</TT> defines the signature (<I>i.e.&#XA0;</I>type informations for <I>generic</I> types) for the various kinds of Java<SUP>&#X2122;</SUP> elements;
+</LI><LI CLASS="li-itemize"><TT>AccessFlag</TT> defines the access flags for the various kinds of Java<SUP>&#X2122;</SUP> elements;
+</LI><LI CLASS="li-itemize"><TT>ConstantPool</TT> defines the constant pools used for decoding/encoding of class files.
+</LI></UL><P>
+Additionally, other modules provide types representing the class file elements. Each class file element comes in two flavours: a low-level form (as close as possible to the class file format) and a high-level form (as expressive as can be). Table <A HREF="#ocaml-modules">5.1</A> gives the types for these elements.
+</P><BLOCKQUOTE CLASS="table">
+<DIV CLASS="center">
+<TABLE CELLSPACING=6 CELLPADDING=0><TR><TD CLASS="hbar" COLSPAN=3></TD></TR>
+<TR><TD ALIGN=center NOWRAP> <B>Element</B></TD><TD ALIGN=center NOWRAP><B>Low-level form</B></TD><TD ALIGN=center NOWRAP><B>High-level form</B></TD></TR>
+<TR><TD CLASS="hbar" COLSPAN=3></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Annotations</TD><TD ALIGN=center NOWRAP><TT>Annotation.info</TT></TD><TD ALIGN=center NOWRAP><TT>Annotation.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Attributes</TD><TD ALIGN=center NOWRAP><TT>Attribute.into</TT></TD><TD ALIGN=center NOWRAP><TT>Attribute.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Instructions</TD><TD ALIGN=center NOWRAP><TT>ByteCode.t</TT></TD><TD ALIGN=center NOWRAP><TT>Instruction.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Fields</TD><TD ALIGN=center NOWRAP><TT>Field.info</TT></TD><TD ALIGN=center NOWRAP><TT>Field.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Methods</TD><TD ALIGN=center NOWRAP><TT>Method.info</TT></TD><TD ALIGN=center NOWRAP><TT>Method.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Classes</TD><TD ALIGN=center NOWRAP><TT>ClassFile.t</TT></TD><TD ALIGN=center NOWRAP><TT>ClassDefinition.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Packages</TD><TD ALIGN=center NOWRAP><TT>ClassFile.t</TT></TD><TD ALIGN=center NOWRAP><TT>PackageDefinition.t</TT></TD></TR>
+<TR><TD ALIGN=center NOWRAP> Modules</TD><TD ALIGN=center NOWRAP><TT>ClassFile.t</TT></TD><TD ALIGN=center NOWRAP><TT>ModuleDefinition.t</TT></TD></TR>
+<TR><TD CLASS="hbar" COLSPAN=3></TD></TR>
+</TABLE>
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Table 5.1: <A NAME="ocaml-modules"></A>Mapping of Java<SUP>&#X2122;</SUP> elements to Barista types.</TD></TR>
+</TABLE></DIV>
+</DIV>
+</BLOCKQUOTE><P>The main utility modules in <TT>analysis</TT> are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>StackState</TT> providing manipulation of locals and operand stacks;
+</LI><LI CLASS="li-itemize"><TT>ControlFlow</TT> providing construction of the (hyper-)graph representing the control flow of a method;
+</LI><LI CLASS="li-itemize"><TT>Peephole</TT> providing rewriting rules for <I>peephole</I> of instruction list in a control flow graph;
+</LI><LI CLASS="li-itemize"><TT>Code</TT> providing various functions working on a control flow graph (<I>e.g.&#XA0;</I>computation of stack elements, that is <TT>max_locals</TT>, <TT>max_stack</TT>, and stack frames).
+</LI></UL><P>The main utility modules in <TT>tools</TT> are:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT>Assembler</TT> providing the function called by the <TT>assemble</TT> subcommand;
+</LI><LI CLASS="li-itemize"><TT>ClassPrinter</TT> providing the function called by the <TT>print</TT> subcommand;
+</LI><LI CLASS="li-itemize"><TT>Disassembler</TT> providing the function called by the <TT>disassemble</TT> subcommand;
+</LI><LI CLASS="li-itemize"><TT>FlowPrinter</TT> providing the function called by the <TT>flow</TT> subcommand.
+</LI></UL><!--TOC section Complete example-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc62">5.3</A>&#XA0;&#XA0;Complete example</H2><!--SEC END --><P>
+Code sample&#XA0;<A HREF="#embedding-barista">5.1</A> shows an example of an Objective Caml program using Barista to produce a file named <TT>Hello.class</TT> containing the definition of a class named <TT>example.Hello</TT>. This class contains only a <TT>main</TT> method that prints &#X201C;hello.&#X201D; on the standard output.<BR>
+
+Here are the key points of this example, in the order they appear in the source file:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+first, the Barista library and its <TT>Utils</TT> is open (the latter is especially useful to get access to the UTF8-related modules);
+</LI><LI CLASS="li-itemize">then, some abbreviations are given to functions building UTF8 strings and class, field, and method names;
+</LI><LI CLASS="li-itemize">from these shorthands, some constants denoting class field and methods are defined;
+</LI><LI CLASS="li-itemize"><TT>instructions</TT> is bound to what will actually be executed by the <TT>main</TT> method of the class;
+</LI><LI CLASS="li-itemize"><TT>code</TT> encapsulates <TT>instructions</TT>, as well as stack/local limits and possible exception table and attributes;
+</LI><LI CLASS="li-itemize"><TT>main_method</TT> is defined as would be in a Java<SUP>&#X2122;</SUP> source file: flags, name, descriptor (<I>i.e.&#XA0;</I>signature), and attributes (here only its code);
+</LI><LI CLASS="li-itemize">at this point, it is possible to build an actual class definition from flags, name, parent class, parent interfaces, embedded fields, embedded methods, and attributes;
+</LI><LI CLASS="li-itemize">finally, the class definition is converted into a class file that is written to the file <TT>&#X2018;&#X2018;Hello.class&#X2019;&#X2019;</TT>.
+</LI></UL><BLOCKQUOTE CLASS="figure">
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 5.1: <A NAME="embedding-barista"></A>Using Barista to produce a class file from an Objective Caml program.</TD></TR>
+</TABLE></DIV>
+<PRE CLASS="verbatim">
+open BaristaLibrary
+open Utils
+
+let utf8 = UTF8.of_string
+let utf8_for_class x = Name.make_for_class_from_external (utf8 x)
+let utf8_for_field x = Name.make_for_field (utf8 x)
+let utf8_for_method x = Name.make_for_method (utf8 x)
+
+let example_Hello = utf8_for_class "example.Hello"
+let java_lang_Object = utf8_for_class "java.lang.Object"
+let java_lang_System = utf8_for_class "java.lang.System"
+let java_lang_String = utf8_for_class "java.lang.String"
+let java_io_PrintStream = utf8_for_class "java.io.PrintStream"
+let out = utf8_for_field "out"
+let println = utf8_for_method "println"
+let main = utf8_for_method "main"
+
+let () =
+  let instructions = [
+    Instruction.GETSTATIC (java_lang_System, out, `Class java_io_PrintStream);
+    Instruction.LDC (`String (utf8 "hello."));
+    Instruction.INVOKEVIRTUAL (`Class_or_interface java_io_PrintStream,
+                               println,
+                               ([`Class java_lang_String], `Void));
+    Instruction.RETURN;
+  ] in
+  let code = {
+    Attribute.max_stack = u2 2;
+    Attribute.max_locals = u2 1;
+    Attribute.code = instructions;
+    Attribute.exception_table = [];
+    Attribute.attributes = [];
+  } in
+  let main_method =
+    Method.Regular { Method.flags = [`Public; `Static]; 
+                     Method.name = main;
+                     Method.descriptor = [`Array (`Class java_lang_String)], `Void;
+                     Method.attributes = [`Code code] } in
+  let hello = {
+    ClassDefinition.access_flags = [`Public; `Super];
+    ClassDefinition.name = example_Hello;
+    ClassDefinition.extends = Some java_lang_Object;
+    ClassDefinition.implements = [];
+    ClassDefinition.fields = [];
+    ClassDefinition.methods = [main_method];
+    ClassDefinition.attributes = [];
+  } in
+  let cf = ClassDefinition.encode hello in
+  ClassFile.write cf (OutputStream.make_of_channel (open_out "Hello.class"))
+</PRE>
+</BLOCKQUOTE><!--TOC chapter Instructions and related parameters-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc63">Appendix&#XA0;A</A>&#XA0;&#XA0;Instructions and related parameters</H1><!--SEC END --><P>
+This appendix summarizes, in alphabetical order, the instructions
+recognized by the Barista assembler. For a complete description,
+one should refer to the JVM documentation provided by Oracle<SUP>&#XAE;</SUP>.<BR>
+
+For various examples of actual uses, one is advised to check either the
+samples in the <TT>examples</TT> subdirectory, or the sources used as
+unit tests (they can be found in the <TT>tests</TT> subdirectory
+of the Barista source distribution).<BR>
+
+<BR>
+<BR>
+<BR>
+
+<A NAME="aaload"></A>
+
+
+<TT><B>aaload</B></TT> &#X2014; load reference from array<BR>
+
+<I>opcode:</I> <TT>0x32</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="aastore"></A>
+
+
+<TT><B>aastore</B></TT> &#X2014; store into reference array<BR>
+
+<I>opcode:</I> <TT>0x53</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="aconst_null"></A>
+
+
+<TT><B>aconst_null</B></TT> &#X2014; push null<BR>
+
+<I>opcode:</I> <TT>0x01</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="aload"></A>
+
+
+<TT><B>aload</B></TT> &#X2014; load reference from local variable<BR>
+
+<I>opcode:</I> <TT>0x19</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="aload_0"></A>
+
+
+<TT><B>aload_0</B></TT> &#X2014; load reference from local variable<BR>
+
+<I>opcode:</I> <TT>0x2A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="aload_1"></A>
+
+
+<TT><B>aload_1</B></TT> &#X2014; load reference from local variable<BR>
+
+<I>opcode:</I> <TT>0x2B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="aload_2"></A>
+
+
+<TT><B>aload_2</B></TT> &#X2014; load reference from local variable<BR>
+
+<I>opcode:</I> <TT>0x2C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="aload_3"></A>
+
+
+<TT><B>aload_3</B></TT> &#X2014; load reference from local variable<BR>
+
+<I>opcode:</I> <TT>0x2D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="anewarray"></A>
+
+
+<TT><B>anewarray</B></TT> &#X2014; create new array of references<BR>
+
+<I>opcode:</I> <TT>0xBD</TT><BR>
+ <I>parameter #1:</I> element type (class name, or array type)<BR>
+
+
+</P><P><BR>
+
+<A NAME="areturn"></A>
+
+
+<TT><B>areturn</B></TT> &#X2014; return reference from method<BR>
+
+<I>opcode:</I> <TT>0xB0</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="arraylength"></A>
+
+
+<TT><B>arraylength</B></TT> &#X2014; get length of array<BR>
+
+<I>opcode:</I> <TT>0xBE</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="astore"></A>
+
+
+<TT><B>astore</B></TT> &#X2014; store reference into local variable<BR>
+
+<I>opcode:</I> <TT>0x3A</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="astore_0"></A>
+
+
+<TT><B>astore_0</B></TT> &#X2014; store reference into local variable<BR>
+
+<I>opcode:</I> <TT>0x4B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="astore_1"></A>
+
+
+<TT><B>astore_1</B></TT> &#X2014; store reference into local variable<BR>
+
+<I>opcode:</I> <TT>0x4C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="astore_2"></A>
+
+
+<TT><B>astore_2</B></TT> &#X2014; store reference into local variable<BR>
+
+<I>opcode:</I> <TT>0x4D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="astore_3"></A>
+
+
+<TT><B>astore_3</B></TT> &#X2014; store reference into local variable<BR>
+
+<I>opcode:</I> <TT>0x4E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="athrow"></A>
+
+
+<TT><B>athrow</B></TT> &#X2014; throw exception or error<BR>
+
+<I>opcode:</I> <TT>0xBF</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="baload"></A>
+
+
+<TT><B>baload</B></TT> &#X2014; load byte or boolean from array<BR>
+
+<I>opcode:</I> <TT>0x33</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="bastore"></A>
+
+
+<TT><B>bastore</B></TT> &#X2014; store into byte or boolean array<BR>
+
+<I>opcode:</I> <TT>0x54</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="bipush"></A>
+
+
+<TT><B>bipush</B></TT> &#X2014; push byte<BR>
+
+<I>opcode:</I> <TT>0x10</TT><BR>
+ <I>parameter #1:</I> byte value (signed 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="caload"></A>
+
+
+<TT><B>caload</B></TT> &#X2014; load char from array<BR>
+
+<I>opcode:</I> <TT>0x34</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="castore"></A>
+
+
+<TT><B>castore</B></TT> &#X2014; store into char array<BR>
+
+<I>opcode:</I> <TT>0x55</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="checkcast"></A>
+
+
+<TT><B>checkcast</B></TT> &#X2014; check whether object is of given type<BR>
+
+<I>opcode:</I> <TT>0xC0</TT><BR>
+ <I>parameter #1:</I> type to test against (class name, or array type)<BR>
+
+
+</P><P><BR>
+
+<A NAME="d2f"></A>
+
+
+<TT><B>d2f</B></TT> &#X2014; convert double to float<BR>
+
+<I>opcode:</I> <TT>0x90</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="d2i"></A>
+
+
+<TT><B>d2i</B></TT> &#X2014; convert double to int<BR>
+
+<I>opcode:</I> <TT>0x8E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="d2l"></A>
+
+
+<TT><B>d2l</B></TT> &#X2014; convert double to long<BR>
+
+<I>opcode:</I> <TT>0x8F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dadd"></A>
+
+
+<TT><B>dadd</B></TT> &#X2014; add double<BR>
+
+<I>opcode:</I> <TT>0x63</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="daload"></A>
+
+
+<TT><B>daload</B></TT> &#X2014; load double from array<BR>
+
+<I>opcode:</I> <TT>0x31</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dastore"></A>
+
+
+<TT><B>dastore</B></TT> &#X2014; store into double array<BR>
+
+<I>opcode:</I> <TT>0x52</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dcmpg"></A>
+
+
+<TT><B>dcmpg</B></TT> &#X2014; compare double<BR>
+
+<I>opcode:</I> <TT>0x98</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dcmpl"></A>
+
+
+<TT><B>dcmpl</B></TT> &#X2014; compare double<BR>
+
+<I>opcode:</I> <TT>0x97</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dconst_0"></A>
+
+
+<TT><B>dconst_0</B></TT> &#X2014; push double<BR>
+
+<I>opcode:</I> <TT>0x0E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dconst_1"></A>
+
+
+<TT><B>dconst_1</B></TT> &#X2014; push double<BR>
+
+<I>opcode:</I> <TT>0x0F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ddiv"></A>
+
+
+<TT><B>ddiv</B></TT> &#X2014; divide double<BR>
+
+<I>opcode:</I> <TT>0x6F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dload"></A>
+
+
+<TT><B>dload</B></TT> &#X2014; load double from local variable<BR>
+
+<I>opcode:</I> <TT>0x18</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="dload_0"></A>
+
+
+<TT><B>dload_0</B></TT> &#X2014; load double from local variable<BR>
+
+<I>opcode:</I> <TT>0x26</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dload_1"></A>
+
+
+<TT><B>dload_1</B></TT> &#X2014; load double from local variable<BR>
+
+<I>opcode:</I> <TT>0x27</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dload_2"></A>
+
+
+<TT><B>dload_2</B></TT> &#X2014; load double from local variable<BR>
+
+<I>opcode:</I> <TT>0x28</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dload_3"></A>
+
+
+<TT><B>dload_3</B></TT> &#X2014; load double from local variable<BR>
+
+<I>opcode:</I> <TT>0x29</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dmul"></A>
+
+
+<TT><B>dmul</B></TT> &#X2014; multiply double<BR>
+
+<I>opcode:</I> <TT>0x6B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dneg"></A>
+
+
+<TT><B>dneg</B></TT> &#X2014; negate double<BR>
+
+<I>opcode:</I> <TT>0x77</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="drem"></A>
+
+
+<TT><B>drem</B></TT> &#X2014; remainder double<BR>
+
+<I>opcode:</I> <TT>0x73</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dreturn"></A>
+
+
+<TT><B>dreturn</B></TT> &#X2014; return double from method<BR>
+
+<I>opcode:</I> <TT>0xAF</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dstore"></A>
+
+
+<TT><B>dstore</B></TT> &#X2014; store double into local variable<BR>
+
+<I>opcode:</I> <TT>0x39</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="dstore_0"></A>
+
+
+<TT><B>dstore_0</B></TT> &#X2014; store double into local variable<BR>
+
+<I>opcode:</I> <TT>0x47</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dstore_1"></A>
+
+
+<TT><B>dstore_1</B></TT> &#X2014; store double into local variable<BR>
+
+<I>opcode:</I> <TT>0x48</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dstore_2"></A>
+
+
+<TT><B>dstore_2</B></TT> &#X2014; store double into local variable<BR>
+
+<I>opcode:</I> <TT>0x49</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dstore_3"></A>
+
+
+<TT><B>dstore_3</B></TT> &#X2014; store double into local variable<BR>
+
+<I>opcode:</I> <TT>0x4A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dsub"></A>
+
+
+<TT><B>dsub</B></TT> &#X2014; subtract double<BR>
+
+<I>opcode:</I> <TT>0x67</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dup"></A>
+
+
+<TT><B>dup</B></TT> &#X2014; duplicate the top operand stack value<BR>
+
+<I>opcode:</I> <TT>0x59</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dup2"></A>
+
+
+<TT><B>dup2</B></TT> &#X2014; duplicate the top one or two operand stack values<BR>
+
+<I>opcode:</I> <TT>0x5C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dup2_x1"></A>
+
+
+<TT><B>dup2_x1</B></TT> &#X2014; duplicate the top one or two operand stack values and insert two or three values down<BR>
+
+<I>opcode:</I> <TT>0x5D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dup2_x2"></A>
+
+
+<TT><B>dup2_x2</B></TT> &#X2014; duplicate the top one or two operand stack values and insert two, three, or four values down<BR>
+
+<I>opcode:</I> <TT>0x5E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dup_x1"></A>
+
+
+<TT><B>dup_x1</B></TT> &#X2014; duplicate the top operand stack value and insert two values down<BR>
+
+<I>opcode:</I> <TT>0x5A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="dup_x2"></A>
+
+
+<TT><B>dup_x2</B></TT> &#X2014; duplicate the top operand stack value and insert two or threee values down<BR>
+
+<I>opcode:</I> <TT>0x5B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="f2d"></A>
+
+
+<TT><B>f2d</B></TT> &#X2014; convert float to double<BR>
+
+<I>opcode:</I> <TT>0x8D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="f2i"></A>
+
+
+<TT><B>f2i</B></TT> &#X2014; convert float to int<BR>
+
+<I>opcode:</I> <TT>0x8B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="f2l"></A>
+
+
+<TT><B>f2l</B></TT> &#X2014; convert float to long<BR>
+
+<I>opcode:</I> <TT>0x8C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fadd"></A>
+
+
+<TT><B>fadd</B></TT> &#X2014; add float<BR>
+
+<I>opcode:</I> <TT>0x62</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="faload"></A>
+
+
+<TT><B>faload</B></TT> &#X2014; load float from array<BR>
+
+<I>opcode:</I> <TT>0x30</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fastore"></A>
+
+
+<TT><B>fastore</B></TT> &#X2014; store into float array<BR>
+
+<I>opcode:</I> <TT>0x51</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fcmpg"></A>
+
+
+<TT><B>fcmpg</B></TT> &#X2014; compare float<BR>
+
+<I>opcode:</I> <TT>0x96</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fcmpl"></A>
+
+
+<TT><B>fcmpl</B></TT> &#X2014; compare float<BR>
+
+<I>opcode:</I> <TT>0x95</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fconst_0"></A>
+
+
+<TT><B>fconst_0</B></TT> &#X2014; push float<BR>
+
+<I>opcode:</I> <TT>0x0B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fconst_1"></A>
+
+
+<TT><B>fconst_1</B></TT> &#X2014; push float<BR>
+
+<I>opcode:</I> <TT>0x0C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fconst_2"></A>
+
+
+<TT><B>fconst_2</B></TT> &#X2014; push float<BR>
+
+<I>opcode:</I> <TT>0x0D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fdiv"></A>
+
+
+<TT><B>fdiv</B></TT> &#X2014; divide float<BR>
+
+<I>opcode:</I> <TT>0x6E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fload"></A>
+
+
+<TT><B>fload</B></TT> &#X2014; load float from local variable<BR>
+
+<I>opcode:</I> <TT>0x17</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="fload_0"></A>
+
+
+<TT><B>fload_0</B></TT> &#X2014; load float from local variable<BR>
+
+<I>opcode:</I> <TT>0x22</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fload_1"></A>
+
+
+<TT><B>fload_1</B></TT> &#X2014; load float from local variable<BR>
+
+<I>opcode:</I> <TT>0x23</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fload_2"></A>
+
+
+<TT><B>fload_2</B></TT> &#X2014; load float from local variable<BR>
+
+<I>opcode:</I> <TT>0x24</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fload_3"></A>
+
+
+<TT><B>fload_3</B></TT> &#X2014; load float from local variable<BR>
+
+<I>opcode:</I> <TT>0x25</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fmul"></A>
+
+
+<TT><B>fmul</B></TT> &#X2014; multiply float<BR>
+
+<I>opcode:</I> <TT>0x6A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fneg"></A>
+
+
+<TT><B>fneg</B></TT> &#X2014; negate float<BR>
+
+<I>opcode:</I> <TT>0x76</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="frem"></A>
+
+
+<TT><B>frem</B></TT> &#X2014; remainder float<BR>
+
+<I>opcode:</I> <TT>0x72</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="freturn"></A>
+
+
+<TT><B>freturn</B></TT> &#X2014; return float from method<BR>
+
+<I>opcode:</I> <TT>0xAE</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fstore"></A>
+
+
+<TT><B>fstore</B></TT> &#X2014; store float into local variable<BR>
+
+<I>opcode:</I> <TT>0x38</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="fstore_0"></A>
+
+
+<TT><B>fstore_0</B></TT> &#X2014; store float into local variable<BR>
+
+<I>opcode:</I> <TT>0x43</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fstore_1"></A>
+
+
+<TT><B>fstore_1</B></TT> &#X2014; store float into local variable<BR>
+
+<I>opcode:</I> <TT>0x44</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fstore_2"></A>
+
+
+<TT><B>fstore_2</B></TT> &#X2014; store float into local variable<BR>
+
+<I>opcode:</I> <TT>0x45</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fstore_3"></A>
+
+
+<TT><B>fstore_3</B></TT> &#X2014; store float into local variable<BR>
+
+<I>opcode:</I> <TT>0x46</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="fsub"></A>
+
+
+<TT><B>fsub</B></TT> &#X2014; subtract float<BR>
+
+<I>opcode:</I> <TT>0x66</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="getfield"></A>
+
+
+<TT><B>getfield</B></TT> &#X2014; fetch field from object<BR>
+
+<I>opcode:</I> <TT>0xB4</TT><BR>
+ <I>parameter #1:</I> field to get (field reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="getstatic"></A>
+
+
+<TT><B>getstatic</B></TT> &#X2014; get static field from class<BR>
+
+<I>opcode:</I> <TT>0xB2</TT><BR>
+ <I>parameter #1:</I> field to get (field reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="goto"></A>
+
+
+<TT><B>goto</B></TT> &#X2014; branch always<BR>
+
+<I>opcode:</I> <TT>0xA7</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="goto_w"></A>
+
+
+<TT><B>goto_w</B></TT> &#X2014; branch always<BR>
+
+<I>opcode:</I> <TT>0xC8</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="i2b"></A>
+
+
+<TT><B>i2b</B></TT> &#X2014; convert int to byte<BR>
+
+<I>opcode:</I> <TT>0x91</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="i2c"></A>
+
+
+<TT><B>i2c</B></TT> &#X2014; convert int to char<BR>
+
+<I>opcode:</I> <TT>0x92</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="i2d"></A>
+
+
+<TT><B>i2d</B></TT> &#X2014; convert int to double<BR>
+
+<I>opcode:</I> <TT>0x87</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="i2f"></A>
+
+
+<TT><B>i2f</B></TT> &#X2014; convert int to float<BR>
+
+<I>opcode:</I> <TT>0x86</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="i2l"></A>
+
+
+<TT><B>i2l</B></TT> &#X2014; convert int to long<BR>
+
+<I>opcode:</I> <TT>0x85</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="i2s"></A>
+
+
+<TT><B>i2s</B></TT> &#X2014; convert int to short<BR>
+
+<I>opcode:</I> <TT>0x93</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iadd"></A>
+
+
+<TT><B>iadd</B></TT> &#X2014; add int<BR>
+
+<I>opcode:</I> <TT>0x60</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iaload"></A>
+
+
+<TT><B>iaload</B></TT> &#X2014; load int from array<BR>
+
+<I>opcode:</I> <TT>0x2E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iand"></A>
+
+
+<TT><B>iand</B></TT> &#X2014; boolean AND int<BR>
+
+<I>opcode:</I> <TT>0x7E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iastore"></A>
+
+
+<TT><B>iastore</B></TT> &#X2014; store into int array<BR>
+
+<I>opcode:</I> <TT>0x4F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_0"></A>
+
+
+<TT><B>iconst_0</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x03</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_1"></A>
+
+
+<TT><B>iconst_1</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x04</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_2"></A>
+
+
+<TT><B>iconst_2</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x05</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_3"></A>
+
+
+<TT><B>iconst_3</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x06</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_4"></A>
+
+
+<TT><B>iconst_4</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x07</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_5"></A>
+
+
+<TT><B>iconst_5</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x08</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iconst_m1"></A>
+
+
+<TT><B>iconst_m1</B></TT> &#X2014; push int constant<BR>
+
+<I>opcode:</I> <TT>0x02</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="idiv"></A>
+
+
+<TT><B>idiv</B></TT> &#X2014; divide int<BR>
+
+<I>opcode:</I> <TT>0x6C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="if_acmpeq"></A>
+
+
+<TT><B>if_acmpeq</B></TT> &#X2014; branch if reference comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA5</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_acmpne"></A>
+
+
+<TT><B>if_acmpne</B></TT> &#X2014; branch if reference comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA6</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_icmpeq"></A>
+
+
+<TT><B>if_icmpeq</B></TT> &#X2014; branch if int comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0x9F</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_icmpge"></A>
+
+
+<TT><B>if_icmpge</B></TT> &#X2014; branch if int comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA2</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_icmpgt"></A>
+
+
+<TT><B>if_icmpgt</B></TT> &#X2014; branch if int comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA3</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_icmple"></A>
+
+
+<TT><B>if_icmple</B></TT> &#X2014; branch if int comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA4</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_icmplt"></A>
+
+
+<TT><B>if_icmplt</B></TT> &#X2014; branch if int comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA1</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="if_icmpne"></A>
+
+
+<TT><B>if_icmpne</B></TT> &#X2014; branch if int comparison succeeds<BR>
+
+<I>opcode:</I> <TT>0xA0</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifeq"></A>
+
+
+<TT><B>ifeq</B></TT> &#X2014; branch if int comparison with zero succeeds<BR>
+
+<I>opcode:</I> <TT>0x99</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifge"></A>
+
+
+<TT><B>ifge</B></TT> &#X2014; branch if int comparison with zero succeeds<BR>
+
+<I>opcode:</I> <TT>0x9C</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifgt"></A>
+
+
+<TT><B>ifgt</B></TT> &#X2014; branch if int comparison with zero succeeds<BR>
+
+<I>opcode:</I> <TT>0x9D</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifle"></A>
+
+
+<TT><B>ifle</B></TT> &#X2014; branch if int comparison with zero succeeds<BR>
+
+<I>opcode:</I> <TT>0x9E</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="iflt"></A>
+
+
+<TT><B>iflt</B></TT> &#X2014; branch if int comparison with zero succeeds<BR>
+
+<I>opcode:</I> <TT>0x9B</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifne"></A>
+
+
+<TT><B>ifne</B></TT> &#X2014; branch if int comparison with zero succeeds<BR>
+
+<I>opcode:</I> <TT>0x9A</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifnonnull"></A>
+
+
+<TT><B>ifnonnull</B></TT> &#X2014; branch if reference not null<BR>
+
+<I>opcode:</I> <TT>0xC7</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ifnull"></A>
+
+
+<TT><B>ifnull</B></TT> &#X2014; branch if reference not null<BR>
+
+<I>opcode:</I> <TT>0xC6</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="iinc"></A>
+
+
+<TT><B>iinc</B></TT> &#X2014; increment local variable by constant<BR>
+
+<I>opcode:</I> <TT>0x84</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+ <I>parameter #2:</I> increment value (signed 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="iload"></A>
+
+
+<TT><B>iload</B></TT> &#X2014; load int from local variable<BR>
+
+<I>opcode:</I> <TT>0x15</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="iload_0"></A>
+
+
+<TT><B>iload_0</B></TT> &#X2014; load int from local variable<BR>
+
+<I>opcode:</I> <TT>0x1A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iload_1"></A>
+
+
+<TT><B>iload_1</B></TT> &#X2014; load int from local variable<BR>
+
+<I>opcode:</I> <TT>0x1B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iload_2"></A>
+
+
+<TT><B>iload_2</B></TT> &#X2014; load int from local variable<BR>
+
+<I>opcode:</I> <TT>0x1C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iload_3"></A>
+
+
+<TT><B>iload_3</B></TT> &#X2014; load int from local variable<BR>
+
+<I>opcode:</I> <TT>0x1D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="imul"></A>
+
+
+<TT><B>imul</B></TT> &#X2014; multiply int<BR>
+
+<I>opcode:</I> <TT>0x68</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ineg"></A>
+
+
+<TT><B>ineg</B></TT> &#X2014; negate int<BR>
+
+<I>opcode:</I> <TT>0x74</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="instanceof"></A>
+
+
+<TT><B>instanceof</B></TT> &#X2014; determine if object is of given type<BR>
+
+<I>opcode:</I> <TT>0xC1</TT><BR>
+ <I>parameter #1:</I> type to test against (class name, or array type)<BR>
+
+
+</P><P><BR>
+
+<A NAME="invokedynamic"></A>
+
+
+<TT><B>invokedynamic</B></TT> &#X2014; invoke instance method; resolve and dispatch based on class<BR>
+
+<I>opcode:</I> <TT>0xBA</TT><BR>
+ <I>parameter #1:</I> method to invoke (dynamic method reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="invokeinterface"></A>
+
+
+<TT><B>invokeinterface</B></TT> &#X2014; invoke interface method<BR>
+
+<I>opcode:</I> <TT>0xB9</TT><BR>
+ <I>parameter #1:</I> method to invoke (method reference)<BR>
+ <I>parameter #2:</I> parameter count (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="invokespecial"></A>
+
+
+<TT><B>invokespecial</B></TT> &#X2014; invoke instance method; special handling for superclass, private, and instance initialization method invocations<BR>
+
+<I>opcode:</I> <TT>0xB7</TT><BR>
+ <I>parameter #1:</I> method to invoke (method reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="invokestatic"></A>
+
+
+<TT><B>invokestatic</B></TT> &#X2014; invoke a class (static) method<BR>
+
+<I>opcode:</I> <TT>0xB8</TT><BR>
+ <I>parameter #1:</I> method to invoke (method reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="invokevirtual"></A>
+
+
+<TT><B>invokevirtual</B></TT> &#X2014; invoke instance method; dispatch based on class<BR>
+
+<I>opcode:</I> <TT>0xB6</TT><BR>
+ <I>parameter #1:</I> method to invoke (method reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ior"></A>
+
+
+<TT><B>ior</B></TT> &#X2014; boolean OR int<BR>
+
+<I>opcode:</I> <TT>0x80</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="irem"></A>
+
+
+<TT><B>irem</B></TT> &#X2014; remainder int<BR>
+
+<I>opcode:</I> <TT>0x70</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ireturn"></A>
+
+
+<TT><B>ireturn</B></TT> &#X2014; return int from method<BR>
+
+<I>opcode:</I> <TT>0xAC</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ishl"></A>
+
+
+<TT><B>ishl</B></TT> &#X2014; shift left int<BR>
+
+<I>opcode:</I> <TT>0x78</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ishr"></A>
+
+
+<TT><B>ishr</B></TT> &#X2014; arithmetic shift right int<BR>
+
+<I>opcode:</I> <TT>0x7A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="istore"></A>
+
+
+<TT><B>istore</B></TT> &#X2014; store int into local variable<BR>
+
+<I>opcode:</I> <TT>0x36</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="istore_0"></A>
+
+
+<TT><B>istore_0</B></TT> &#X2014; store int into local variable<BR>
+
+<I>opcode:</I> <TT>0x3B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="istore_1"></A>
+
+
+<TT><B>istore_1</B></TT> &#X2014; store int into local variable<BR>
+
+<I>opcode:</I> <TT>0x3C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="istore_2"></A>
+
+
+<TT><B>istore_2</B></TT> &#X2014; store int into local variable<BR>
+
+<I>opcode:</I> <TT>0x3D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="istore_3"></A>
+
+
+<TT><B>istore_3</B></TT> &#X2014; store int into local variable<BR>
+
+<I>opcode:</I> <TT>0x3E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="isub"></A>
+
+
+<TT><B>isub</B></TT> &#X2014; subtract int<BR>
+
+<I>opcode:</I> <TT>0x64</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="iushr"></A>
+
+
+<TT><B>iushr</B></TT> &#X2014; logical shift right int<BR>
+
+<I>opcode:</I> <TT>0x7C</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ixor"></A>
+
+
+<TT><B>ixor</B></TT> &#X2014; boolean XOR int<BR>
+
+<I>opcode:</I> <TT>0x82</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="jsr"></A>
+
+
+<TT><B>jsr</B></TT> &#X2014; jump subroutine<BR>
+
+<I>opcode:</I> <TT>0xA8</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="jsr_w"></A>
+
+
+<TT><B>jsr_w</B></TT> &#X2014; jump subroutine (wide index)<BR>
+
+<I>opcode:</I> <TT>0xC9</TT><BR>
+ <I>parameter #1:</I> destination offset (label)<BR>
+
+
+</P><P><BR>
+
+<A NAME="l2d"></A>
+
+
+<TT><B>l2d</B></TT> &#X2014; convert long to double<BR>
+
+<I>opcode:</I> <TT>0x8A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="l2f"></A>
+
+
+<TT><B>l2f</B></TT> &#X2014; convert long to float<BR>
+
+<I>opcode:</I> <TT>0x89</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="l2i"></A>
+
+
+<TT><B>l2i</B></TT> &#X2014; convert long to int<BR>
+
+<I>opcode:</I> <TT>0x88</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ladd"></A>
+
+
+<TT><B>ladd</B></TT> &#X2014; add long<BR>
+
+<I>opcode:</I> <TT>0x61</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="laload"></A>
+
+
+<TT><B>laload</B></TT> &#X2014; load long from array<BR>
+
+<I>opcode:</I> <TT>0x2F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="land"></A>
+
+
+<TT><B>land</B></TT> &#X2014; boolean AND long<BR>
+
+<I>opcode:</I> <TT>0x7F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lastore"></A>
+
+
+<TT><B>lastore</B></TT> &#X2014; store into long array<BR>
+
+<I>opcode:</I> <TT>0x50</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lcmp"></A>
+
+
+<TT><B>lcmp</B></TT> &#X2014; compare long<BR>
+
+<I>opcode:</I> <TT>0x94</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lconst_0"></A>
+
+
+<TT><B>lconst_0</B></TT> &#X2014; push long constant<BR>
+
+<I>opcode:</I> <TT>0x09</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lconst_1"></A>
+
+
+<TT><B>lconst_1</B></TT> &#X2014; push long constant<BR>
+
+<I>opcode:</I> <TT>0x0A</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="ldc"></A>
+
+
+<TT><B>ldc</B></TT> &#X2014; push item from runtime constant pool<BR>
+
+<I>opcode:</I> <TT>0x12</TT><BR>
+ <I>parameter #1:</I> value to be pushed (signed 32-bit integer, or float, or string literal, or class name, or array type, or method type constant, or method handle constant)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ldc2_w"></A>
+
+
+<TT><B>ldc2_w</B></TT> &#X2014; push long or double from runtime constant pool (wide index)<BR>
+
+<I>opcode:</I> <TT>0x14</TT><BR>
+ <I>parameter #1:</I> value to be pushed (signed 64-bit integer, or float)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ldc_w"></A>
+
+
+<TT><B>ldc_w</B></TT> &#X2014; push item from runtime constant pool (wide index)<BR>
+
+<I>opcode:</I> <TT>0x13</TT><BR>
+ <I>parameter #1:</I> value to be pushed (signed 32-bit integer, or float, or string literal, or class name, or array type, or method type constant, or method handle constant)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ldiv"></A>
+
+
+<TT><B>ldiv</B></TT> &#X2014; divide long<BR>
+
+<I>opcode:</I> <TT>0x6D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lload"></A>
+
+
+<TT><B>lload</B></TT> &#X2014; load long from local variable<BR>
+
+<I>opcode:</I> <TT>0x16</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="lload_0"></A>
+
+
+<TT><B>lload_0</B></TT> &#X2014; load long from local variable<BR>
+
+<I>opcode:</I> <TT>0x1E</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lload_1"></A>
+
+
+<TT><B>lload_1</B></TT> &#X2014; load long from local variable<BR>
+
+<I>opcode:</I> <TT>0x1F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lload_2"></A>
+
+
+<TT><B>lload_2</B></TT> &#X2014; load long from local variable<BR>
+
+<I>opcode:</I> <TT>0x20</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lload_3"></A>
+
+
+<TT><B>lload_3</B></TT> &#X2014; load long from local variable<BR>
+
+<I>opcode:</I> <TT>0x21</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lmul"></A>
+
+
+<TT><B>lmul</B></TT> &#X2014; multiply long<BR>
+
+<I>opcode:</I> <TT>0x69</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lneg"></A>
+
+
+<TT><B>lneg</B></TT> &#X2014; negate long<BR>
+
+<I>opcode:</I> <TT>0x75</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lookupswitch"></A>
+
+
+<TT><B>lookupswitch</B></TT> &#X2014; access jump table by key match and jump<BR>
+
+<I>opcode:</I> <TT>0xAB</TT><BR>
+ <I>parameter #1:</I> default destination offset (label)<BR>
+ <I>parameter #2:</I> number of key, offset pairs (signed 32-bit integer)<BR>
+ <I>parameter #3:</I> key, offset pairs (list of (match, label) pairs)<BR>
+
+
+</P><P><BR>
+
+<A NAME="lor"></A>
+
+
+<TT><B>lor</B></TT> &#X2014; boolean OR long<BR>
+
+<I>opcode:</I> <TT>0x81</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lrem"></A>
+
+
+<TT><B>lrem</B></TT> &#X2014; remainder long<BR>
+
+<I>opcode:</I> <TT>0x71</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lreturn"></A>
+
+
+<TT><B>lreturn</B></TT> &#X2014; return long from method<BR>
+
+<I>opcode:</I> <TT>0xAD</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lshl"></A>
+
+
+<TT><B>lshl</B></TT> &#X2014; shift left long<BR>
+
+<I>opcode:</I> <TT>0x79</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lshr"></A>
+
+
+<TT><B>lshr</B></TT> &#X2014; arithmetic shift right long<BR>
+
+<I>opcode:</I> <TT>0x7B</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lstore"></A>
+
+
+<TT><B>lstore</B></TT> &#X2014; store long into local variable<BR>
+
+<I>opcode:</I> <TT>0x37</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="lstore_0"></A>
+
+
+<TT><B>lstore_0</B></TT> &#X2014; store long into local variable<BR>
+
+<I>opcode:</I> <TT>0x3F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lstore_1"></A>
+
+
+<TT><B>lstore_1</B></TT> &#X2014; store long into local variable<BR>
+
+<I>opcode:</I> <TT>0x40</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lstore_2"></A>
+
+
+<TT><B>lstore_2</B></TT> &#X2014; store long into local variable<BR>
+
+<I>opcode:</I> <TT>0x41</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lstore_3"></A>
+
+
+<TT><B>lstore_3</B></TT> &#X2014; store long into local variable<BR>
+
+<I>opcode:</I> <TT>0x42</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lsub"></A>
+
+
+<TT><B>lsub</B></TT> &#X2014; subtract long<BR>
+
+<I>opcode:</I> <TT>0x65</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lushr"></A>
+
+
+<TT><B>lushr</B></TT> &#X2014; logical shift right long<BR>
+
+<I>opcode:</I> <TT>0x7D</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="lxor"></A>
+
+
+<TT><B>lxor</B></TT> &#X2014; boolean XOR long<BR>
+
+<I>opcode:</I> <TT>0x83</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="monitorenter"></A>
+
+
+<TT><B>monitorenter</B></TT> &#X2014; enter monitor for object<BR>
+
+<I>opcode:</I> <TT>0xC2</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="monitorexit"></A>
+
+
+<TT><B>monitorexit</B></TT> &#X2014; exit monitor for object<BR>
+
+<I>opcode:</I> <TT>0xC3</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="multianewarray"></A>
+
+
+<TT><B>multianewarray</B></TT> &#X2014; create new multidimensional array<BR>
+
+<I>opcode:</I> <TT>0xC5</TT><BR>
+ <I>parameter #1:</I> element type (class name, or array type)<BR>
+ <I>parameter #2:</I> number of dimensions (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="new"></A>
+
+
+<TT><B>new</B></TT> &#X2014; create new object<BR>
+
+<I>opcode:</I> <TT>0xBB</TT><BR>
+ <I>parameter #1:</I> type to create (class name)<BR>
+
+
+</P><P><BR>
+
+<A NAME="newarray"></A>
+
+
+<TT><B>newarray</B></TT> &#X2014; create new arrayhandler<BR>
+
+<I>opcode:</I> <TT>0xBC</TT><BR>
+ <I>parameter #1:</I> element type (primitive array type)<BR>
+
+
+</P><P><BR>
+
+<A NAME="nop"></A>
+
+
+<TT><B>nop</B></TT> &#X2014; do nothing<BR>
+
+<I>opcode:</I> <TT>0x00</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="pop"></A>
+
+
+<TT><B>pop</B></TT> &#X2014; pop the top operand stack value<BR>
+
+<I>opcode:</I> <TT>0x57</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="pop2"></A>
+
+
+<TT><B>pop2</B></TT> &#X2014; pop the top one or two operand stack values<BR>
+
+<I>opcode:</I> <TT>0x58</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="putfield"></A>
+
+
+<TT><B>putfield</B></TT> &#X2014; set field in object<BR>
+
+<I>opcode:</I> <TT>0xB5</TT><BR>
+ <I>parameter #1:</I> field to set (field reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="putstatic"></A>
+
+
+<TT><B>putstatic</B></TT> &#X2014; set static field in class<BR>
+
+<I>opcode:</I> <TT>0xB3</TT><BR>
+ <I>parameter #1:</I> field to set (field reference)<BR>
+
+
+</P><P><BR>
+
+<A NAME="ret"></A>
+
+
+<TT><B>ret</B></TT> &#X2014; return from subroutine<BR>
+
+<I>opcode:</I> <TT>0xA9</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 8-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="return"></A>
+
+
+<TT><B>return</B></TT> &#X2014; return void from method<BR>
+
+<I>opcode:</I> <TT>0xB1</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="saload"></A>
+
+
+<TT><B>saload</B></TT> &#X2014; load short from array<BR>
+
+<I>opcode:</I> <TT>0x35</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="sastore"></A>
+
+
+<TT><B>sastore</B></TT> &#X2014; store into short array<BR>
+
+<I>opcode:</I> <TT>0x56</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="sipush"></A>
+
+
+<TT><B>sipush</B></TT> &#X2014; push short<BR>
+
+<I>opcode:</I> <TT>0x11</TT><BR>
+ <I>parameter #1:</I> short value (signed 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="swap"></A>
+
+
+<TT><B>swap</B></TT> &#X2014; swap the top two operand stack values<BR>
+
+<I>opcode:</I> <TT>0x5F</TT><BR>
+ <I>no parameter</I><BR>
+
+
+</P><P><BR>
+
+<A NAME="tableswitch"></A>
+
+
+<TT><B>tableswitch</B></TT> &#X2014; access jump table by index and jump<BR>
+
+<I>opcode:</I> <TT>0xAA</TT><BR>
+ <I>parameter #1:</I> default destination offset (label)<BR>
+ <I>parameter #2:</I> lower bound (signed 32-bit integer)<BR>
+ <I>parameter #3:</I> higher bound (signed 32-bit integer)<BR>
+ <I>parameter #4:</I> destination offsets (list of labels)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_aload"></A>
+
+
+<TT><B>wide aload</B></TT> &#X2014; load reference from local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x19</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_astore"></A>
+
+
+<TT><B>wide astore</B></TT> &#X2014; store reference into local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x3A</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_dload"></A>
+
+
+<TT><B>wide dload</B></TT> &#X2014; load double from local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x18</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_dstore"></A>
+
+
+<TT><B>wide dstore</B></TT> &#X2014; store double into local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x39</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_fload"></A>
+
+
+<TT><B>wide fload</B></TT> &#X2014; load float from local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x17</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_fstore"></A>
+
+
+<TT><B>wide fstore</B></TT> &#X2014; store float into local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x38</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_iinc"></A>
+
+
+<TT><B>wide iinc</B></TT> &#X2014; increment local variable by constant<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x84</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+ <I>parameter #2:</I> increment value (signed 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_iload"></A>
+
+
+<TT><B>wide iload</B></TT> &#X2014; load int from local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x15</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_istore"></A>
+
+
+<TT><B>wide istore</B></TT> &#X2014; store int into local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x36</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_lload"></A>
+
+
+<TT><B>wide lload</B></TT> &#X2014; load long from local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x16</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_lstore"></A>
+
+
+<TT><B>wide lstore</B></TT> &#X2014; store long into local variable<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0x37</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+<A NAME="wide_ret"></A>
+
+
+<TT><B>wide ret</B></TT> &#X2014; return from subroutine<BR>
+
+<I>opcode:</I> <TT>0xC4</TT> followed by <TT>0xA9</TT><BR>
+ <I>parameter #1:</I> local index (unsigned 16-bit integer)<BR>
+
+
+</P><P><BR>
+
+
+</P><!--TOC chapter Instructions by categories-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc64">Appendix&#XA0;B</A>&#XA0;&#XA0;Instructions by categories</H1><!--SEC END --><P>
+This appendix lists the instructions grouped by categories, allowing
+easy search for a given operation. Categories overlaps, as a given instruction
+belongs to several categories; example: <B><TT>fconst_0</TT></B> is both related to
+constants and to floats.<BR>
+
+Hyperlinks allow navigation to the previous appendix.
+
+</P><!--TOC section Array creations and accesses-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Array creations and accesses</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#aaload">aaload&#XA0;:</A></B></TT> load reference from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aastore">aastore&#XA0;:</A></B></TT> store into reference array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#anewarray">anewarray&#XA0;:</A></B></TT> create new array of references
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#arraylength">arraylength&#XA0;:</A></B></TT> get length of array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#baload">baload&#XA0;:</A></B></TT> load byte or boolean from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#bastore">bastore&#XA0;:</A></B></TT> store into byte or boolean array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#caload">caload&#XA0;:</A></B></TT> load char from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#castore">castore&#XA0;:</A></B></TT> store into char array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#daload">daload&#XA0;:</A></B></TT> load double from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dastore">dastore&#XA0;:</A></B></TT> store into double array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#faload">faload&#XA0;:</A></B></TT> load float from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fastore">fastore&#XA0;:</A></B></TT> store into float array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iaload">iaload&#XA0;:</A></B></TT> load int from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iastore">iastore&#XA0;:</A></B></TT> store into int array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#laload">laload&#XA0;:</A></B></TT> load long from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lastore">lastore&#XA0;:</A></B></TT> store into long array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#multianewarray">multianewarray&#XA0;:</A></B></TT> create new multidimensional array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#newarray">newarray&#XA0;:</A></B></TT> create new arrayhandler
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#saload">saload&#XA0;:</A></B></TT> load short from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#sastore">sastore&#XA0;:</A></B></TT> store into short array
+</LI></UL><!--TOC section Arithmetic operations-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Arithmetic operations</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#dadd">dadd&#XA0;:</A></B></TT> add double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ddiv">ddiv&#XA0;:</A></B></TT> divide double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dmul">dmul&#XA0;:</A></B></TT> multiply double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dneg">dneg&#XA0;:</A></B></TT> negate double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#drem">drem&#XA0;:</A></B></TT> remainder double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dsub">dsub&#XA0;:</A></B></TT> subtract double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fadd">fadd&#XA0;:</A></B></TT> add float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fdiv">fdiv&#XA0;:</A></B></TT> divide float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fmul">fmul&#XA0;:</A></B></TT> multiply float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fneg">fneg&#XA0;:</A></B></TT> negate float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#frem">frem&#XA0;:</A></B></TT> remainder float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fsub">fsub&#XA0;:</A></B></TT> subtract float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iadd">iadd&#XA0;:</A></B></TT> add int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#idiv">idiv&#XA0;:</A></B></TT> divide int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iinc">iinc&#XA0;:</A></B></TT> increment local variable by constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#imul">imul&#XA0;:</A></B></TT> multiply int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ineg">ineg&#XA0;:</A></B></TT> negate int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#irem">irem&#XA0;:</A></B></TT> remainder int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#isub">isub&#XA0;:</A></B></TT> subtract int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ladd">ladd&#XA0;:</A></B></TT> add long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ldiv">ldiv&#XA0;:</A></B></TT> divide long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lmul">lmul&#XA0;:</A></B></TT> multiply long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lneg">lneg&#XA0;:</A></B></TT> negate long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lrem">lrem&#XA0;:</A></B></TT> remainder long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lsub">lsub&#XA0;:</A></B></TT> subtract long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_iinc">wide iinc&#XA0;:</A></B></TT> increment local variable by constant
+</LI></UL><!--TOC section Comparison operations-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Comparison operations</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#dcmpg">dcmpg&#XA0;:</A></B></TT> compare double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dcmpl">dcmpl&#XA0;:</A></B></TT> compare double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fcmpg">fcmpg&#XA0;:</A></B></TT> compare float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fcmpl">fcmpl&#XA0;:</A></B></TT> compare float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_acmpeq">if_acmpeq&#XA0;:</A></B></TT> branch if reference comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_acmpne">if_acmpne&#XA0;:</A></B></TT> branch if reference comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpeq">if_icmpeq&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpge">if_icmpge&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpgt">if_icmpgt&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmple">if_icmple&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmplt">if_icmplt&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpne">if_icmpne&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifeq">ifeq&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifge">ifge&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifgt">ifgt&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifle">ifle&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iflt">iflt&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifne">ifne&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifnonnull">ifnonnull&#XA0;:</A></B></TT> branch if reference not null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifnull">ifnull&#XA0;:</A></B></TT> branch if reference not null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lcmp">lcmp&#XA0;:</A></B></TT> compare long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lookupswitch">lookupswitch&#XA0;:</A></B></TT> access jump table by key match and jump
+</LI></UL><!--TOC section Control flow instructions-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Control flow instructions</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#goto">goto&#XA0;:</A></B></TT> branch always
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#goto_w">goto_w&#XA0;:</A></B></TT> branch always
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_acmpeq">if_acmpeq&#XA0;:</A></B></TT> branch if reference comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_acmpne">if_acmpne&#XA0;:</A></B></TT> branch if reference comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpeq">if_icmpeq&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpge">if_icmpge&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpgt">if_icmpgt&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmple">if_icmple&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmplt">if_icmplt&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpne">if_icmpne&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifeq">ifeq&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifge">ifge&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifgt">ifgt&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifle">ifle&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iflt">iflt&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifne">ifne&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifnonnull">ifnonnull&#XA0;:</A></B></TT> branch if reference not null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifnull">ifnull&#XA0;:</A></B></TT> branch if reference not null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#jsr">jsr&#XA0;:</A></B></TT> jump subroutine
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#jsr_w">jsr_w&#XA0;:</A></B></TT> jump subroutine (wide index)
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lookupswitch">lookupswitch&#XA0;:</A></B></TT> access jump table by key match and jump
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ret">ret&#XA0;:</A></B></TT> return from subroutine
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#tableswitch">tableswitch&#XA0;:</A></B></TT> access jump table by index and jump
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_ret">wide ret&#XA0;:</A></B></TT> return from subroutine
+</LI></UL><!--TOC section Conversions-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Conversions</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#checkcast">checkcast&#XA0;:</A></B></TT> check whether object is of given type
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#d2f">d2f&#XA0;:</A></B></TT> convert double to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#d2i">d2i&#XA0;:</A></B></TT> convert double to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#d2l">d2l&#XA0;:</A></B></TT> convert double to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2d">f2d&#XA0;:</A></B></TT> convert float to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2i">f2i&#XA0;:</A></B></TT> convert float to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2l">f2l&#XA0;:</A></B></TT> convert float to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2b">i2b&#XA0;:</A></B></TT> convert int to byte
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2c">i2c&#XA0;:</A></B></TT> convert int to char
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2d">i2d&#XA0;:</A></B></TT> convert int to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2f">i2f&#XA0;:</A></B></TT> convert int to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2l">i2l&#XA0;:</A></B></TT> convert int to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2s">i2s&#XA0;:</A></B></TT> convert int to short
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2d">l2d&#XA0;:</A></B></TT> convert long to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2f">l2f&#XA0;:</A></B></TT> convert long to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2i">l2i&#XA0;:</A></B></TT> convert long to int
+</LI></UL><!--TOC section Exception-related instructions-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Exception-related instructions</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#athrow">athrow&#XA0;:</A></B></TT> throw exception or error
+</LI></UL><!--TOC section Field-related instructions-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Field-related instructions</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#getfield">getfield&#XA0;:</A></B></TT> fetch field from object
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#getstatic">getstatic&#XA0;:</A></B></TT> get static field from class
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#putfield">putfield&#XA0;:</A></B></TT> set field in object
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#putstatic">putstatic&#XA0;:</A></B></TT> set static field in class
+</LI></UL><!--TOC section Constants-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Constants</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#bipush">bipush&#XA0;:</A></B></TT> push byte
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dconst_0">dconst_0&#XA0;:</A></B></TT> push double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dconst_1">dconst_1&#XA0;:</A></B></TT> push double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fconst_0">fconst_0&#XA0;:</A></B></TT> push float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fconst_1">fconst_1&#XA0;:</A></B></TT> push float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fconst_2">fconst_2&#XA0;:</A></B></TT> push float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_0">iconst_0&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_1">iconst_1&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_2">iconst_2&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_3">iconst_3&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_4">iconst_4&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_5">iconst_5&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_m1">iconst_m1&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lconst_0">lconst_0&#XA0;:</A></B></TT> push long constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lconst_1">lconst_1&#XA0;:</A></B></TT> push long constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#sipush">sipush&#XA0;:</A></B></TT> push short
+</LI></UL><!--TOC section Access to local variables-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Access to local variables</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#aload">aload&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_0">aload_0&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_1">aload_1&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_2">aload_2&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_3">aload_3&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore">astore&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_0">astore_0&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_1">astore_1&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_2">astore_2&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_3">astore_3&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload">dload&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_0">dload_0&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_1">dload_1&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_2">dload_2&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_3">dload_3&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore">dstore&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_0">dstore_0&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_1">dstore_1&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_2">dstore_2&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_3">dstore_3&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload">fload&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_0">fload_0&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_1">fload_1&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_2">fload_2&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_3">fload_3&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore">fstore&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_0">fstore_0&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_1">fstore_1&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_2">fstore_2&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_3">fstore_3&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iinc">iinc&#XA0;:</A></B></TT> increment local variable by constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload">iload&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_0">iload_0&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_1">iload_1&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_2">iload_2&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_3">iload_3&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore">istore&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_0">istore_0&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_1">istore_1&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_2">istore_2&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_3">istore_3&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload">lload&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_0">lload_0&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_1">lload_1&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_2">lload_2&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_3">lload_3&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore">lstore&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_0">lstore_0&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_1">lstore_1&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_2">lstore_2&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_3">lstore_3&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_aload">wide aload&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_astore">wide astore&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_dload">wide dload&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_dstore">wide dstore&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_fload">wide fload&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_fstore">wide fstore&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_iinc">wide iinc&#XA0;:</A></B></TT> increment local variable by constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_iload">wide iload&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_istore">wide istore&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_lload">wide lload&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_lstore">wide lstore&#XA0;:</A></B></TT> store long into local variable
+</LI></UL><!--TOC section Logical operations-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Logical operations</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#iand">iand&#XA0;:</A></B></TT> boolean AND int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ior">ior&#XA0;:</A></B></TT> boolean OR int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ishl">ishl&#XA0;:</A></B></TT> shift left int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ishr">ishr&#XA0;:</A></B></TT> arithmetic shift right int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iushr">iushr&#XA0;:</A></B></TT> logical shift right int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ixor">ixor&#XA0;:</A></B></TT> boolean XOR int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#land">land&#XA0;:</A></B></TT> boolean AND long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lor">lor&#XA0;:</A></B></TT> boolean OR long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lshl">lshl&#XA0;:</A></B></TT> shift left long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lshr">lshr&#XA0;:</A></B></TT> arithmetic shift right long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lushr">lushr&#XA0;:</A></B></TT> logical shift right long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lxor">lxor&#XA0;:</A></B></TT> boolean XOR long
+</LI></UL><!--TOC section Method calls-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Method calls</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#invokedynamic">invokedynamic&#XA0;:</A></B></TT> invoke instance method; resolve and dispatch based on class
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#invokeinterface">invokeinterface&#XA0;:</A></B></TT> invoke interface method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#invokespecial">invokespecial&#XA0;:</A></B></TT> invoke instance method; special handling for superclass, private, and instance initialization method invocations
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#invokestatic">invokestatic&#XA0;:</A></B></TT> invoke a class (static) method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#invokevirtual">invokevirtual&#XA0;:</A></B></TT> invoke instance method; dispatch based on class
+</LI></UL><!--TOC section Instructions over monitors-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Instructions over monitors</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#monitorenter">monitorenter&#XA0;:</A></B></TT> enter monitor for object
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#monitorexit">monitorexit&#XA0;:</A></B></TT> exit monitor for object
+</LI></UL><!--TOC section Method returns-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Method returns</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#areturn">areturn&#XA0;:</A></B></TT> return reference from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dreturn">dreturn&#XA0;:</A></B></TT> return double from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#freturn">freturn&#XA0;:</A></B></TT> return float from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ireturn">ireturn&#XA0;:</A></B></TT> return int from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lreturn">lreturn&#XA0;:</A></B></TT> return long from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#return">return&#XA0;:</A></B></TT> return void from method
+</LI></UL><!--TOC section Stack manipulation-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Stack manipulation</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#dup">dup&#XA0;:</A></B></TT> duplicate the top operand stack value
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dup2">dup2&#XA0;:</A></B></TT> duplicate the top one or two operand stack values
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dup2_x1">dup2_x1&#XA0;:</A></B></TT> duplicate the top one or two operand stack values and insert two or three values down
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dup2_x2">dup2_x2&#XA0;:</A></B></TT> duplicate the top one or two operand stack values and insert two, three, or four values down
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dup_x1">dup_x1&#XA0;:</A></B></TT> duplicate the top operand stack value and insert two values down
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dup_x2">dup_x2&#XA0;:</A></B></TT> duplicate the top operand stack value and insert two or threee values down
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ldc">ldc&#XA0;:</A></B></TT> push item from runtime constant pool
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ldc2_w">ldc2_w&#XA0;:</A></B></TT> push long or double from runtime constant pool (wide index)
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ldc_w">ldc_w&#XA0;:</A></B></TT> push item from runtime constant pool (wide index)
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#pop">pop&#XA0;:</A></B></TT> pop the top operand stack value
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#pop2">pop2&#XA0;:</A></B></TT> pop the top one or two operand stack values
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#swap">swap&#XA0;:</A></B></TT> swap the top two operand stack values
+</LI></UL><!--TOC section Operations over <TT>boolean</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>boolean</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#baload">baload&#XA0;:</A></B></TT> load byte or boolean from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#bastore">bastore&#XA0;:</A></B></TT> store into byte or boolean array
+</LI></UL><!--TOC section Operations over <TT>byte</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>byte</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#baload">baload&#XA0;:</A></B></TT> load byte or boolean from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#bastore">bastore&#XA0;:</A></B></TT> store into byte or boolean array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#bipush">bipush&#XA0;:</A></B></TT> push byte
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2b">i2b&#XA0;:</A></B></TT> convert int to byte
+</LI></UL><!--TOC section Operations over <TT>char</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>char</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#caload">caload&#XA0;:</A></B></TT> load char from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#castore">castore&#XA0;:</A></B></TT> store into char array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2c">i2c&#XA0;:</A></B></TT> convert int to char
+</LI></UL><!--TOC section Operations over <TT>double</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>double</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#d2f">d2f&#XA0;:</A></B></TT> convert double to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#d2i">d2i&#XA0;:</A></B></TT> convert double to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#d2l">d2l&#XA0;:</A></B></TT> convert double to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dadd">dadd&#XA0;:</A></B></TT> add double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#daload">daload&#XA0;:</A></B></TT> load double from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dastore">dastore&#XA0;:</A></B></TT> store into double array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dcmpg">dcmpg&#XA0;:</A></B></TT> compare double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dcmpl">dcmpl&#XA0;:</A></B></TT> compare double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dconst_0">dconst_0&#XA0;:</A></B></TT> push double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dconst_1">dconst_1&#XA0;:</A></B></TT> push double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ddiv">ddiv&#XA0;:</A></B></TT> divide double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload">dload&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_0">dload_0&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_1">dload_1&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_2">dload_2&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dload_3">dload_3&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dmul">dmul&#XA0;:</A></B></TT> multiply double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dneg">dneg&#XA0;:</A></B></TT> negate double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#drem">drem&#XA0;:</A></B></TT> remainder double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dreturn">dreturn&#XA0;:</A></B></TT> return double from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore">dstore&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_0">dstore_0&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_1">dstore_1&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_2">dstore_2&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dstore_3">dstore_3&#XA0;:</A></B></TT> store double into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#dsub">dsub&#XA0;:</A></B></TT> subtract double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2d">f2d&#XA0;:</A></B></TT> convert float to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2d">i2d&#XA0;:</A></B></TT> convert int to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2d">l2d&#XA0;:</A></B></TT> convert long to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_dload">wide dload&#XA0;:</A></B></TT> load double from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_dstore">wide dstore&#XA0;:</A></B></TT> store double into local variable
+</LI></UL><!--TOC section Operations over <TT>float</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>float</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#d2f">d2f&#XA0;:</A></B></TT> convert double to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2d">f2d&#XA0;:</A></B></TT> convert float to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2i">f2i&#XA0;:</A></B></TT> convert float to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2l">f2l&#XA0;:</A></B></TT> convert float to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fadd">fadd&#XA0;:</A></B></TT> add float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#faload">faload&#XA0;:</A></B></TT> load float from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fastore">fastore&#XA0;:</A></B></TT> store into float array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fcmpg">fcmpg&#XA0;:</A></B></TT> compare float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fcmpl">fcmpl&#XA0;:</A></B></TT> compare float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fconst_0">fconst_0&#XA0;:</A></B></TT> push float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fconst_1">fconst_1&#XA0;:</A></B></TT> push float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fconst_2">fconst_2&#XA0;:</A></B></TT> push float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fdiv">fdiv&#XA0;:</A></B></TT> divide float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload">fload&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_0">fload_0&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_1">fload_1&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_2">fload_2&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fload_3">fload_3&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fmul">fmul&#XA0;:</A></B></TT> multiply float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fneg">fneg&#XA0;:</A></B></TT> negate float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#frem">frem&#XA0;:</A></B></TT> remainder float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#freturn">freturn&#XA0;:</A></B></TT> return float from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore">fstore&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_0">fstore_0&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_1">fstore_1&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_2">fstore_2&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fstore_3">fstore_3&#XA0;:</A></B></TT> store float into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#fsub">fsub&#XA0;:</A></B></TT> subtract float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2f">i2f&#XA0;:</A></B></TT> convert int to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2f">l2f&#XA0;:</A></B></TT> convert long to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_fload">wide fload&#XA0;:</A></B></TT> load float from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_fstore">wide fstore&#XA0;:</A></B></TT> store float into local variable
+</LI></UL><!--TOC section Operations over <TT>int</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>int</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#d2i">d2i&#XA0;:</A></B></TT> convert double to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2i">f2i&#XA0;:</A></B></TT> convert float to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2b">i2b&#XA0;:</A></B></TT> convert int to byte
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2c">i2c&#XA0;:</A></B></TT> convert int to char
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2d">i2d&#XA0;:</A></B></TT> convert int to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2f">i2f&#XA0;:</A></B></TT> convert int to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2l">i2l&#XA0;:</A></B></TT> convert int to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2s">i2s&#XA0;:</A></B></TT> convert int to short
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iadd">iadd&#XA0;:</A></B></TT> add int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iaload">iaload&#XA0;:</A></B></TT> load int from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iand">iand&#XA0;:</A></B></TT> boolean AND int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iastore">iastore&#XA0;:</A></B></TT> store into int array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_0">iconst_0&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_1">iconst_1&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_2">iconst_2&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_3">iconst_3&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_4">iconst_4&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_5">iconst_5&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iconst_m1">iconst_m1&#XA0;:</A></B></TT> push int constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#idiv">idiv&#XA0;:</A></B></TT> divide int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpeq">if_icmpeq&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpge">if_icmpge&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpgt">if_icmpgt&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmple">if_icmple&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmplt">if_icmplt&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_icmpne">if_icmpne&#XA0;:</A></B></TT> branch if int comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifeq">ifeq&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifge">ifge&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifgt">ifgt&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifle">ifle&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iflt">iflt&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifne">ifne&#XA0;:</A></B></TT> branch if int comparison with zero succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iinc">iinc&#XA0;:</A></B></TT> increment local variable by constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload">iload&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_0">iload_0&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_1">iload_1&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_2">iload_2&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iload_3">iload_3&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#imul">imul&#XA0;:</A></B></TT> multiply int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ineg">ineg&#XA0;:</A></B></TT> negate int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ior">ior&#XA0;:</A></B></TT> boolean OR int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#irem">irem&#XA0;:</A></B></TT> remainder int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ireturn">ireturn&#XA0;:</A></B></TT> return int from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ishl">ishl&#XA0;:</A></B></TT> shift left int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ishr">ishr&#XA0;:</A></B></TT> arithmetic shift right int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore">istore&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_0">istore_0&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_1">istore_1&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_2">istore_2&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#istore_3">istore_3&#XA0;:</A></B></TT> store int into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#isub">isub&#XA0;:</A></B></TT> subtract int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#iushr">iushr&#XA0;:</A></B></TT> logical shift right int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ixor">ixor&#XA0;:</A></B></TT> boolean XOR int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2i">l2i&#XA0;:</A></B></TT> convert long to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lookupswitch">lookupswitch&#XA0;:</A></B></TT> access jump table by key match and jump
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#tableswitch">tableswitch&#XA0;:</A></B></TT> access jump table by index and jump
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_iinc">wide iinc&#XA0;:</A></B></TT> increment local variable by constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_iload">wide iload&#XA0;:</A></B></TT> load int from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_istore">wide istore&#XA0;:</A></B></TT> store int into local variable
+</LI></UL><!--TOC section Operations over <TT>long</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>long</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#d2l">d2l&#XA0;:</A></B></TT> convert double to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#f2l">f2l&#XA0;:</A></B></TT> convert float to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#i2l">i2l&#XA0;:</A></B></TT> convert int to long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2d">l2d&#XA0;:</A></B></TT> convert long to double
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2f">l2f&#XA0;:</A></B></TT> convert long to float
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#l2i">l2i&#XA0;:</A></B></TT> convert long to int
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ladd">ladd&#XA0;:</A></B></TT> add long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#laload">laload&#XA0;:</A></B></TT> load long from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#land">land&#XA0;:</A></B></TT> boolean AND long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lastore">lastore&#XA0;:</A></B></TT> store into long array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lcmp">lcmp&#XA0;:</A></B></TT> compare long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lconst_0">lconst_0&#XA0;:</A></B></TT> push long constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lconst_1">lconst_1&#XA0;:</A></B></TT> push long constant
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ldiv">ldiv&#XA0;:</A></B></TT> divide long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload">lload&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_0">lload_0&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_1">lload_1&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_2">lload_2&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lload_3">lload_3&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lmul">lmul&#XA0;:</A></B></TT> multiply long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lneg">lneg&#XA0;:</A></B></TT> negate long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lor">lor&#XA0;:</A></B></TT> boolean OR long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lrem">lrem&#XA0;:</A></B></TT> remainder long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lreturn">lreturn&#XA0;:</A></B></TT> return long from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lshl">lshl&#XA0;:</A></B></TT> shift left long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lshr">lshr&#XA0;:</A></B></TT> arithmetic shift right long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore">lstore&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_0">lstore_0&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_1">lstore_1&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_2">lstore_2&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lstore_3">lstore_3&#XA0;:</A></B></TT> store long into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lsub">lsub&#XA0;:</A></B></TT> subtract long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lushr">lushr&#XA0;:</A></B></TT> logical shift right long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#lxor">lxor&#XA0;:</A></B></TT> boolean XOR long
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_lload">wide lload&#XA0;:</A></B></TT> load long from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_lstore">wide lstore&#XA0;:</A></B></TT> store long into local variable
+</LI></UL><!--TOC section Operations over references-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over references</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#aaload">aaload&#XA0;:</A></B></TT> load reference from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aastore">aastore&#XA0;:</A></B></TT> store into reference array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aconst_null">aconst_null&#XA0;:</A></B></TT> push null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload">aload&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_0">aload_0&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_1">aload_1&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_2">aload_2&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#aload_3">aload_3&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#anewarray">anewarray&#XA0;:</A></B></TT> create new array of references
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#areturn">areturn&#XA0;:</A></B></TT> return reference from method
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore">astore&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_0">astore_0&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_1">astore_1&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_2">astore_2&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#astore_3">astore_3&#XA0;:</A></B></TT> store reference into local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#checkcast">checkcast&#XA0;:</A></B></TT> check whether object is of given type
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_acmpeq">if_acmpeq&#XA0;:</A></B></TT> branch if reference comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#if_acmpne">if_acmpne&#XA0;:</A></B></TT> branch if reference comparison succeeds
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifnonnull">ifnonnull&#XA0;:</A></B></TT> branch if reference not null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#ifnull">ifnull&#XA0;:</A></B></TT> branch if reference not null
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#instanceof">instanceof&#XA0;:</A></B></TT> determine if object is of given type
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#monitorenter">monitorenter&#XA0;:</A></B></TT> enter monitor for object
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#monitorexit">monitorexit&#XA0;:</A></B></TT> exit monitor for object
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#multianewarray">multianewarray&#XA0;:</A></B></TT> create new multidimensional array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#new">new&#XA0;:</A></B></TT> create new object
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_aload">wide aload&#XA0;:</A></B></TT> load reference from local variable
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#wide_astore">wide astore&#XA0;:</A></B></TT> store reference into local variable
+</LI></UL><!--TOC section Operations over <TT>short</TT>s-->
+<H2 CLASS="section"><!--SEC ANCHOR -->Operations over <TT>short</TT>s</H2><!--SEC END --><UL CLASS="itemize"><LI CLASS="li-itemize">
+<TT><B><A HREF="#i2s">i2s&#XA0;:</A></B></TT> convert int to short
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#saload">saload&#XA0;:</A></B></TT> load short from array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#sastore">sastore&#XA0;:</A></B></TT> store into short array
+</LI><LI CLASS="li-itemize"><TT><B><A HREF="#sipush">sipush&#XA0;:</A></B></TT> push short
+</LI></UL><!--TOC chapter Instructions by opcode-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc65">Appendix&#XA0;C</A>&#XA0;&#XA0;Instructions by opcode</H1><!--SEC END --><P>
+This appendix lists the instructions sorted by opcode.<BR>
+
+Hyperlinks allow navigation to the first appendix.<BR>
+
+
+
+<TT>0x00</TT> : <TT><B><A HREF="#nop">nop</A></B></TT><BR>
+ <TT>0x01</TT> : <TT><B><A HREF="#aconst_null">aconst_null</A></B></TT><BR>
+ <TT>0x02</TT> : <TT><B><A HREF="#iconst_m1">iconst_m1</A></B></TT><BR>
+ <TT>0x03</TT> : <TT><B><A HREF="#iconst_0">iconst_0</A></B></TT><BR>
+ <TT>0x04</TT> : <TT><B><A HREF="#iconst_1">iconst_1</A></B></TT><BR>
+ <TT>0x05</TT> : <TT><B><A HREF="#iconst_2">iconst_2</A></B></TT><BR>
+ <TT>0x06</TT> : <TT><B><A HREF="#iconst_3">iconst_3</A></B></TT><BR>
+ <TT>0x07</TT> : <TT><B><A HREF="#iconst_4">iconst_4</A></B></TT><BR>
+ <TT>0x08</TT> : <TT><B><A HREF="#iconst_5">iconst_5</A></B></TT><BR>
+ <TT>0x09</TT> : <TT><B><A HREF="#lconst_0">lconst_0</A></B></TT><BR>
+ <TT>0x0A</TT> : <TT><B><A HREF="#lconst_1">lconst_1</A></B></TT><BR>
+ <TT>0x0B</TT> : <TT><B><A HREF="#fconst_0">fconst_0</A></B></TT><BR>
+ <TT>0x0C</TT> : <TT><B><A HREF="#fconst_1">fconst_1</A></B></TT><BR>
+ <TT>0x0D</TT> : <TT><B><A HREF="#fconst_2">fconst_2</A></B></TT><BR>
+ <TT>0x0E</TT> : <TT><B><A HREF="#dconst_0">dconst_0</A></B></TT><BR>
+ <TT>0x0F</TT> : <TT><B><A HREF="#dconst_1">dconst_1</A></B></TT><BR>
+ <TT>0x10</TT> : <TT><B><A HREF="#bipush">bipush</A></B></TT><BR>
+ <TT>0x11</TT> : <TT><B><A HREF="#sipush">sipush</A></B></TT><BR>
+ <TT>0x12</TT> : <TT><B><A HREF="#ldc">ldc</A></B></TT><BR>
+ <TT>0x13</TT> : <TT><B><A HREF="#ldc_w">ldc_w</A></B></TT><BR>
+ <TT>0x14</TT> : <TT><B><A HREF="#ldc2_w">ldc2_w</A></B></TT><BR>
+ <TT>0x15</TT> : <TT><B><A HREF="#iload">iload</A></B></TT><BR>
+ <TT>0x16</TT> : <TT><B><A HREF="#lload">lload</A></B></TT><BR>
+ <TT>0x17</TT> : <TT><B><A HREF="#fload">fload</A></B></TT><BR>
+ <TT>0x18</TT> : <TT><B><A HREF="#dload">dload</A></B></TT><BR>
+ <TT>0x19</TT> : <TT><B><A HREF="#aload">aload</A></B></TT><BR>
+ <TT>0x1A</TT> : <TT><B><A HREF="#iload_0">iload_0</A></B></TT><BR>
+ <TT>0x1B</TT> : <TT><B><A HREF="#iload_1">iload_1</A></B></TT><BR>
+ <TT>0x1C</TT> : <TT><B><A HREF="#iload_2">iload_2</A></B></TT><BR>
+ <TT>0x1D</TT> : <TT><B><A HREF="#iload_3">iload_3</A></B></TT><BR>
+ <TT>0x1E</TT> : <TT><B><A HREF="#lload_0">lload_0</A></B></TT><BR>
+ <TT>0x1F</TT> : <TT><B><A HREF="#lload_1">lload_1</A></B></TT><BR>
+ <TT>0x20</TT> : <TT><B><A HREF="#lload_2">lload_2</A></B></TT><BR>
+ <TT>0x21</TT> : <TT><B><A HREF="#lload_3">lload_3</A></B></TT><BR>
+ <TT>0x22</TT> : <TT><B><A HREF="#fload_0">fload_0</A></B></TT><BR>
+ <TT>0x23</TT> : <TT><B><A HREF="#fload_1">fload_1</A></B></TT><BR>
+ <TT>0x24</TT> : <TT><B><A HREF="#fload_2">fload_2</A></B></TT><BR>
+ <TT>0x25</TT> : <TT><B><A HREF="#fload_3">fload_3</A></B></TT><BR>
+ <TT>0x26</TT> : <TT><B><A HREF="#dload_0">dload_0</A></B></TT><BR>
+ <TT>0x27</TT> : <TT><B><A HREF="#dload_1">dload_1</A></B></TT><BR>
+ <TT>0x28</TT> : <TT><B><A HREF="#dload_2">dload_2</A></B></TT><BR>
+ <TT>0x29</TT> : <TT><B><A HREF="#dload_3">dload_3</A></B></TT><BR>
+ <TT>0x2A</TT> : <TT><B><A HREF="#aload_0">aload_0</A></B></TT><BR>
+ <TT>0x2B</TT> : <TT><B><A HREF="#aload_1">aload_1</A></B></TT><BR>
+ <TT>0x2C</TT> : <TT><B><A HREF="#aload_2">aload_2</A></B></TT><BR>
+ <TT>0x2D</TT> : <TT><B><A HREF="#aload_3">aload_3</A></B></TT><BR>
+ <TT>0x2E</TT> : <TT><B><A HREF="#iaload">iaload</A></B></TT><BR>
+ <TT>0x2F</TT> : <TT><B><A HREF="#laload">laload</A></B></TT><BR>
+ <TT>0x30</TT> : <TT><B><A HREF="#faload">faload</A></B></TT><BR>
+ <TT>0x31</TT> : <TT><B><A HREF="#daload">daload</A></B></TT><BR>
+ <TT>0x32</TT> : <TT><B><A HREF="#aaload">aaload</A></B></TT><BR>
+ <TT>0x33</TT> : <TT><B><A HREF="#baload">baload</A></B></TT><BR>
+ <TT>0x34</TT> : <TT><B><A HREF="#caload">caload</A></B></TT><BR>
+ <TT>0x35</TT> : <TT><B><A HREF="#saload">saload</A></B></TT><BR>
+ <TT>0x36</TT> : <TT><B><A HREF="#istore">istore</A></B></TT><BR>
+ <TT>0x37</TT> : <TT><B><A HREF="#lstore">lstore</A></B></TT><BR>
+ <TT>0x38</TT> : <TT><B><A HREF="#fstore">fstore</A></B></TT><BR>
+ <TT>0x39</TT> : <TT><B><A HREF="#dstore">dstore</A></B></TT><BR>
+ <TT>0x3A</TT> : <TT><B><A HREF="#astore">astore</A></B></TT><BR>
+ <TT>0x3B</TT> : <TT><B><A HREF="#istore_0">istore_0</A></B></TT><BR>
+ <TT>0x3C</TT> : <TT><B><A HREF="#istore_1">istore_1</A></B></TT><BR>
+ <TT>0x3D</TT> : <TT><B><A HREF="#istore_2">istore_2</A></B></TT><BR>
+ <TT>0x3E</TT> : <TT><B><A HREF="#istore_3">istore_3</A></B></TT><BR>
+ <TT>0x3F</TT> : <TT><B><A HREF="#lstore_0">lstore_0</A></B></TT><BR>
+ <TT>0x40</TT> : <TT><B><A HREF="#lstore_1">lstore_1</A></B></TT><BR>
+ <TT>0x41</TT> : <TT><B><A HREF="#lstore_2">lstore_2</A></B></TT><BR>
+ <TT>0x42</TT> : <TT><B><A HREF="#lstore_3">lstore_3</A></B></TT><BR>
+ <TT>0x43</TT> : <TT><B><A HREF="#fstore_0">fstore_0</A></B></TT><BR>
+ <TT>0x44</TT> : <TT><B><A HREF="#fstore_1">fstore_1</A></B></TT><BR>
+ <TT>0x45</TT> : <TT><B><A HREF="#fstore_2">fstore_2</A></B></TT><BR>
+ <TT>0x46</TT> : <TT><B><A HREF="#fstore_3">fstore_3</A></B></TT><BR>
+ <TT>0x47</TT> : <TT><B><A HREF="#dstore_0">dstore_0</A></B></TT><BR>
+ <TT>0x48</TT> : <TT><B><A HREF="#dstore_1">dstore_1</A></B></TT><BR>
+ <TT>0x49</TT> : <TT><B><A HREF="#dstore_2">dstore_2</A></B></TT><BR>
+ <TT>0x4A</TT> : <TT><B><A HREF="#dstore_3">dstore_3</A></B></TT><BR>
+ <TT>0x4B</TT> : <TT><B><A HREF="#astore_0">astore_0</A></B></TT><BR>
+ <TT>0x4C</TT> : <TT><B><A HREF="#astore_1">astore_1</A></B></TT><BR>
+ <TT>0x4D</TT> : <TT><B><A HREF="#astore_2">astore_2</A></B></TT><BR>
+ <TT>0x4E</TT> : <TT><B><A HREF="#astore_3">astore_3</A></B></TT><BR>
+ <TT>0x4F</TT> : <TT><B><A HREF="#iastore">iastore</A></B></TT><BR>
+ <TT>0x50</TT> : <TT><B><A HREF="#lastore">lastore</A></B></TT><BR>
+ <TT>0x51</TT> : <TT><B><A HREF="#fastore">fastore</A></B></TT><BR>
+ <TT>0x52</TT> : <TT><B><A HREF="#dastore">dastore</A></B></TT><BR>
+ <TT>0x53</TT> : <TT><B><A HREF="#aastore">aastore</A></B></TT><BR>
+ <TT>0x54</TT> : <TT><B><A HREF="#bastore">bastore</A></B></TT><BR>
+ <TT>0x55</TT> : <TT><B><A HREF="#castore">castore</A></B></TT><BR>
+ <TT>0x56</TT> : <TT><B><A HREF="#sastore">sastore</A></B></TT><BR>
+ <TT>0x57</TT> : <TT><B><A HREF="#pop">pop</A></B></TT><BR>
+ <TT>0x58</TT> : <TT><B><A HREF="#pop2">pop2</A></B></TT><BR>
+ <TT>0x59</TT> : <TT><B><A HREF="#dup">dup</A></B></TT><BR>
+ <TT>0x5A</TT> : <TT><B><A HREF="#dup_x1">dup_x1</A></B></TT><BR>
+ <TT>0x5B</TT> : <TT><B><A HREF="#dup_x2">dup_x2</A></B></TT><BR>
+ <TT>0x5C</TT> : <TT><B><A HREF="#dup2">dup2</A></B></TT><BR>
+ <TT>0x5D</TT> : <TT><B><A HREF="#dup2_x1">dup2_x1</A></B></TT><BR>
+ <TT>0x5E</TT> : <TT><B><A HREF="#dup2_x2">dup2_x2</A></B></TT><BR>
+ <TT>0x5F</TT> : <TT><B><A HREF="#swap">swap</A></B></TT><BR>
+ <TT>0x60</TT> : <TT><B><A HREF="#iadd">iadd</A></B></TT><BR>
+ <TT>0x61</TT> : <TT><B><A HREF="#ladd">ladd</A></B></TT><BR>
+ <TT>0x62</TT> : <TT><B><A HREF="#fadd">fadd</A></B></TT><BR>
+ <TT>0x63</TT> : <TT><B><A HREF="#dadd">dadd</A></B></TT><BR>
+ <TT>0x64</TT> : <TT><B><A HREF="#isub">isub</A></B></TT><BR>
+ <TT>0x65</TT> : <TT><B><A HREF="#lsub">lsub</A></B></TT><BR>
+ <TT>0x66</TT> : <TT><B><A HREF="#fsub">fsub</A></B></TT><BR>
+ <TT>0x67</TT> : <TT><B><A HREF="#dsub">dsub</A></B></TT><BR>
+ <TT>0x68</TT> : <TT><B><A HREF="#imul">imul</A></B></TT><BR>
+ <TT>0x69</TT> : <TT><B><A HREF="#lmul">lmul</A></B></TT><BR>
+ <TT>0x6A</TT> : <TT><B><A HREF="#fmul">fmul</A></B></TT><BR>
+ <TT>0x6B</TT> : <TT><B><A HREF="#dmul">dmul</A></B></TT><BR>
+ <TT>0x6C</TT> : <TT><B><A HREF="#idiv">idiv</A></B></TT><BR>
+ <TT>0x6D</TT> : <TT><B><A HREF="#ldiv">ldiv</A></B></TT><BR>
+ <TT>0x6E</TT> : <TT><B><A HREF="#fdiv">fdiv</A></B></TT><BR>
+ <TT>0x6F</TT> : <TT><B><A HREF="#ddiv">ddiv</A></B></TT><BR>
+ <TT>0x70</TT> : <TT><B><A HREF="#irem">irem</A></B></TT><BR>
+ <TT>0x71</TT> : <TT><B><A HREF="#lrem">lrem</A></B></TT><BR>
+ <TT>0x72</TT> : <TT><B><A HREF="#frem">frem</A></B></TT><BR>
+ <TT>0x73</TT> : <TT><B><A HREF="#drem">drem</A></B></TT><BR>
+ <TT>0x74</TT> : <TT><B><A HREF="#ineg">ineg</A></B></TT><BR>
+ <TT>0x75</TT> : <TT><B><A HREF="#lneg">lneg</A></B></TT><BR>
+ <TT>0x76</TT> : <TT><B><A HREF="#fneg">fneg</A></B></TT><BR>
+ <TT>0x77</TT> : <TT><B><A HREF="#dneg">dneg</A></B></TT><BR>
+ <TT>0x78</TT> : <TT><B><A HREF="#ishl">ishl</A></B></TT><BR>
+ <TT>0x79</TT> : <TT><B><A HREF="#lshl">lshl</A></B></TT><BR>
+ <TT>0x7A</TT> : <TT><B><A HREF="#ishr">ishr</A></B></TT><BR>
+ <TT>0x7B</TT> : <TT><B><A HREF="#lshr">lshr</A></B></TT><BR>
+ <TT>0x7C</TT> : <TT><B><A HREF="#iushr">iushr</A></B></TT><BR>
+ <TT>0x7D</TT> : <TT><B><A HREF="#lushr">lushr</A></B></TT><BR>
+ <TT>0x7E</TT> : <TT><B><A HREF="#iand">iand</A></B></TT><BR>
+ <TT>0x7F</TT> : <TT><B><A HREF="#land">land</A></B></TT><BR>
+ <TT>0x80</TT> : <TT><B><A HREF="#ior">ior</A></B></TT><BR>
+ <TT>0x81</TT> : <TT><B><A HREF="#lor">lor</A></B></TT><BR>
+ <TT>0x82</TT> : <TT><B><A HREF="#ixor">ixor</A></B></TT><BR>
+ <TT>0x83</TT> : <TT><B><A HREF="#lxor">lxor</A></B></TT><BR>
+ <TT>0x84</TT> : <TT><B><A HREF="#iinc">iinc</A></B></TT><BR>
+ <TT>0x85</TT> : <TT><B><A HREF="#i2l">i2l</A></B></TT><BR>
+ <TT>0x86</TT> : <TT><B><A HREF="#i2f">i2f</A></B></TT><BR>
+ <TT>0x87</TT> : <TT><B><A HREF="#i2d">i2d</A></B></TT><BR>
+ <TT>0x88</TT> : <TT><B><A HREF="#l2i">l2i</A></B></TT><BR>
+ <TT>0x89</TT> : <TT><B><A HREF="#l2f">l2f</A></B></TT><BR>
+ <TT>0x8A</TT> : <TT><B><A HREF="#l2d">l2d</A></B></TT><BR>
+ <TT>0x8B</TT> : <TT><B><A HREF="#f2i">f2i</A></B></TT><BR>
+ <TT>0x8C</TT> : <TT><B><A HREF="#f2l">f2l</A></B></TT><BR>
+ <TT>0x8D</TT> : <TT><B><A HREF="#f2d">f2d</A></B></TT><BR>
+ <TT>0x8E</TT> : <TT><B><A HREF="#d2i">d2i</A></B></TT><BR>
+ <TT>0x8F</TT> : <TT><B><A HREF="#d2l">d2l</A></B></TT><BR>
+ <TT>0x90</TT> : <TT><B><A HREF="#d2f">d2f</A></B></TT><BR>
+ <TT>0x91</TT> : <TT><B><A HREF="#i2b">i2b</A></B></TT><BR>
+ <TT>0x92</TT> : <TT><B><A HREF="#i2c">i2c</A></B></TT><BR>
+ <TT>0x93</TT> : <TT><B><A HREF="#i2s">i2s</A></B></TT><BR>
+ <TT>0x94</TT> : <TT><B><A HREF="#lcmp">lcmp</A></B></TT><BR>
+ <TT>0x95</TT> : <TT><B><A HREF="#fcmpl">fcmpl</A></B></TT><BR>
+ <TT>0x96</TT> : <TT><B><A HREF="#fcmpg">fcmpg</A></B></TT><BR>
+ <TT>0x97</TT> : <TT><B><A HREF="#dcmpl">dcmpl</A></B></TT><BR>
+ <TT>0x98</TT> : <TT><B><A HREF="#dcmpg">dcmpg</A></B></TT><BR>
+ <TT>0x99</TT> : <TT><B><A HREF="#ifeq">ifeq</A></B></TT><BR>
+ <TT>0x9A</TT> : <TT><B><A HREF="#ifne">ifne</A></B></TT><BR>
+ <TT>0x9B</TT> : <TT><B><A HREF="#iflt">iflt</A></B></TT><BR>
+ <TT>0x9C</TT> : <TT><B><A HREF="#ifge">ifge</A></B></TT><BR>
+ <TT>0x9D</TT> : <TT><B><A HREF="#ifgt">ifgt</A></B></TT><BR>
+ <TT>0x9E</TT> : <TT><B><A HREF="#ifle">ifle</A></B></TT><BR>
+ <TT>0x9F</TT> : <TT><B><A HREF="#if_icmpeq">if_icmpeq</A></B></TT><BR>
+ <TT>0xA0</TT> : <TT><B><A HREF="#if_icmpne">if_icmpne</A></B></TT><BR>
+ <TT>0xA1</TT> : <TT><B><A HREF="#if_icmplt">if_icmplt</A></B></TT><BR>
+ <TT>0xA2</TT> : <TT><B><A HREF="#if_icmpge">if_icmpge</A></B></TT><BR>
+ <TT>0xA3</TT> : <TT><B><A HREF="#if_icmpgt">if_icmpgt</A></B></TT><BR>
+ <TT>0xA4</TT> : <TT><B><A HREF="#if_icmple">if_icmple</A></B></TT><BR>
+ <TT>0xA5</TT> : <TT><B><A HREF="#if_acmpeq">if_acmpeq</A></B></TT><BR>
+ <TT>0xA6</TT> : <TT><B><A HREF="#if_acmpne">if_acmpne</A></B></TT><BR>
+ <TT>0xA7</TT> : <TT><B><A HREF="#goto">goto</A></B></TT><BR>
+ <TT>0xA8</TT> : <TT><B><A HREF="#jsr">jsr</A></B></TT><BR>
+ <TT>0xA9</TT> : <TT><B><A HREF="#ret">ret</A></B></TT><BR>
+ <TT>0xAA</TT> : <TT><B><A HREF="#tableswitch">tableswitch</A></B></TT><BR>
+ <TT>0xAB</TT> : <TT><B><A HREF="#lookupswitch">lookupswitch</A></B></TT><BR>
+ <TT>0xAC</TT> : <TT><B><A HREF="#ireturn">ireturn</A></B></TT><BR>
+ <TT>0xAD</TT> : <TT><B><A HREF="#lreturn">lreturn</A></B></TT><BR>
+ <TT>0xAE</TT> : <TT><B><A HREF="#freturn">freturn</A></B></TT><BR>
+ <TT>0xAF</TT> : <TT><B><A HREF="#dreturn">dreturn</A></B></TT><BR>
+ <TT>0xB0</TT> : <TT><B><A HREF="#areturn">areturn</A></B></TT><BR>
+ <TT>0xB1</TT> : <TT><B><A HREF="#return">return</A></B></TT><BR>
+ <TT>0xB2</TT> : <TT><B><A HREF="#getstatic">getstatic</A></B></TT><BR>
+ <TT>0xB3</TT> : <TT><B><A HREF="#putstatic">putstatic</A></B></TT><BR>
+ <TT>0xB4</TT> : <TT><B><A HREF="#getfield">getfield</A></B></TT><BR>
+ <TT>0xB5</TT> : <TT><B><A HREF="#putfield">putfield</A></B></TT><BR>
+ <TT>0xB6</TT> : <TT><B><A HREF="#invokevirtual">invokevirtual</A></B></TT><BR>
+ <TT>0xB7</TT> : <TT><B><A HREF="#invokespecial">invokespecial</A></B></TT><BR>
+ <TT>0xB8</TT> : <TT><B><A HREF="#invokestatic">invokestatic</A></B></TT><BR>
+ <TT>0xB9</TT> : <TT><B><A HREF="#invokeinterface">invokeinterface</A></B></TT><BR>
+ <TT>0xBA</TT> : <TT><B><A HREF="#invokedynamic">invokedynamic</A></B></TT><BR>
+ <TT>0xBB</TT> : <TT><B><A HREF="#new">new</A></B></TT><BR>
+ <TT>0xBC</TT> : <TT><B><A HREF="#newarray">newarray</A></B></TT><BR>
+ <TT>0xBD</TT> : <TT><B><A HREF="#anewarray">anewarray</A></B></TT><BR>
+ <TT>0xBE</TT> : <TT><B><A HREF="#arraylength">arraylength</A></B></TT><BR>
+ <TT>0xBF</TT> : <TT><B><A HREF="#athrow">athrow</A></B></TT><BR>
+ <TT>0xC0</TT> : <TT><B><A HREF="#checkcast">checkcast</A></B></TT><BR>
+ <TT>0xC1</TT> : <TT><B><A HREF="#instanceof">instanceof</A></B></TT><BR>
+ <TT>0xC2</TT> : <TT><B><A HREF="#monitorenter">monitorenter</A></B></TT><BR>
+ <TT>0xC3</TT> : <TT><B><A HREF="#monitorexit">monitorexit</A></B></TT><BR>
+ <TT>0xC5</TT> : <TT><B><A HREF="#multianewarray">multianewarray</A></B></TT><BR>
+ <TT>0xC6</TT> : <TT><B><A HREF="#ifnull">ifnull</A></B></TT><BR>
+ <TT>0xC7</TT> : <TT><B><A HREF="#ifnonnull">ifnonnull</A></B></TT><BR>
+ <TT>0xC8</TT> : <TT><B><A HREF="#goto_w">goto_w</A></B></TT><BR>
+ <TT>0xC9</TT> : <TT><B><A HREF="#jsr_w">jsr_w</A></B></TT><BR>
+ &#XA0;<BR>
+ <TT>0xC4&#XA0;0x15</TT> : <TT><B><A HREF="#wide_iload">wide iload</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x16</TT> : <TT><B><A HREF="#wide_lload">wide lload</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x17</TT> : <TT><B><A HREF="#wide_fload">wide fload</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x18</TT> : <TT><B><A HREF="#wide_dload">wide dload</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x19</TT> : <TT><B><A HREF="#wide_aload">wide aload</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x36</TT> : <TT><B><A HREF="#wide_istore">wide istore</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x37</TT> : <TT><B><A HREF="#wide_lstore">wide lstore</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x38</TT> : <TT><B><A HREF="#wide_fstore">wide fstore</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x39</TT> : <TT><B><A HREF="#wide_dstore">wide dstore</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x3A</TT> : <TT><B><A HREF="#wide_astore">wide astore</A></B></TT><BR>
+ <TT>0xC4&#XA0;0x84</TT> : <TT><B><A HREF="#wide_iinc">wide iinc</A></B></TT><BR>
+ <TT>0xC4&#XA0;0xA9</TT> : <TT><B><A HREF="#wide_ret">wide ret</A></B></TT><BR>
+
+
+
+</P><!--CUT END -->
+<!--HTMLFOOT-->
+<!--ENDHTML-->
+<!--FOOTER-->
+<HR SIZE=2><BLOCKQUOTE CLASS="quote"><EM>This document was translated from L<sup>A</sup>T<sub>E</sub>X by
+<A HREF="http://hevea.inria.fr/index.html">H<FONT SIZE=2><sup>E</sup></FONT>V<FONT SIZE=2><sup>E</sup></FONT>A</A>.</EM></BLOCKQUOTE></BODY>
+</HTML>

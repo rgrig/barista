@@ -1,0 +1,781 @@
+--- pack.TestGen --------------------------------------------------------------
+.class public super pack.TestGen
+.extends java.lang.Object
+  @SourceFile "TestGen.java"
+  @Signature "<A:Ljava/lang/Number;B:Ljava/lang/Exception;:Ljava/lang/Comparable<TB;>;>Ljava/lang/Object;"
+
+
+.field public java.lang.Number field
+  @Signature "TA;"
+
+
+.method public void <init>()
+  .max_stack 1
+  .max_locals 1
+  @LineNumberTable 3
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  code00000004: return
+
+.method public static void f_extends(java.lang.Comparable)
+  @Signature "<T:Ljava/lang/Object;:Ljava/lang/Comparable<+TT;>;>(TT;)V"
+  .max_stack 0
+  .max_locals 1
+  @LineNumberTable 6
+  code00000000: return
+
+.method public static void f_star(java.lang.Comparable)
+  @Signature "<T:Ljava/lang/Object;:Ljava/lang/Comparable<*>;>(TT;)V"
+  .max_stack 0
+  .max_locals 1
+  @LineNumberTable 7
+  code00000000: return
+
+.method public static void f_super(java.lang.Comparable)
+  @Signature "<T:Ljava/lang/Object;:Ljava/lang/Comparable<-TT;>;>(TT;)V"
+  .max_stack 0
+  .max_locals 1
+  @LineNumberTable 5
+  code00000000: return
+
+--- pack.TestAnnot ------------------------------------------------------------
+.class public super pack.TestAnnot
+.extends java.lang.Object
+  @Deprecated
+  @SourceFile "TestAnnot.java"
+  @InnerClass pack.MyAnnotation$E pack.MyAnnotation E public static final enum 
+  @RuntimeVisibleAnnotations java.lang.Deprecated 
+
+
+.method public void <init>()
+  .max_stack 1
+  .max_locals 1
+  @LineNumberTable 4
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  code00000004: return
+
+.method public static void f()
+  @Deprecated
+  @RuntimeVisibleAnnotations java.lang.Deprecated 
+  .max_stack 0
+  .max_locals 0
+  @LineNumberTable 6
+  code00000000: return
+
+.method public static void g()
+  @RuntimeVisibleAnnotations pack.MyAnnotation a string "xyz"
+  @RuntimeVisibleAnnotations pack.MyAnnotation b float 3.140000
+  @RuntimeVisibleAnnotations pack.MyAnnotation c 0 int 5
+  @RuntimeVisibleAnnotations pack.MyAnnotation e enum pack.MyAnnotation$E E3
+  .max_stack 0
+  .max_locals 0
+  @LineNumberTable 9
+  code00000000: return
+
+--- pack.TestFrame ------------------------------------------------------------
+.class public super pack.TestFrame
+.extends java.lang.Object
+  @SourceFile "TestFrame.java"
+
+
+.method public void <init>()
+  .max_stack 1
+  .max_locals 1
+  @LineNumberTable 3
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  code00000004: return
+
+.method public static int f(boolean,int,float)
+  .max_stack 2
+  .max_locals 3
+  @LineNumberTable 5
+  code00000000: iload_0
+  code00000001: ifeq code00000009:
+  @LineNumberTable 6
+  code00000004: iload_1
+  code00000005: fload_2
+  code00000006: f2i
+  code00000007: isub
+  code00000008: ireturn
+  @LineNumberTable 8
+  code00000009: iload_1
+  code00000010: fload_2
+  code00000011: f2i
+  code00000012: iadd
+  code00000013: ireturn
+  .frame code00000009: same
+
+--- java.lang.Throwable -------------------------------------------------------
+.class public super java.lang.Throwable
+.extends java.lang.Object
+.implements java.io.Serializable
+  @SourceFile "Throwable.java"
+
+
+.field private static final long serialVersionUID
+  @ConstantValue -3042686055658047285
+
+.field private transient java.lang.Object backtrace
+
+.field private java.lang.Throwable cause
+
+.field private java.lang.String detailMessage
+
+.field private java.lang.StackTraceElement[] stackTrace
+
+
+.method public void <init>()
+  .max_stack 2
+  .max_locals 1
+  @LineNumberTable 180
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  @LineNumberTable 158
+  code00000004: aload_0
+  code00000005: aload_0
+  code00000006: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 181
+  code00000009: aload_0
+  code00000010: invokevirtual java.lang.Throwable.fillInStackTrace():java.lang.Throwable
+  code00000013: pop
+  @LineNumberTable 182
+  code00000014: return
+
+.method public void <init>(java.lang.String)
+  .max_stack 2
+  .max_locals 2
+  @LineNumberTable 195
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  @LineNumberTable 158
+  code00000004: aload_0
+  code00000005: aload_0
+  code00000006: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 196
+  code00000009: aload_0
+  code00000010: invokevirtual java.lang.Throwable.fillInStackTrace():java.lang.Throwable
+  code00000013: pop
+  @LineNumberTable 197
+  code00000014: aload_0
+  code00000015: aload_1
+  code00000016: putfield java.lang.Throwable.detailMessage:java.lang.String
+  @LineNumberTable 198
+  code00000019: return
+
+.method public void <init>(java.lang.Throwable)
+  .max_stack 2
+  .max_locals 2
+  @LineNumberTable 240
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  @LineNumberTable 158
+  code00000004: aload_0
+  code00000005: aload_0
+  code00000006: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 241
+  code00000009: aload_0
+  code00000010: invokevirtual java.lang.Throwable.fillInStackTrace():java.lang.Throwable
+  code00000013: pop
+  @LineNumberTable 242
+  code00000014: aload_0
+  code00000015: aload_1
+  code00000016: ifnonnull code00000023:
+  code00000019: aconst_null
+  code00000020: goto code00000027:
+  code00000023: aload_1
+  code00000024: invokevirtual java.lang.Throwable.toString():java.lang.String
+  code00000027: putfield java.lang.Throwable.detailMessage:java.lang.String
+  @LineNumberTable 243
+  code00000030: aload_0
+  code00000031: aload_1
+  code00000032: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 244
+  code00000035: return
+
+.method public void <init>(java.lang.String,java.lang.Throwable)
+  .max_stack 2
+  .max_locals 3
+  @LineNumberTable 217
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Object.<init>():void
+  @LineNumberTable 158
+  code00000004: aload_0
+  code00000005: aload_0
+  code00000006: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 218
+  code00000009: aload_0
+  code00000010: invokevirtual java.lang.Throwable.fillInStackTrace():java.lang.Throwable
+  code00000013: pop
+  @LineNumberTable 219
+  code00000014: aload_0
+  code00000015: aload_1
+  code00000016: putfield java.lang.Throwable.detailMessage:java.lang.String
+  @LineNumberTable 220
+  code00000019: aload_0
+  code00000020: aload_2
+  code00000021: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 221
+  code00000024: return
+
+.method public synchronized java.lang.Throwable initCause(java.lang.Throwable)
+  .max_stack 3
+  .max_locals 2
+  @LineNumberTable 319
+  code00000000: aload_0
+  code00000001: getfield java.lang.Throwable.cause:java.lang.Throwable
+  code00000004: aload_0
+  code00000005: if_acmpeq code00000018:
+  @LineNumberTable 320
+  code00000008: new java.lang.IllegalStateException
+  code00000011: dup
+  code00000012: ldc "Can't overwrite cause"
+  code00000014: invokespecial java.lang.IllegalStateException.<init>(java.lang.String):void
+  code00000017: athrow
+  @LineNumberTable 321
+  code00000018: aload_1
+  code00000019: aload_0
+  code00000020: if_acmpne code00000033:
+  @LineNumberTable 322
+  code00000023: new java.lang.IllegalArgumentException
+  code00000026: dup
+  code00000027: ldc "Self-causation not permitted"
+  code00000029: invokespecial java.lang.IllegalArgumentException.<init>(java.lang.String):void
+  code00000032: athrow
+  @LineNumberTable 323
+  code00000033: aload_0
+  code00000034: aload_1
+  code00000035: putfield java.lang.Throwable.cause:java.lang.Throwable
+  @LineNumberTable 324
+  code00000038: aload_0
+  code00000039: areturn
+
+.method public java.lang.Throwable getCause()
+  .max_stack 2
+  .max_locals 1
+  @LineNumberTable 291
+  code00000000: aload_0
+  code00000001: getfield java.lang.Throwable.cause:java.lang.Throwable
+  code00000004: aload_0
+  code00000005: if_acmpne code00000012:
+  code00000008: aconst_null
+  code00000009: goto code00000016:
+  code00000012: aload_0
+  code00000013: getfield java.lang.Throwable.cause:java.lang.Throwable
+  code00000016: areturn
+
+.method public java.lang.String getLocalizedMessage()
+  .max_stack 1
+  .max_locals 1
+  @LineNumberTable 267
+  code00000000: aload_0
+  code00000001: invokevirtual java.lang.Throwable.getMessage():java.lang.String
+  code00000004: areturn
+
+.method public java.lang.String getMessage()
+  .max_stack 1
+  .max_locals 1
+  @LineNumberTable 253
+  code00000000: aload_0
+  code00000001: getfield java.lang.Throwable.detailMessage:java.lang.String
+  code00000004: areturn
+
+.method public java.lang.StackTraceElement[] getStackTrace()
+  .max_stack 1
+  .max_locals 1
+  @LineNumberTable 582
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
+  code00000004: invokevirtual java.lang.StackTraceElement[].clone():java.lang.Object
+  code00000007: checkcast java.lang.StackTraceElement[]
+  code00000010: checkcast java.lang.StackTraceElement[]
+  code00000013: areturn
+
+.method public void printStackTrace()
+  .max_stack 2
+  .max_locals 1
+  @LineNumberTable 451
+  code00000000: aload_0
+  code00000001: getstatic java.lang.System.err:java.io.PrintStream
+  code00000004: invokevirtual java.lang.Throwable.printStackTrace(java.io.PrintStream):void
+  @LineNumberTable 452
+  code00000007: return
+
+.method public void printStackTrace(java.io.PrintStream)
+  .max_stack 4
+  .max_locals 6
+  @LineNumberTable 460
+  code00000000: aload_1
+  code00000001: dup
+  code00000002: astore_2
+  code00000003: monitorenter
+  @LineNumberTable 461
+  code00000004: aload_1
+  code00000005: aload_0
+  code00000006: invokevirtual java.io.PrintStream.println(java.lang.Object):void
+  @LineNumberTable 462
+  code00000009: aload_0
+  code00000010: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
+  code00000013: astore_3
+  @LineNumberTable 463
+  code00000014: iconst_0
+  code00000015: istore 4
+  code00000017: iload 4
+  code00000019: aload_3
+  code00000020: arraylength
+  code00000021: if_icmpge code00000056:
+  @LineNumberTable 464
+  code00000024: aload_1
+  code00000025: new java.lang.StringBuilder
+  code00000028: dup
+  code00000029: invokespecial java.lang.StringBuilder.<init>():void
+  code00000032: ldc "\tat "
+  code00000034: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000037: aload_3
+  code00000038: iload 4
+  code00000040: aaload
+  code00000041: invokevirtual java.lang.StringBuilder.append(java.lang.Object):java.lang.StringBuilder
+  code00000044: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000047: invokevirtual java.io.PrintStream.println(java.lang.String):void
+  @LineNumberTable 463
+  code00000050: iinc 4 1
+  code00000053: goto code00000017:
+  @LineNumberTable 466
+  code00000056: aload_0
+  code00000057: invokevirtual java.lang.Throwable.getCause():java.lang.Throwable
+  code00000060: astore 4
+  @LineNumberTable 467
+  code00000062: aload 4
+  code00000064: ifnull code00000074:
+  @LineNumberTable 468
+  code00000067: aload 4
+  code00000069: aload_1
+  code00000070: aload_3
+  code00000071: invokespecial java.lang.Throwable.printStackTraceAsCause(java.io.PrintStream,java.lang.StackTraceElement[]):void
+  @LineNumberTable 469
+  code00000074: aload_2
+  code00000075: monitorexit
+  code00000076: goto code00000086:
+  code00000079: astore 5
+  code00000081: aload_2
+  code00000082: monitorexit
+  code00000083: aload 5
+  code00000085: athrow
+  @LineNumberTable 470
+  code00000086: return
+  .catch code00000004: code00000076: code00000079:
+  .catch code00000079: code00000083: code00000079:
+
+.method public void printStackTrace(java.io.PrintWriter)
+  .max_stack 4
+  .max_locals 6
+  @LineNumberTable 508
+  code00000000: aload_1
+  code00000001: dup
+  code00000002: astore_2
+  code00000003: monitorenter
+  @LineNumberTable 509
+  code00000004: aload_1
+  code00000005: aload_0
+  code00000006: invokevirtual java.io.PrintWriter.println(java.lang.Object):void
+  @LineNumberTable 510
+  code00000009: aload_0
+  code00000010: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
+  code00000013: astore_3
+  @LineNumberTable 511
+  code00000014: iconst_0
+  code00000015: istore 4
+  code00000017: iload 4
+  code00000019: aload_3
+  code00000020: arraylength
+  code00000021: if_icmpge code00000056:
+  @LineNumberTable 512
+  code00000024: aload_1
+  code00000025: new java.lang.StringBuilder
+  code00000028: dup
+  code00000029: invokespecial java.lang.StringBuilder.<init>():void
+  code00000032: ldc "\tat "
+  code00000034: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000037: aload_3
+  code00000038: iload 4
+  code00000040: aaload
+  code00000041: invokevirtual java.lang.StringBuilder.append(java.lang.Object):java.lang.StringBuilder
+  code00000044: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000047: invokevirtual java.io.PrintWriter.println(java.lang.String):void
+  @LineNumberTable 511
+  code00000050: iinc 4 1
+  code00000053: goto code00000017:
+  @LineNumberTable 514
+  code00000056: aload_0
+  code00000057: invokevirtual java.lang.Throwable.getCause():java.lang.Throwable
+  code00000060: astore 4
+  @LineNumberTable 515
+  code00000062: aload 4
+  code00000064: ifnull code00000074:
+  @LineNumberTable 516
+  code00000067: aload 4
+  code00000069: aload_1
+  code00000070: aload_3
+  code00000071: invokespecial java.lang.Throwable.printStackTraceAsCause(java.io.PrintWriter,java.lang.StackTraceElement[]):void
+  @LineNumberTable 517
+  code00000074: aload_2
+  code00000075: monitorexit
+  code00000076: goto code00000086:
+  code00000079: astore 5
+  code00000081: aload_2
+  code00000082: monitorexit
+  code00000083: aload 5
+  code00000085: athrow
+  @LineNumberTable 518
+  code00000086: return
+  .catch code00000004: code00000076: code00000079:
+  .catch code00000079: code00000083: code00000079:
+
+.method public void setStackTrace(java.lang.StackTraceElement[])
+  .max_stack 4
+  .max_locals 4
+  @LineNumberTable 620
+  code00000000: aload_1
+  code00000001: invokevirtual java.lang.StackTraceElement[].clone():java.lang.Object
+  code00000004: checkcast java.lang.StackTraceElement[]
+  code00000007: checkcast java.lang.StackTraceElement[]
+  code00000010: astore_2
+  @LineNumberTable 622
+  code00000011: iconst_0
+  code00000012: istore_3
+  code00000013: iload_3
+  code00000014: aload_2
+  code00000015: arraylength
+  code00000016: if_icmpge code00000063:
+  @LineNumberTable 623
+  code00000019: aload_2
+  code00000020: iload_3
+  code00000021: aaload
+  code00000022: ifnonnull code00000057:
+  @LineNumberTable 624
+  code00000025: new java.lang.NullPointerException
+  code00000028: dup
+  code00000029: new java.lang.StringBuilder
+  code00000032: dup
+  code00000033: invokespecial java.lang.StringBuilder.<init>():void
+  code00000036: ldc "stackTrace["
+  code00000038: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000041: iload_3
+  code00000042: invokevirtual java.lang.StringBuilder.append(int):java.lang.StringBuilder
+  code00000045: ldc "]"
+  code00000047: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000050: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000053: invokespecial java.lang.NullPointerException.<init>(java.lang.String):void
+  code00000056: athrow
+  @LineNumberTable 622
+  code00000057: iinc 3 1
+  code00000060: goto code00000013:
+  @LineNumberTable 626
+  code00000063: aload_0
+  code00000064: aload_2
+  code00000065: putfield java.lang.Throwable.stackTrace:java.lang.StackTraceElement[]
+  @LineNumberTable 627
+  code00000068: return
+
+.method public java.lang.String toString()
+  .max_stack 2
+  .max_locals 3
+  @LineNumberTable 342
+  code00000000: aload_0
+  code00000001: invokevirtual java.lang.Object.getClass():java.lang.Class
+  code00000004: invokevirtual java.lang.Class.getName():java.lang.String
+  code00000007: astore_1
+  @LineNumberTable 343
+  code00000008: aload_0
+  code00000009: invokevirtual java.lang.Throwable.getLocalizedMessage():java.lang.String
+  code00000012: astore_2
+  @LineNumberTable 344
+  code00000013: aload_2
+  code00000014: ifnull code00000043:
+  code00000017: new java.lang.StringBuilder
+  code00000020: dup
+  code00000021: invokespecial java.lang.StringBuilder.<init>():void
+  code00000024: aload_1
+  code00000025: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000028: ldc ": "
+  code00000030: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000033: aload_2
+  code00000034: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000037: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000040: goto code00000044:
+  code00000043: aload_1
+  code00000044: areturn
+
+.method public native synchronized java.lang.Throwable fillInStackTrace()
+
+.method private synchronized java.lang.StackTraceElement[] getOurStackTrace()
+  .max_stack 4
+  .max_locals 3
+  @LineNumberTable 587
+  code00000000: aload_0
+  code00000001: getfield java.lang.Throwable.stackTrace:java.lang.StackTraceElement[]
+  code00000004: ifnonnull code00000044:
+  @LineNumberTable 588
+  code00000007: aload_0
+  code00000008: invokespecial java.lang.Throwable.getStackTraceDepth():int
+  code00000011: istore_1
+  @LineNumberTable 589
+  code00000012: aload_0
+  code00000013: iload_1
+  code00000014: anewarray java.lang.StackTraceElement
+  code00000017: putfield java.lang.Throwable.stackTrace:java.lang.StackTraceElement[]
+  @LineNumberTable 590
+  code00000020: iconst_0
+  code00000021: istore_2
+  code00000022: iload_2
+  code00000023: iload_1
+  code00000024: if_icmpge code00000044:
+  @LineNumberTable 591
+  code00000027: aload_0
+  code00000028: getfield java.lang.Throwable.stackTrace:java.lang.StackTraceElement[]
+  code00000031: iload_2
+  code00000032: aload_0
+  code00000033: iload_2
+  code00000034: invokespecial java.lang.Throwable.getStackTraceElement(int):java.lang.StackTraceElement
+  code00000037: aastore
+  @LineNumberTable 590
+  code00000038: iinc 2 1
+  code00000041: goto code00000022:
+  @LineNumberTable 593
+  code00000044: aload_0
+  code00000045: getfield java.lang.Throwable.stackTrace:java.lang.StackTraceElement[]
+  code00000048: areturn
+
+.method private synchronized void writeObject(java.io.ObjectOutputStream)
+  @Exceptions java.io.IOException
+  .max_stack 1
+  .max_locals 2
+  @LineNumberTable 647
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
+  code00000004: pop
+  @LineNumberTable 648
+  code00000005: aload_1
+  code00000006: invokevirtual java.io.ObjectOutputStream.defaultWriteObject():void
+  @LineNumberTable 649
+  code00000009: return
+
+.method private void printStackTraceAsCause(java.io.PrintStream,java.lang.StackTraceElement[])
+  .max_stack 4
+  .max_locals 8
+  @LineNumberTable 481
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
+  code00000004: astore_3
+  @LineNumberTable 482
+  code00000005: aload_3
+  code00000006: arraylength
+  code00000007: iconst_1
+  code00000008: isub
+  code00000009: istore 4
+  code00000011: aload_2
+  code00000012: arraylength
+  code00000013: iconst_1
+  code00000014: isub
+  code00000015: istore 5
+  @LineNumberTable 483
+  code00000017: iload 4
+  code00000019: iflt code00000050:
+  code00000022: iload 5
+  code00000024: iflt code00000050:
+  code00000027: aload_3
+  code00000028: iload 4
+  code00000030: aaload
+  code00000031: aload_2
+  code00000032: iload 5
+  code00000034: aaload
+  code00000035: invokevirtual java.lang.StackTraceElement.equals(java.lang.Object):boolean
+  code00000038: ifeq code00000050:
+  @LineNumberTable 484
+  code00000041: iinc 4 -1
+  code00000044: iinc 5 -1
+  code00000047: goto code00000017:
+  @LineNumberTable 486
+  code00000050: aload_3
+  code00000051: arraylength
+  code00000052: iconst_1
+  code00000053: isub
+  code00000054: iload 4
+  code00000056: isub
+  code00000057: istore 6
+  @LineNumberTable 488
+  code00000059: aload_1
+  code00000060: new java.lang.StringBuilder
+  code00000063: dup
+  code00000064: invokespecial java.lang.StringBuilder.<init>():void
+  code00000067: ldc "Caused by: "
+  code00000069: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000072: aload_0
+  code00000073: invokevirtual java.lang.StringBuilder.append(java.lang.Object):java.lang.StringBuilder
+  code00000076: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000079: invokevirtual java.io.PrintStream.println(java.lang.String):void
+  @LineNumberTable 489
+  code00000082: iconst_0
+  code00000083: istore 7
+  code00000085: iload 7
+  code00000087: iload 4
+  code00000089: if_icmpgt code00000124:
+  @LineNumberTable 490
+  code00000092: aload_1
+  code00000093: new java.lang.StringBuilder
+  code00000096: dup
+  code00000097: invokespecial java.lang.StringBuilder.<init>():void
+  code00000100: ldc "\tat "
+  code00000102: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000105: aload_3
+  code00000106: iload 7
+  code00000108: aaload
+  code00000109: invokevirtual java.lang.StringBuilder.append(java.lang.Object):java.lang.StringBuilder
+  code00000112: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000115: invokevirtual java.io.PrintStream.println(java.lang.String):void
+  @LineNumberTable 489
+  code00000118: iinc 7 1
+  code00000121: goto code00000085:
+  @LineNumberTable 491
+  code00000124: iload 6
+  code00000126: ifeq code00000158:
+  @LineNumberTable 492
+  code00000129: aload_1
+  code00000130: new java.lang.StringBuilder
+  code00000133: dup
+  code00000134: invokespecial java.lang.StringBuilder.<init>():void
+  code00000137: ldc "\t... "
+  code00000139: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000142: iload 6
+  code00000144: invokevirtual java.lang.StringBuilder.append(int):java.lang.StringBuilder
+  code00000147: ldc " more"
+  code00000149: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000152: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000155: invokevirtual java.io.PrintStream.println(java.lang.String):void
+  @LineNumberTable 495
+  code00000158: aload_0
+  code00000159: invokevirtual java.lang.Throwable.getCause():java.lang.Throwable
+  code00000162: astore 7
+  @LineNumberTable 496
+  code00000164: aload 7
+  code00000166: ifnull code00000176:
+  @LineNumberTable 497
+  code00000169: aload 7
+  code00000171: aload_1
+  code00000172: aload_3
+  code00000173: invokespecial java.lang.Throwable.printStackTraceAsCause(java.io.PrintStream,java.lang.StackTraceElement[]):void
+  @LineNumberTable 498
+  code00000176: return
+
+.method private void printStackTraceAsCause(java.io.PrintWriter,java.lang.StackTraceElement[])
+  .max_stack 4
+  .max_locals 8
+  @LineNumberTable 529
+  code00000000: aload_0
+  code00000001: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
+  code00000004: astore_3
+  @LineNumberTable 530
+  code00000005: aload_3
+  code00000006: arraylength
+  code00000007: iconst_1
+  code00000008: isub
+  code00000009: istore 4
+  code00000011: aload_2
+  code00000012: arraylength
+  code00000013: iconst_1
+  code00000014: isub
+  code00000015: istore 5
+  @LineNumberTable 531
+  code00000017: iload 4
+  code00000019: iflt code00000050:
+  code00000022: iload 5
+  code00000024: iflt code00000050:
+  code00000027: aload_3
+  code00000028: iload 4
+  code00000030: aaload
+  code00000031: aload_2
+  code00000032: iload 5
+  code00000034: aaload
+  code00000035: invokevirtual java.lang.StackTraceElement.equals(java.lang.Object):boolean
+  code00000038: ifeq code00000050:
+  @LineNumberTable 532
+  code00000041: iinc 4 -1
+  code00000044: iinc 5 -1
+  code00000047: goto code00000017:
+  @LineNumberTable 534
+  code00000050: aload_3
+  code00000051: arraylength
+  code00000052: iconst_1
+  code00000053: isub
+  code00000054: iload 4
+  code00000056: isub
+  code00000057: istore 6
+  @LineNumberTable 536
+  code00000059: aload_1
+  code00000060: new java.lang.StringBuilder
+  code00000063: dup
+  code00000064: invokespecial java.lang.StringBuilder.<init>():void
+  code00000067: ldc "Caused by: "
+  code00000069: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000072: aload_0
+  code00000073: invokevirtual java.lang.StringBuilder.append(java.lang.Object):java.lang.StringBuilder
+  code00000076: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000079: invokevirtual java.io.PrintWriter.println(java.lang.String):void
+  @LineNumberTable 537
+  code00000082: iconst_0
+  code00000083: istore 7
+  code00000085: iload 7
+  code00000087: iload 4
+  code00000089: if_icmpgt code00000124:
+  @LineNumberTable 538
+  code00000092: aload_1
+  code00000093: new java.lang.StringBuilder
+  code00000096: dup
+  code00000097: invokespecial java.lang.StringBuilder.<init>():void
+  code00000100: ldc "\tat "
+  code00000102: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000105: aload_3
+  code00000106: iload 7
+  code00000108: aaload
+  code00000109: invokevirtual java.lang.StringBuilder.append(java.lang.Object):java.lang.StringBuilder
+  code00000112: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000115: invokevirtual java.io.PrintWriter.println(java.lang.String):void
+  @LineNumberTable 537
+  code00000118: iinc 7 1
+  code00000121: goto code00000085:
+  @LineNumberTable 539
+  code00000124: iload 6
+  code00000126: ifeq code00000158:
+  @LineNumberTable 540
+  code00000129: aload_1
+  code00000130: new java.lang.StringBuilder
+  code00000133: dup
+  code00000134: invokespecial java.lang.StringBuilder.<init>():void
+  code00000137: ldc "\t... "
+  code00000139: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000142: iload 6
+  code00000144: invokevirtual java.lang.StringBuilder.append(int):java.lang.StringBuilder
+  code00000147: ldc " more"
+  code00000149: invokevirtual java.lang.StringBuilder.append(java.lang.String):java.lang.StringBuilder
+  code00000152: invokevirtual java.lang.StringBuilder.toString():java.lang.String
+  code00000155: invokevirtual java.io.PrintWriter.println(java.lang.String):void
+  @LineNumberTable 543
+  code00000158: aload_0
+  code00000159: invokevirtual java.lang.Throwable.getCause():java.lang.Throwable
+  code00000162: astore 7
+  @LineNumberTable 544
+  code00000164: aload 7
+  code00000166: ifnull code00000176:
+  @LineNumberTable 545
+  code00000169: aload 7
+  code00000171: aload_1
+  code00000172: aload_3
+  code00000173: invokespecial java.lang.Throwable.printStackTraceAsCause(java.io.PrintWriter,java.lang.StackTraceElement[]):void
+  @LineNumberTable 546
+  code00000176: return
+
+.method private native int getStackTraceDepth()
+
+.method private native java.lang.StackTraceElement getStackTraceElement(int)
+

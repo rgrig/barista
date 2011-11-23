@@ -1,0 +1,3 @@
+RUN_PARAMS=
+CLASS_NAME=pack.Test
+include ../makefiles/Makefile.asm-ocaml

@@ -1,0 +1,27 @@
+--- java.lang.Integer.toUnsignedString(int,int):java.lang.String --------------
+digraph {
+  node_0 [shape=box,color=blue,label=<[offset 0]<br/>bipush 32<br/>newarray char<br/>astore_2<br/>bipush 32<br/>istore_3<br/>iconst_1<br/>iload_1<br/>ishl<br/>istore 4<br/>iload 4<br/>iconst_1<br/>isub<br/>istore 5>]
+  node_1 [shape=box,label=<[offset 19]<br/>aload_2<br/>iinc 3 -1<br/>iload_3<br/>getstatic java.lang.Integer.digits<br/>iload_0<br/>iload 5<br/>iand<br/>caload<br/>castore<br/>iload_0<br/>iload_1<br/>iushr<br/>istore_0<br/>iload_0>]
+  node_2 [shape=box,label=<[offset 41]<br/>new java.lang.String<br/>dup<br/>aload_2<br/>iload_3<br/>bipush 32<br/>iload_3<br/>isub<br/>invokespecial java.lang.String.&lt;init&gt;(char[],int,int):void<br/>areturn>]
+  node_0 -> node_1 [label=<->]
+  node_1_cond [shape=circle,label=<ne/int<br/>->]
+  node_1 -> node_1_cond [label=<->]
+  node_1_cond -> node_1 [label=<true>]
+  node_1_cond -> node_2 [label=<false>]
+}
+
+--- java.lang.Class.getSimpleBinaryName():java.lang.String --------------------
+digraph {
+  node_3 [shape=box,color=blue,label=<[offset 0]<br/>aload_0<br/>invokevirtual java.lang.Class.getEnclosingClass():java.lang.Class<br/>astore_1<br/>aload_1>]
+  node_4 [shape=box,label=<[offset 9]<br/>aconst_null<br/>areturn>]
+  node_5 [shape=box,label=<[offset 11]<br/>aload_0<br/>invokevirtual java.lang.Class.getName():java.lang.String<br/>aload_1<br/>invokevirtual java.lang.Class.getName():java.lang.String<br/>invokevirtual java.lang.String.length():int<br/>invokevirtual java.lang.String.substring(int):java.lang.String>]
+  node_6 [shape=box,label=<[offset 25]<br/>areturn>]
+  node_7 [shape=box,label=<[offset 26]<br/>astore_2<br/>new java.lang.InternalError<br/>dup<br/>ldc &quot;Malformed class name&quot;<br/>invokespecial java.lang.InternalError.&lt;init&gt;(java.lang.String):void<br/>athrow>]
+  node_3_cond [shape=circle,label=<not null<br/>->]
+  node_3 -> node_3_cond [label=<->]
+  node_3_cond -> node_5 [label=<true>]
+  node_3_cond -> node_4 [label=<false>]
+  node_5 -> node_6 [label=<->]
+  node_5 -> node_7 [label=<-<br/>java.lang.IndexOutOfBoundsException>,style=dotted]
+}
+
