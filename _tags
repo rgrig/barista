@@ -24,7 +24,7 @@ true: debug
 # Options
 <src/**>: use_bigarray, use_camomile, use_str, use_unix, use_zip
 <src/**> and not "src/driver/barista.ml": for-pack(BaristaLibrary)
-<**/*.ml{,i}>: warnings
+#<**/*.ml{,i}>: warnings
 
 # Generation of version file
 "src/common/currentVersion.mli": src_common_currentVersion_ml

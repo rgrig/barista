@@ -57,14 +57,17 @@ all: generate
 	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).byte $(PROJECT_NAME).native; \
 	fi
 
-doc: FORCE
+doc:
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).docdir/index.html
 	cp $(PATH_BUILD)/$(PROJECT_NAME).docdir/*.html $(PATH_BUILD)/$(PROJECT_NAME).docdir/*.css $(PATH_OCAMLDOC)
 
-tests: FORCE
+scrap:
+	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) test.native
+
+tests:
 	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) all && cd ..) || true
 
-clean: FORCE
+clean:
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) -clean
 	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) clean && cd ..) || true
 	rm -f $(MODULES_ODOCL) $(MODULES_MLPACK) $(PROJECT_NAME)Library.itarget
@@ -91,9 +94,9 @@ install: all
 	  fi \
 	fi
 
-generate: FORCE
+generate:
 	echo '$(PROJECT_NAME)Library.cma' > $(PROJECT_NAME)Library.itarget
 	(test -x $(PATH_OCAML_PREFIX)/bin/ocamlopt && echo '$(PROJECT_NAME)Library.cmxa' >> $(PROJECT_NAME)Library.itarget) || true
 	(test -x $(PATH_OCAML_PREFIX)/bin/ocamljava && echo '$(PROJECT_NAME)Library.cmja' >> $(PROJECT_NAME)Library.itarget) || true
 
-FORCE:
+.PHONY: doc clean generate scrap tests
