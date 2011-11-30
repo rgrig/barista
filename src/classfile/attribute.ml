@@ -32,32 +32,32 @@ type info = {
 (* Exception *)
 
 type error =
+  | Defined_twice of string
+  | Invalid_attribute_name_value
+  | Invalid_bootstrap_argument
+  | Invalid_bootstrap_method_handle
+  | Invalid_class_attribute
   | Invalid_code_attribute
   | Invalid_code_length
-  | Defined_twice of string
-  | Invalid_field_attribute
-  | Invalid_method_attribute
-  | Invalid_class_attribute
-  | Invalid_package_attribute
-  | Invalid_module_attribute
   | Invalid_constant_value
   | Invalid_enclosing_method
+  | Invalid_exception
+  | Invalid_exception_name
+  | Invalid_field_attribute
+  | Invalid_inner_class
+  | Invalid_list_length
   | Invalid_local_variable_table
   | Invalid_local_variable_type_table
-  | Invalid_list_length
-  | Invalid_attribute_name_value
-  | Invalid_exception_name
-  | Invalid_exception
-  | Invalid_inner_class
+  | Invalid_method_attribute
+  | Invalid_module
+  | Invalid_module_attribute
+  | Invalid_module_dependency_kind
   | Invalid_outer_class
+  | Invalid_package_attribute
   | Invalid_signature
   | Invalid_source_file
   | Invalid_stack_map_frame
   | Invalid_stack_map_verification_type
-  | Invalid_bootstrap_method_handle
-  | Invalid_bootstrap_argument
-  | Invalid_module
-  | Invalid_module_dependency_kind
   | Missing_module_attribute
 
 exception Exception of error

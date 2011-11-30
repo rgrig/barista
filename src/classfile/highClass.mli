@@ -11,11 +11,20 @@
 the first place. *)
 
 module Instruction : sig (* {{{ *)
+  type t
   type label
   module LabelHash : Hashtbl.S with type key = label
 end (* }}} *)
 
 module Attribute : sig (* {{{ *)
+  (* TODO: Should we just use the one in the old Attribute module? *)
+  type enclosing_elemen =
+    | Class
+    | Method
+    | Field
+    | Package
+    | Module
+
   type constant_value =
     | Long_value of int64
     | Float_value of float
@@ -38,11 +47,33 @@ module Attribute : sig (* {{{ *)
       enclosing_method : (Name.for_method * Descriptor.for_method) option;
     }
 
+  type code_attribute = [
+    | `LineNumberTable of int Instruction.LabelHash.t
+    | `Unknown of Utils.UTF8.t * string ]
+(* TODO
+    | `LocalVariableTable of unit (** types for local variables *)
+    | `LocalVariableTypeTable of local_variable_type_table_element list (** signatures for local variables *)
+    | `StackMapTable of stack_map_frame list
+ *)
+
+  type exception_table_element = {
+      try_start : Instruction.label;
+      try_end : Instruction.label;
+      catch : Instruction.label;
+      caught : Name.for_class option;
+    }
+
+  type code_value = {
+      code : Instruction.t list;
+      exception_table : exception_table_element list;
+      attributes : code_attribute list;
+    }
+
   type for_class =
     [ `InnerClasses of inner_class_element list
     | `EnclosingMethod of enclosing_method_value
     | `Synthetic (** auto-generated element *)
-    | `Signature of [`Class of Signature.class_signature]
+    | `ClassSignature of Signature.class_signature
     | `SourceFile of Utils.UTF8.t
     | `SourceDebugExtension of Utils.UTF8.t (** implementation specific *)
     | `Deprecated
@@ -53,6 +84,24 @@ module Attribute : sig (* {{{ *)
     | `BootstrapMethods of Bootstrap.method_specifier list (** bootstrap for dynamic methods *)
     | `Module of Utils.UTF8.t * Utils.UTF8.t (** module name and version *)
     | `Unknown of Utils.UTF8.t * string ]
+
+  type for_method =
+    [ `Code of code_value
+    | `Exceptions of Name.for_class list
+    | `Synthetic (** auto-generated element *)
+    | `MethodSignature of Signature.method_signature
+    | `Deprecated
+    | `RuntimeVisibleAnnotations of Annotation.t list
+    | `RuntimeInvisibleAnnotations of Annotation.t list
+    | `RuntimeVisibleParameterAnnotations of Annotation.t list list
+    | `RuntimeInvisibleParameterAnnotations of Annotation.t list list
+    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
+    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
+    | `AnnotationDefault of Annotation.element_value
+    | `Unknown of Utils.UTF8.t * string ]
+
+  type t = [ for_class | for_method ]
+
 end (* }}} *)
 
 module Method : sig (* {{{ *)
@@ -71,6 +120,8 @@ type t = {
 
 type error =
   | Invalid_class_name
+  | Invalid_module
+  | Invalid_attribute_name
 
 exception Exception of error
 

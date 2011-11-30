@@ -8,6 +8,8 @@ module U = Utils
 (* errors *) (* {{{ *)
 type error =
   | Invalid_class_name
+  | Invalid_module
+  | Invalid_attribute_name
 
 exception Exception of error
 
@@ -24,7 +26,21 @@ module Instruction = struct (* {{{ *)
   end)
 end (* }}} *)
 
-module Attribute = struct (* {{{ *)
+module OA = Attribute (* {{{ *)
+  (* used only for the low-level stuff, which is unchanged *)
+
+module Attribute = struct
+  open Consts
+
+  type enclosing_elemen =
+    | Class
+    | Method
+    | Field
+    | Package
+    | Module
+
+  (* high-level *)
+
   type constant_value =
     | Long_value of int64
     | Float_value of float
@@ -74,7 +90,7 @@ module Attribute = struct (* {{{ *)
     [ `InnerClasses of inner_class_element list
     | `EnclosingMethod of enclosing_method_value
     | `Synthetic (** auto-generated element *)
-    | `Signature of [`Class of Signature.class_signature]
+    | `ClassSignature of Signature.class_signature
     | `SourceFile of Utils.UTF8.t
     | `SourceDebugExtension of Utils.UTF8.t (** implementation specific *)
     | `Deprecated
@@ -90,7 +106,7 @@ module Attribute = struct (* {{{ *)
     [ `Code of code_value
     | `Exceptions of Name.for_class list
     | `Synthetic (** auto-generated element *)
-    | `Signature of [`Method of Signature.method_signature]
+    | `MethodSignature of Signature.method_signature
     | `Deprecated
     | `RuntimeVisibleAnnotations of Annotation.t list
     | `RuntimeInvisibleAnnotations of Annotation.t list
@@ -101,7 +117,130 @@ module Attribute = struct (* {{{ *)
     | `AnnotationDefault of Annotation.element_value
     | `Unknown of Utils.UTF8.t * string ]
 
-  let decode _ _ _ = failwith "todo"
+  type t = [ for_class | for_method ]
+
+  (* helper functions *)
+
+  let get_utf8 pool idx err =
+    match ConstantPool.get_entry pool idx with
+    | ConstantPool.UTF8 v -> v
+    | _ -> fail err
+
+  let read_annotations pool st =
+    InputStream.read_elements
+      st
+      (fun st ->
+        let a = Annotation.read_info st in
+        Annotation.decode pool a)
+
+  let read_extended_annotations pool st =
+    InputStream.read_elements
+      st
+      (fun st ->
+        let a = Annotation.read_extended_info st in
+        Annotation.decode_extended pool a)
+
+  let read_annotations_list pool st =
+    let nb = InputStream.read_u1 st in
+    let res = ref [] in
+    for i = 1 to (nb :> int) do
+      let local =
+        InputStream.read_elements
+          st
+          (fun st ->
+            let a = Annotation.read_info st in
+            Annotation.decode pool a) in
+      res := local :: !res
+    done;
+    List.rev !res
+
+  let read_module_info pool st =
+    let module_index = InputStream.read_u2 st in
+    let name_index, version_index =
+      match ConstantPool.get_entry pool module_index with
+      | ConstantPool.ModuleId (n, v) -> n, v
+      | _ -> fail Invalid_module in
+    let name = get_utf8 pool name_index Invalid_module in
+    let version = get_utf8 pool version_index Invalid_module in
+    name, version
+
+  let decode_attr_constant_value = failwith "todo"
+  let decode_attr_code = failwith "todo"
+  let decode_attr_exceptions = failwith "todo"
+  let decode_attr_inner_classes = failwith "todo"
+  let decode_attr_enclosing_method = failwith "todo"
+  let decode_attr_synthetic = failwith "todo"
+  let decode_attr_signature = failwith "todo"
+  let decode_attr_source_file = failwith "todo"
+  let decode_attr_source_debug_extension = failwith "todo"
+  let decode_attr_line_number_table = failwith "todo"
+  let decode_attr_local_variable_table = failwith "todo"
+  let decode_attr_local_variable_type_table = failwith "todo"
+  let decode_attr_deprecated = failwith "todo"
+  let decode_attr_runtime_visible_annotations = failwith "todo"
+  let decode_attr_runtime_invisible_annotations = failwith "todo"
+  let decode_attr_runtime_visible_parameter_annotations = failwith "todo"
+  let decode_attr_runtime_invisible_parameter_annotations = failwith "todo"
+  let decode_attr_runtime_visible_type_annotations = failwith "todo"
+  let decode_attr_runtime_invisible_type_annotations = failwith "todo"
+  let decode_attr_annotation_default = failwith "todo"
+  let decode_attr_stack_map_table = failwith "todo"
+  let decode_attr_bootstrap_methods = failwith "todo"
+  let decode_attr_module = failwith "todo"
+  let decode_attr_module_requires = failwith "todo"
+  let decode_attr_module_permits = failwith "todo"
+  let decode_attr_module_provides = failwith "todo"
+
+  module UTF8Hashtbl = Hashtbl.Make (Utils.UTF8)
+
+  let decoders :
+    (enclosing_elemen ->
+      ConstantPool.t ->
+        OA.info -> InputStream.t -> t) UTF8Hashtbl.t
+  =
+    let ds = [
+      attr_constant_value, decode_attr_constant_value;
+      attr_code, decode_attr_code;
+      attr_exceptions, decode_attr_exceptions;
+      attr_inner_classes, decode_attr_inner_classes;
+      attr_enclosing_method, decode_attr_enclosing_method;
+      attr_synthetic, decode_attr_synthetic;
+      attr_signature, decode_attr_signature;
+      attr_source_file, decode_attr_source_file;
+      attr_source_debug_extension, decode_attr_source_debug_extension;
+      attr_line_number_table, decode_attr_line_number_table;
+      attr_local_variable_table, decode_attr_local_variable_table;
+      attr_local_variable_type_table, decode_attr_local_variable_type_table;
+      attr_deprecated, decode_attr_deprecated;
+      attr_runtime_visible_annotations, decode_attr_runtime_visible_annotations;
+      attr_runtime_invisible_annotations, decode_attr_runtime_invisible_annotations;
+      attr_runtime_visible_parameter_annotations, decode_attr_runtime_visible_parameter_annotations;
+      attr_runtime_invisible_parameter_annotations, decode_attr_runtime_invisible_parameter_annotations;
+      attr_runtime_visible_type_annotations, decode_attr_runtime_visible_type_annotations;
+      attr_runtime_invisible_type_annotations, decode_attr_runtime_invisible_type_annotations;
+      attr_annotation_default, decode_attr_annotation_default;
+      attr_stack_map_table, decode_attr_stack_map_table;
+      attr_bootstrap_methods, decode_attr_bootstrap_methods;
+      attr_module, decode_attr_module;
+      attr_module_requires, decode_attr_module_requires;
+      attr_module_permits, decode_attr_module_permits;
+      attr_module_provides, decode_attr_module_provides
+    ] in
+    let r = UTF8Hashtbl.create 61 in
+    List.iter (fun (k, v) -> UTF8Hashtbl.add r k v) ds;
+    r
+
+  (* visible functions *)
+
+  let for_class _ = failwith "todo"
+
+  let decode element pool i =
+    let st = InputStream.make_of_string i.OA.data in
+    let attr_name = get_utf8 pool i.OA.name_index Invalid_attribute_name in
+    try
+      for_class (UTF8Hashtbl.find decoders attr_name element pool i st)
+    with Not_found ->
+      `Unknown (attr_name, i.OA.data)
 end (* }}} *)
 
 module Method = struct (* {{{ *)
@@ -173,7 +312,7 @@ let decode ?(version = Version.default) cf =
   let is_interface = List.mem `Interface flags in
   let field_decode = Field.decode is_interface pool in
   let method_decode = Method.decode is_interface pool in
-  let attribute_decode = Attribute.decode is_interface pool in
+  let attribute_decode = A.decode A.Class pool in
   check_version_high ~version:version { access_flags = flags;
     name = get_class_name cf.CF.this_class;
     extends = extends;

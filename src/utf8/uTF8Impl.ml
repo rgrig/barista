@@ -160,6 +160,12 @@ let to_string s =
     Buffer.contents res
   with _ -> fail (Unable_to_convert_from_utf8 s)
 
+let hash s =
+  let res = ref 0 in
+  let hc c = try UChar.uint_code c with UChar.Out_of_range -> 0 in
+  UTF8.iter (fun c -> res := 31 * !res + hc c) s;
+  !res
+
 let to_string_noerr s =
   try
     to_string s

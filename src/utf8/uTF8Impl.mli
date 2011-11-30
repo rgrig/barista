@@ -101,6 +101,9 @@ val get : t -> int -> UCharImpl.t
 val equal : t -> t -> bool
 (** Equality over UTF8 strings. *)
 
+val hash : t -> int
+(** Hash of UTF8 strings. *)
+
 val compare : t -> t -> int
 (** Comparison over UTF8 strings. *)
 
