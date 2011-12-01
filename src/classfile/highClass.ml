@@ -11,6 +11,9 @@ type error =
   | Invalid_module
   | Invalid_attribute_name
   | Invalid_constant_value
+  | Invalid_code_length
+  | Invalid_exception_name
+  | Invalid_code_attribute
 
 exception Exception of error
 
@@ -25,6 +28,9 @@ module Instruction = struct (* {{{ *)
     let equal = (=)
     let hash x = x
   end)
+
+  let decode _ _ _ = failwith "todo"
+  let size_of _ _ = failwith "todo"
 end (* }}} *)
 
 module OA = Attribute (* {{{ *)
@@ -138,6 +144,13 @@ module Attribute = struct
     | ConstantPool.UTF8 v -> v
     | _ -> fail err
 
+  let get_class_name pool idx err =
+    match ConstantPool.get_entry pool idx with
+      | ConstantPool.Class idx ->
+	let n = get_utf8 pool idx err in
+	Name.make_for_class_from_internal n
+      | _ -> fail err
+
   let read_annotations pool st =
     InputStream.read_elements
       st
@@ -176,7 +189,28 @@ module Attribute = struct
     let version = get_utf8 pool version_index Invalid_module in
     name, version
 
-  let decode_attr_constant_value _ pool _ st =
+  let read_info st =
+    let name = InputStream.read_u2 st in
+    let len = InputStream.read_u4 st in
+    if (len :> int64) > (Int64.of_int max_int) then
+      raise (InputStream.Exception InputStream.Data_is_too_large)
+    else
+      let dat = InputStream.read_bytes st (Int64.to_int (len :> int64)) in
+      { Attribute.name_index = name;
+	length = len;
+	data = dat; }
+
+  let check_code_attributes l =
+    let map = function
+      | (`LineNumberTable _ as x)
+(*      | (`LocalVariableTable _ as x)
+      | (`LocalVariableTypeTable _ as x)
+      | (`StackMapTable _ as x) *)
+      | (`Unknown _ as x) -> x
+      | #t -> fail Invalid_code_attribute in
+    List.map map l
+      
+  let decode_attr_constant_value _ _ pool _ st =
         let const_index = InputStream.read_u2 st in
         match ConstantPool.get_entry pool const_index with
         | ConstantPool.Long (hi, lo) ->
@@ -193,7 +227,56 @@ module Attribute = struct
             `ConstantValue (String_value (get_utf8 pool idx Invalid_constant_value))
         | _ -> fail Invalid_constant_value
 
-  let decode_attr_code _ = failwith "todo"
+  let decode_attr_code decode element pool i st =
+    (* read these anyway to get into the stream *)
+    let (*mx_stack*) _ = InputStream.read_u2 st in
+    let (*mx_locals*) _ = InputStream.read_u2 st in
+    let code_len' = InputStream.read_u4 st in
+    let code_len =
+      if (code_len' :> int64) < 65536L then
+        Int64.to_int (code_len' :> int64)
+      else
+        fail Invalid_code_length in
+    let code_content = InputStream.read_bytes st code_len in
+    let code_stream = InputStream.make_of_string code_content in
+    let instr_codes = ByteCode.read code_stream 0 in
+    let fold_size (l, ofs, lbl) inst =
+      let s = Instruction.size_of ofs inst in
+      (inst, ofs, lbl) :: l, ofs + s, lbl + 1 in
+    let instr_codes_annot, _, _ = List.fold_left fold_size ([], 0, 0) instr_codes in
+    let ofs_to_label ofs =
+      let (_, _, lbl) = List.find (fun (_, o, _) -> o = ofs) instr_codes_annot in
+      lbl in
+    let u2_ofs_to_label ofs = ofs_to_label (ofs : Utils.u2 :> int) in
+    let instrs = List.map (Instruction.decode pool ofs_to_label) instr_codes in
+    let exceptions =
+      InputStream.read_elements
+        st
+        (fun st ->
+          let start_pc = InputStream.read_u2 st in
+          let end_pc = InputStream.read_u2 st in
+          let handler_pc = InputStream.read_u2 st in
+          let catch_index = InputStream.read_u2 st in
+          let catch_type =
+            if (catch_index :> int) <> 0 then
+              Some (get_class_name pool catch_index Invalid_exception_name)
+            else
+              None in
+          { try_start = u2_ofs_to_label start_pc;
+            try_end = u2_ofs_to_label end_pc;
+            catch = u2_ofs_to_label handler_pc;
+            caught = catch_type; }) in
+    let attrs =
+      InputStream.read_elements
+        st
+        (fun st ->
+          let a = read_info st in
+          decode element pool a) in
+    `Code { code = instrs;
+            exception_table = exceptions;
+            attributes = check_code_attributes attrs; }
+      (* TODO: should code attributes be checked here? *)
+
   let decode_attr_exceptions _ = failwith "todo"
   let decode_attr_inner_classes _ = failwith "todo"
   let decode_attr_enclosing_method _ = failwith "todo"
@@ -222,10 +305,12 @@ module Attribute = struct
   module UTF8Hashtbl = Hashtbl.Make (Utils.UTF8)
 
   let decoders :
-    (enclosing_elemen ->
-      ConstantPool.t ->
-        OA.info -> InputStream.t -> t) UTF8Hashtbl.t
-  =
+      ((enclosing_elemen ->
+	ConstantPool.t ->
+	OA.info -> for_class) ->
+       enclosing_elemen ->
+       ConstantPool.t ->
+       OA.info -> InputStream.t -> t) UTF8Hashtbl.t =
     let ds = [
       attr_constant_value, decode_attr_constant_value;
       attr_code, decode_attr_code;
@@ -262,11 +347,11 @@ module Attribute = struct
 
   let for_class _ = failwith "todo"
 
-  let decode element pool i =
+  let rec decode element pool i =
     let st = InputStream.make_of_string i.OA.data in
     let attr_name = get_utf8 pool i.OA.name_index Invalid_attribute_name in
     try
-      for_class (UTF8Hashtbl.find decoders attr_name element pool i st)
+      for_class (UTF8Hashtbl.find decoders attr_name decode element pool i st)
     with Not_found ->
       `Unknown (attr_name, i.OA.data)
 end (* }}} *)

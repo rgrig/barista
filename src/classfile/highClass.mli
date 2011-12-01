@@ -134,6 +134,9 @@ type error =
   | Invalid_module
   | Invalid_attribute_name
   | Invalid_constant_value
+  | Invalid_code_length
+  | Invalid_exception_name
+  | Invalid_code_attribute
 
 exception Exception of error
 
