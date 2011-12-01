@@ -100,7 +100,18 @@ module Attribute : sig (* {{{ *)
     | `AnnotationDefault of Annotation.element_value
     | `Unknown of Utils.UTF8.t * string ]
 
-  type t = [ for_class | for_method ]
+  type for_field =
+    [ `ConstantValue of constant_value
+    | `Synthetic
+    | `Signature of [`Field of Signature.field_type_signature]
+    | `Deprecated
+    | `RuntimeVisibleAnnotations of Annotation.t list
+    | `RuntimeInvisibleAnnotations of Annotation.t list
+    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
+    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
+    | `Unknown of Utils.UTF8.t * string ]
+
+  type t = [ for_class | for_method | for_field ]
 
 end (* }}} *)
 
@@ -122,6 +133,7 @@ type error =
   | Invalid_class_name
   | Invalid_module
   | Invalid_attribute_name
+  | Invalid_constant_value
 
 exception Exception of error
 

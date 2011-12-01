@@ -48,6 +48,7 @@ default:
 	@echo "  veryclean   deletes all produced files (including documentation)"
 	@echo "  install     copies executable and library files"
 	@echo "  generate    generates files needed for build"
+	@echo "  scrap       generates small test file"
 
 all: generate
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME)Library.otarget

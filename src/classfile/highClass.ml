@@ -10,6 +10,7 @@ type error =
   | Invalid_class_name
   | Invalid_module
   | Invalid_attribute_name
+  | Invalid_constant_value
 
 exception Exception of error
 
@@ -117,7 +118,18 @@ module Attribute = struct
     | `AnnotationDefault of Annotation.element_value
     | `Unknown of Utils.UTF8.t * string ]
 
-  type t = [ for_class | for_method ]
+  type for_field =
+    [ `ConstantValue of constant_value
+    | `Synthetic
+    | `Signature of [`Field of Signature.field_type_signature]
+    | `Deprecated
+    | `RuntimeVisibleAnnotations of Annotation.t list
+    | `RuntimeInvisibleAnnotations of Annotation.t list
+    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
+    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
+    | `Unknown of Utils.UTF8.t * string ]
+
+  type t = [ for_class | for_method | for_field ]
 
   (* helper functions *)
 
@@ -164,32 +176,48 @@ module Attribute = struct
     let version = get_utf8 pool version_index Invalid_module in
     name, version
 
-  let decode_attr_constant_value = failwith "todo"
-  let decode_attr_code = failwith "todo"
-  let decode_attr_exceptions = failwith "todo"
-  let decode_attr_inner_classes = failwith "todo"
-  let decode_attr_enclosing_method = failwith "todo"
-  let decode_attr_synthetic = failwith "todo"
-  let decode_attr_signature = failwith "todo"
-  let decode_attr_source_file = failwith "todo"
-  let decode_attr_source_debug_extension = failwith "todo"
-  let decode_attr_line_number_table = failwith "todo"
-  let decode_attr_local_variable_table = failwith "todo"
-  let decode_attr_local_variable_type_table = failwith "todo"
-  let decode_attr_deprecated = failwith "todo"
-  let decode_attr_runtime_visible_annotations = failwith "todo"
-  let decode_attr_runtime_invisible_annotations = failwith "todo"
-  let decode_attr_runtime_visible_parameter_annotations = failwith "todo"
-  let decode_attr_runtime_invisible_parameter_annotations = failwith "todo"
-  let decode_attr_runtime_visible_type_annotations = failwith "todo"
-  let decode_attr_runtime_invisible_type_annotations = failwith "todo"
-  let decode_attr_annotation_default = failwith "todo"
-  let decode_attr_stack_map_table = failwith "todo"
-  let decode_attr_bootstrap_methods = failwith "todo"
-  let decode_attr_module = failwith "todo"
-  let decode_attr_module_requires = failwith "todo"
-  let decode_attr_module_permits = failwith "todo"
-  let decode_attr_module_provides = failwith "todo"
+  let decode_attr_constant_value _ pool _ st =
+        let const_index = InputStream.read_u2 st in
+        match ConstantPool.get_entry pool const_index with
+        | ConstantPool.Long (hi, lo) ->
+            let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
+            `ConstantValue (Long_value v)
+        | ConstantPool.Float v ->
+            `ConstantValue (Float_value (Int32.float_of_bits v))
+        | ConstantPool.Double (hi, lo) ->
+            let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
+            `ConstantValue (Double_value (Int64.float_of_bits v))
+        | ConstantPool.Integer v ->
+            `ConstantValue (Integer_value v)
+        | ConstantPool.String idx ->
+            `ConstantValue (String_value (get_utf8 pool idx Invalid_constant_value))
+        | _ -> fail Invalid_constant_value
+
+  let decode_attr_code _ = failwith "todo"
+  let decode_attr_exceptions _ = failwith "todo"
+  let decode_attr_inner_classes _ = failwith "todo"
+  let decode_attr_enclosing_method _ = failwith "todo"
+  let decode_attr_synthetic _ = failwith "todo"
+  let decode_attr_signature _ = failwith "todo"
+  let decode_attr_source_file _ = failwith "todo"
+  let decode_attr_source_debug_extension _ = failwith "todo"
+  let decode_attr_line_number_table _ = failwith "todo"
+  let decode_attr_local_variable_table _ = failwith "todo"
+  let decode_attr_local_variable_type_table _ = failwith "todo"
+  let decode_attr_deprecated _ = failwith "todo"
+  let decode_attr_runtime_visible_annotations _ = failwith "todo"
+  let decode_attr_runtime_invisible_annotations _ = failwith "todo"
+  let decode_attr_runtime_visible_parameter_annotations _ = failwith "todo"
+  let decode_attr_runtime_invisible_parameter_annotations _ = failwith "todo"
+  let decode_attr_runtime_visible_type_annotations _ = failwith "todo"
+  let decode_attr_runtime_invisible_type_annotations _ = failwith "todo"
+  let decode_attr_annotation_default _ = failwith "todo"
+  let decode_attr_stack_map_table _ = failwith "todo"
+  let decode_attr_bootstrap_methods _ = failwith "todo"
+  let decode_attr_module _ = failwith "todo"
+  let decode_attr_module_requires _ = failwith "todo"
+  let decode_attr_module_permits _ = failwith "todo"
+  let decode_attr_module_provides _ = failwith "todo"
 
   module UTF8Hashtbl = Hashtbl.Make (Utils.UTF8)
 
