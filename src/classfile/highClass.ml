@@ -1,5 +1,6 @@
 (* module shorthands *) (* {{{ *)
 module AF = AccessFlag
+module C = Consts
 module CF = ClassFile
 module U = Utils
 
@@ -7,13 +8,15 @@ module U = Utils
 
 (* errors *) (* {{{ *)
 type error =
-  | Invalid_class_name
-  | Invalid_module
   | Invalid_attribute_name
-  | Invalid_constant_value
-  | Invalid_code_length
-  | Invalid_exception_name
+  | Invalid_class_name
   | Invalid_code_attribute
+  | Invalid_code_length
+  | Invalid_constant_value
+  | Invalid_descriptor
+  | Invalid_exception_name
+  | Invalid_method_name
+  | Invalid_module
 
 exception Exception of error
 
@@ -33,18 +36,9 @@ module Instruction = struct (* {{{ *)
   let size_of _ _ = failwith "todo"
 end (* }}} *)
 
-module OA = Attribute (* {{{ *)
-  (* used only for the low-level stuff, which is unchanged *)
-
-module Attribute = struct
+module A = Attribute
+module HighAttribute = struct (* {{{ *)
   open Consts
-
-  type enclosing_elemen =
-    | Class
-    | Method
-    | Field
-    | Package
-    | Module
 
   (* high-level *)
 
@@ -196,7 +190,7 @@ module Attribute = struct
       raise (InputStream.Exception InputStream.Data_is_too_large)
     else
       let dat = InputStream.read_bytes st (Int64.to_int (len :> int64)) in
-      { Attribute.name_index = name;
+      { A.name_index = name;
 	length = len;
 	data = dat; }
 
@@ -305,12 +299,12 @@ module Attribute = struct
   module UTF8Hashtbl = Hashtbl.Make (Utils.UTF8)
 
   let decoders :
-      ((enclosing_elemen ->
+      ((A.enclosing_element ->
 	ConstantPool.t ->
-	OA.info -> for_class) ->
-       enclosing_elemen ->
+	A.info -> for_class) ->
+       A.enclosing_element ->
        ConstantPool.t ->
-       OA.info -> InputStream.t -> t) UTF8Hashtbl.t =
+       A.info -> InputStream.t -> t) UTF8Hashtbl.t =
     let ds = [
       attr_constant_value, decode_attr_constant_value;
       attr_code, decode_attr_code;
@@ -347,32 +341,35 @@ module Attribute = struct
 
   let for_class _ = failwith "todo"
 
+  let decode_method _ _  = failwith "todo"
+
   let rec decode element pool i =
-    let st = InputStream.make_of_string i.OA.data in
-    let attr_name = get_utf8 pool i.OA.name_index Invalid_attribute_name in
+    let st = InputStream.make_of_string i.A.data in
+    let attr_name = get_utf8 pool i.A.name_index Invalid_attribute_name in
     try
       for_class (UTF8Hashtbl.find decoders attr_name decode element pool i st)
     with Not_found ->
-      `Unknown (attr_name, i.OA.data)
+      `Unknown (attr_name, i.A.data)
 end (* }}} *)
 
-module Method = struct (* {{{ *)
+module M = Method
+module HighMethod = struct (* {{{ *)
   type regular = {
       flags : AccessFlag.for_method list;
       name : Name.for_method;
       descriptor : Descriptor.for_method;
-      attributes : Attribute.for_method list;
+      attributes : HighAttribute.for_method list;
     }
 
   type constructor = {
       cstr_flags : AccessFlag.for_constructor list;
       cstr_descriptor : Descriptor.for_parameter list;
-      cstr_attributes : Attribute.for_method list;
+      cstr_attributes : HighAttribute.for_method list;
     }
 
   type class_initializer = {
       init_flags : AccessFlag.for_initializer list;
-      init_attributes : Attribute.for_method list;
+      init_attributes : HighAttribute.for_method list;
     }
 
   type t =
@@ -380,11 +377,45 @@ module Method = struct (* {{{ *)
     | Constructor of constructor
     | Initializer of class_initializer
 
-  let decode _ _ _ = failwith "todo"
+  let decode is_interface pool m =
+    let name = match ConstantPool.get_entry pool m.M.name_index with
+    | ConstantPool.UTF8 n ->
+        if Name.is_valid_for_method n then
+          n
+        else
+          fail Invalid_method_name
+    | _ -> fail Invalid_method_name in
+    let descriptor = match ConstantPool.get_entry pool m.M.descriptor_index with
+     | ConstantPool.UTF8 d -> Descriptor.method_of_utf8 d
+     | _ -> fail Invalid_descriptor in
+     let attributes =
+         U.map_array_to_list
+            (HighAttribute.decode_method Attribute.Method pool)
+            m.M.attributes_array in
+     U.switch
+       U.UTF8.equal
+       [ C.class_initializer,
+         (fun _ ->
+           let flags =
+             AccessFlag.check_initializer_flags (AccessFlag.from_u2 true m.M.access_flags) in
+           Initializer { init_flags = flags; init_attributes = attributes });
+
+         C.class_constructor,
+         (fun _ ->
+           let flags =
+             AccessFlag.check_constructor_flags (AccessFlag.from_u2 true m.M.access_flags) in
+           Constructor { cstr_flags = flags; cstr_descriptor = fst descriptor; cstr_attributes = attributes }) ]
+       (fun _ ->
+         let flags =
+           AccessFlag.check_method_flags is_interface
+            (AccessFlag.from_u2 true m.M.access_flags) in
+         let name = Name.make_for_method name in
+         Regular { flags; name; descriptor; attributes })
+       name
 end (* }}} *)
 
-module A = Attribute
-module M = Method
+module HA = HighAttribute
+module HM = HighMethod
 
 type t = {
     access_flags : AccessFlag.for_class list;
@@ -392,8 +423,8 @@ type t = {
     extends : Name.for_class option;
     implements : Name.for_class list;
     fields : Field.t list;
-    methods : M.t list;
-    attributes : A.for_class list;
+    methods : HM.t list;
+    attributes : HA.for_class list;
   }
 
 let check_version_high ?(version = Version.default) c =
@@ -424,8 +455,8 @@ let decode ?(version = Version.default) cf =
     else Some (get_class_name cf.ClassFile.super_class) in
   let is_interface = List.mem `Interface flags in
   let field_decode = Field.decode is_interface pool in
-  let method_decode = Method.decode is_interface pool in
-  let attribute_decode = A.decode A.Class pool in
+  let method_decode = HM.decode is_interface pool in
+  let attribute_decode = HA.decode A.Class pool in
   check_version_high ~version:version { access_flags = flags;
     name = get_class_name cf.CF.this_class;
     extends = extends;
