@@ -892,40 +892,36 @@ module HighMethod = struct (* {{{ *)
     | Constructor of constructor
     | Initializer of class_initializer
 
-  let utf8_of_pool pool i =
+  let utf8_from_pool pool i =
     match ConstantPool.get_entry pool i with
       | ConstantPool.UTF8 n -> n
       | e -> fail (Invalid_pool_entry_type (e, "UTF8"))
 
-  let descriptor_of_index pool i =
-    Descriptor.method_of_utf8 (utf8_of_pool pool i)
-
-  let decode_initializer (_,_,_, init_attributes, flags) _ =
+  let decode_initializer init_attributes flags _ =
     let init_flags = AccessFlag.check_initializer_flags flags in
     Initializer { init_flags; init_attributes }
 
-  let decode_constructor (_,_, (cstr_descriptor,_), cstr_attributes, flags) _ =
+  let decode_constructor (cstr_descriptor,_) cstr_attributes flags _ =
     let cstr_flags = AccessFlag.check_constructor_flags flags in
     Constructor { cstr_flags; cstr_descriptor; cstr_attributes }
 
-  let decode_regular (i, name, descriptor, attributes, flags) _ =
+  let decode_regular i name descriptor attributes flags _ =
     let flags = AccessFlag.check_method_flags i flags in
     Regular { flags; name; descriptor; attributes}
 
   let decode is_interface pool m =
-    let name = utf8_of_pool pool m.M.name_index in
-    let indaf = (* is_interface, name, descriptor, attributes, flags *)
-      is_interface,
-      Name.make_for_method name,
-      descriptor_of_index pool m.M.descriptor_index,
-      U.map_array_to_list (HA.decode_method pool) m.M.attributes_array,
-      AccessFlag.from_u2 true m.M.access_flags in
-    U.switch
-      U.UTF8.equal
-      [ C.class_initializer, decode_initializer indaf
-      ; C.class_constructor, decode_constructor indaf ]
-      (decode_regular indaf)
-      name
+    let utf8_name = utf8_from_pool pool m.M.name_index in
+    let name = Name.make_for_method utf8_name in
+    let descriptor =
+      Descriptor.method_of_utf8 (utf8_from_pool pool m.M.descriptor_index) in
+    let attributes =
+      U.map_array_to_list (HA.decode_method pool) m.M.attributes_array in
+    let flags = AccessFlag.from_u2 true m.M.access_flags in
+    U.switch U.UTF8.equal
+      [ C.class_initializer, decode_initializer attributes flags
+      ; C.class_constructor, decode_constructor descriptor attributes flags ]
+      (decode_regular is_interface name descriptor attributes flags)
+      utf8_name
 end
 (* }}} *)
 module HM = HighMethod
