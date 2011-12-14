@@ -16,15 +16,7 @@ module Instruction : sig (* {{{ *)
   module LabelHash : Hashtbl.S with type key = label
 end (* }}} *)
 
-module Attribute : sig (* {{{ *)
-  (* TODO: Should we just use the one in the old Attribute module? *)
-  type enclosing_elemen =
-    | Class
-    | Method
-    | Field
-    | Package
-    | Module
-
+module HighAttribute : sig (* {{{ *)
   type constant_value =
     | Long_value of int64
     | Float_value of float
@@ -113,10 +105,15 @@ module Attribute : sig (* {{{ *)
 
   type t = [ for_class | for_method | for_field ]
 
+  val decode_method : ConstantPool.t -> Attribute.info -> for_field
+
+  val decode : Attribute.enclosing_element -> ConstantPool.t -> Attribute.info -> for_class
+
 end (* }}} *)
 
-module Method : sig (* {{{ *)
+module HighMethod : sig (* {{{ *)
   type t
+  val decode : bool -> ConstantPool.t -> Method.info -> t
 end (* }}} *)
 
 type t = {
@@ -125,18 +122,20 @@ type t = {
     extends : Name.for_class option;
     implements : Name.for_class list;
     fields : Field.t list;
-    methods : Method.t list;
-    attributes : Attribute.for_class list;
+    methods : HighMethod.t list;
+    attributes : HighAttribute.for_class list;
   }
 
 type error =
-  | Invalid_class_name
-  | Invalid_module
   | Invalid_attribute_name
-  | Invalid_constant_value
-  | Invalid_code_length
-  | Invalid_exception_name
+  | Invalid_class_name
   | Invalid_code_attribute
+  | Invalid_code_length
+  | Invalid_constant_value
+  | Invalid_descriptor
+  | Invalid_exception_name
+  | Invalid_method_name
+  | Invalid_module
 
   | Invalid_pool_element
   | Invalid_field
