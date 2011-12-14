@@ -138,6 +138,31 @@ type error =
   | Invalid_exception_name
   | Invalid_code_attribute
 
+  | Invalid_pool_element
+  | Invalid_field
+  | Invalid_dynamic_method
+  | Invalid_interface_method
+  | Invalid_method
+  | Invalid_parameter
+  | Invalid_primitive_type
+  | Invalid_switch_cases
+  | Invalid_pool_index
+  | Invalid_pool_entry
+  | Invalid_primitive_array_type
+  | Invalid_index
+  | Invalid_array_element
+  | Invalid_unsigned_byte
+  | Invalid_byte
+  | Invalid_unsigned_short
+  | Invalid_signed_short
+  | Invalid_signed_long
+  | Invalid_short_offset
+  | Invalid_long_offset
+  | Invalid_number_of_arguments
+  | Unknown_instruction
+  | Invalid_method_handle
+  | Too_many_bootstrap_specifiers
+
 exception Exception of error
 
 val check_version_high : ?version : Version.t -> t -> t

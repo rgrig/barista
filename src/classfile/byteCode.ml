@@ -746,3 +746,221 @@ let write st o l =
     | WIDE_LSTORE p1 -> write_u1' 0xC4; write_u1' 0x37; write_u2 p1
     | WIDE_RET p1 -> write_u1' 0xC4; write_u1' 0xA9; write_u2 p1
   in List.iter write_instruction l
+
+(*
+let size_of _ _ = failwith "todo"
+*)
+let size_of ofs = function
+  | AALOAD -> 1
+  | AASTORE -> 1
+  | ACONST_NULL -> 1
+  | ALOAD _ -> 1 + 1
+  | ALOAD_0 -> 1
+  | ALOAD_1 -> 1
+  | ALOAD_2 -> 1
+  | ALOAD_3 -> 1
+  | ANEWARRAY _ -> 1 + 2
+  | ARETURN -> 1
+  | ARRAYLENGTH -> 1
+  | ASTORE _ -> 1 + 1
+  | ASTORE_0 -> 1
+  | ASTORE_1 -> 1
+  | ASTORE_2 -> 1
+  | ASTORE_3 -> 1
+  | ATHROW -> 1
+  | BALOAD -> 1
+  | BASTORE -> 1
+  | BIPUSH _ -> 1 + 1
+  | CALOAD -> 1
+  | CASTORE -> 1
+  | CHECKCAST _ -> 1 + 2
+  | D2F -> 1
+  | D2I -> 1
+  | D2L -> 1
+  | DADD -> 1
+  | DALOAD -> 1
+  | DASTORE -> 1
+  | DCMPG -> 1
+  | DCMPL -> 1
+  | DCONST_0 -> 1
+  | DCONST_1 -> 1
+  | DDIV -> 1
+  | DLOAD _ -> 1 + 1
+  | DLOAD_0 -> 1
+  | DLOAD_1 -> 1
+  | DLOAD_2 -> 1
+  | DLOAD_3 -> 1
+  | DMUL -> 1
+  | DNEG -> 1
+  | DREM -> 1
+  | DRETURN -> 1
+  | DSTORE _ -> 1 + 1
+  | DSTORE_0 -> 1
+  | DSTORE_1 -> 1
+  | DSTORE_2 -> 1
+  | DSTORE_3 -> 1
+  | DSUB -> 1
+  | DUP -> 1
+  | DUP2 -> 1
+  | DUP2_X1 -> 1
+  | DUP2_X2 -> 1
+  | DUP_X1 -> 1
+  | DUP_X2 -> 1
+  | F2D -> 1
+  | F2I -> 1
+  | F2L -> 1
+  | FADD -> 1
+  | FALOAD -> 1
+  | FASTORE -> 1
+  | FCMPG -> 1
+  | FCMPL -> 1
+  | FCONST_0 -> 1
+  | FCONST_1 -> 1
+  | FCONST_2 -> 1
+  | FDIV -> 1
+  | FLOAD _ -> 1 + 1
+  | FLOAD_0 -> 1
+  | FLOAD_1 -> 1
+  | FLOAD_2 -> 1
+  | FLOAD_3 -> 1
+  | FMUL -> 1
+  | FNEG -> 1
+  | FREM -> 1
+  | FRETURN -> 1
+  | FSTORE _ -> 1 + 1
+  | FSTORE_0 -> 1
+  | FSTORE_1 -> 1
+  | FSTORE_2 -> 1
+  | FSTORE_3 -> 1
+  | FSUB -> 1
+  | GETFIELD _ -> 1 + 2
+  | GETSTATIC _ -> 1 + 2
+  | GOTO _ -> 1 + 2
+  | GOTO_W _ -> 1 + 4
+  | I2B -> 1
+  | I2C -> 1
+  | I2D -> 1
+  | I2F -> 1
+  | I2L -> 1
+  | I2S -> 1
+  | IADD -> 1
+  | IALOAD -> 1
+  | IAND -> 1
+  | IASTORE -> 1
+  | ICONST_0 -> 1
+  | ICONST_1 -> 1
+  | ICONST_2 -> 1
+  | ICONST_3 -> 1
+  | ICONST_4 -> 1
+  | ICONST_5 -> 1
+  | ICONST_M1 -> 1
+  | IDIV -> 1
+  | IF_ACMPEQ _ -> 1 + 2
+  | IF_ACMPNE _ -> 1 + 2
+  | IF_ICMPEQ _ -> 1 + 2
+  | IF_ICMPGE _ -> 1 + 2
+  | IF_ICMPGT _ -> 1 + 2
+  | IF_ICMPLE _ -> 1 + 2
+  | IF_ICMPLT _ -> 1 + 2
+  | IF_ICMPNE _ -> 1 + 2
+  | IFEQ _ -> 1 + 2
+  | IFGE _ -> 1 + 2
+  | IFGT _ -> 1 + 2
+  | IFLE _ -> 1 + 2
+  | IFLT _ -> 1 + 2
+  | IFNE _ -> 1 + 2
+  | IFNONNULL _ -> 1 + 2
+  | IFNULL _ -> 1 + 2
+  | IINC _ -> 1 + 1 + 1
+  | ILOAD _ -> 1 + 1
+  | ILOAD_0 -> 1
+  | ILOAD_1 -> 1
+  | ILOAD_2 -> 1
+  | ILOAD_3 -> 1
+  | IMUL -> 1
+  | INEG -> 1
+  | INSTANCEOF _ -> 1 + 2
+  | INVOKEDYNAMIC _ -> 1 + 2 + 2
+  | INVOKEINTERFACE _ -> 1 + 1 + 2 + 1
+  | INVOKESPECIAL _ -> 1 + 2
+  | INVOKESTATIC _ -> 1 + 2
+  | INVOKEVIRTUAL _ -> 1 + 2
+  | IOR -> 1
+  | IREM -> 1
+  | IRETURN -> 1
+  | ISHL -> 1
+  | ISHR -> 1
+  | ISTORE _ -> 1 + 1
+  | ISTORE_0 -> 1
+  | ISTORE_1 -> 1
+  | ISTORE_2 -> 1
+  | ISTORE_3 -> 1
+  | ISUB -> 1
+  | IUSHR -> 1
+  | IXOR -> 1
+  | JSR _ -> 1 + 2
+  | JSR_W _ -> 1 + 4
+  | L2D -> 1
+  | L2F -> 1
+  | L2I -> 1
+  | LADD -> 1
+  | LALOAD -> 1
+  | LAND -> 1
+  | LASTORE -> 1
+  | LCMP -> 1
+  | LCONST_0 -> 1
+  | LCONST_1 -> 1
+  | LDC _ -> 1 + 1
+  | LDC2_W _ -> 1 + 2
+  | LDC_W _ -> 1 + 2
+  | LDIV -> 1
+  | LLOAD _ -> 1 + 1
+  | LLOAD_0 -> 1
+  | LLOAD_1 -> 1
+  | LLOAD_2 -> 1
+  | LLOAD_3 -> 1
+  | LMUL -> 1
+  | LNEG -> 1
+  | LOOKUPSWITCH (_, _, t) -> 1 + (3 - (ofs mod 4)) + 4 + 4 + (8 * (List.length t))
+  | LOR -> 1
+  | LREM -> 1
+  | LRETURN -> 1
+  | LSHL -> 1
+  | LSHR -> 1
+  | LSTORE _ -> 1 + 1
+  | LSTORE_0 -> 1
+  | LSTORE_1 -> 1
+  | LSTORE_2 -> 1
+  | LSTORE_3 -> 1
+  | LSUB -> 1
+  | LUSHR -> 1
+  | LXOR -> 1
+  | MONITORENTER -> 1
+  | MONITOREXIT -> 1
+  | MULTIANEWARRAY _ -> 1 + 2 + 1
+  | NEW _ -> 1 + 2
+  | NEWARRAY _ -> 1 + 1
+  | NOP -> 1
+  | POP -> 1
+  | POP2 -> 1
+  | PUTFIELD _ -> 1 + 2
+  | PUTSTATIC _ -> 1 + 2
+  | RET _ -> 1 + 1
+  | RETURN -> 1
+  | SALOAD -> 1
+  | SASTORE -> 1
+  | SIPUSH _ -> 1 + 2
+  | SWAP -> 1
+  | TABLESWITCH (_, _, _, t) -> 1 + (3 - (ofs mod 4)) + 4 + 4 + 4 + (4 * (List.length t))
+  | WIDE_ALOAD _ -> 2 + 2
+  | WIDE_ASTORE _ -> 2 + 2
+  | WIDE_DLOAD _ -> 2 + 2
+  | WIDE_DSTORE _ -> 2 + 2
+  | WIDE_FLOAD _ -> 2 + 2
+  | WIDE_FSTORE _ -> 2 + 2
+  | WIDE_IINC _ -> 2 + 2 + 2
+  | WIDE_ILOAD _ -> 2 + 2
+  | WIDE_ISTORE _ -> 2 + 2
+  | WIDE_LLOAD _ -> 2 + 2
+  | WIDE_LSTORE _ -> 2 + 2
+  | WIDE_RET _ -> 2 + 2

@@ -281,3 +281,6 @@ val write : OutputStream.t -> int -> instruction list -> unit
     [ofs]. The offset is needed because some instructions include padding
     in order to align data on given offsets.
     Raises [OutputStream.Exception] if an i/o error occurs. *)
+
+val size_of : int -> instruction -> int
+(** [size_of ofs i] returns the size of instruction [i] at offset [ofs]. *)
