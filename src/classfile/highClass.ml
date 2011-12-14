@@ -19,8 +19,8 @@ type error =
   | Invalid_constant_value
   | Invalid_descriptor
   | Invalid_exception_name
-  | Invalid_method_name
   | Invalid_module
+  | Invalid_pool_entry_type of (ConstantPool.element * string)
 
   | Invalid_pool_element
   | Invalid_field
@@ -50,6 +50,10 @@ type error =
 exception Exception of error
 
 let fail e = raise (Exception e)
+
+let string_of_error = function
+  | Invalid_pool_entry_type (_, t) -> "expected pool entry of type " ^ t
+  | _ -> "undescribed error (todo)"
 
 (* }}} *)
 module Instruction = struct (* {{{ *)
@@ -219,7 +223,7 @@ type t =
     let equal = (=)
     let hash x = x
   end)
-    
+
   let s1_to_int (s : U.s1) = (s :> int)
   let s2_to_int (s : U.s2) = (s :> int)
 
@@ -541,6 +545,7 @@ type t =
   | ByteCode.WIDE_RET p1 -> RET (u2_to_int p1)
 end (* }}} *)
 
+(* HighAttribute and HighMethod *) (* {{{ *)
 module A = Attribute
 module HighAttribute = struct (* {{{ *)
   open Consts
@@ -708,7 +713,7 @@ module HighAttribute = struct (* {{{ *)
       | (`Unknown _ as x) -> x
       | #t -> fail Invalid_code_attribute in
     List.map map l
-      
+
   let decode_attr_constant_value _ _ pool _ st =
         let const_index = InputStream.read_u2 st in
         match ConstantPool.get_entry pool const_index with
@@ -849,7 +854,7 @@ module HighAttribute = struct (* {{{ *)
 
   let for_class _ = failwith "todo"
 
-  let decode_method _ _  = failwith "todo"
+  let decode_method _ _ = failwith "todo"
 
   let rec decode element pool i =
     let st = InputStream.make_of_string i.A.data in
@@ -858,7 +863,9 @@ module HighAttribute = struct (* {{{ *)
       for_class (UTF8Hashtbl.find decoders attr_name decode element pool i st)
     with Not_found ->
       `Unknown (attr_name, i.A.data)
-end (* }}} *)
+end
+(* }}} *)
+module HA = HighAttribute
 
 module M = Method
 module HighMethod = struct (* {{{ *)
@@ -885,45 +892,44 @@ module HighMethod = struct (* {{{ *)
     | Constructor of constructor
     | Initializer of class_initializer
 
+  let utf8_of_pool pool i =
+    match ConstantPool.get_entry pool i with
+      | ConstantPool.UTF8 n -> n
+      | e -> fail (Invalid_pool_entry_type (e, "UTF8"))
+
+  let descriptor_of_index pool i =
+    Descriptor.method_of_utf8 (utf8_of_pool pool i)
+
+  let decode_initializer (_,_,_, init_attributes, flags) _ =
+    let init_flags = AccessFlag.check_initializer_flags flags in
+    Initializer { init_flags; init_attributes }
+
+  let decode_constructor (_,_, (cstr_descriptor,_), cstr_attributes, flags) _ =
+    let cstr_flags = AccessFlag.check_constructor_flags flags in
+    Constructor { cstr_flags; cstr_descriptor; cstr_attributes }
+
+  let decode_regular (i, name, descriptor, attributes, flags) _ =
+    let flags = AccessFlag.check_method_flags i flags in
+    Regular { flags; name; descriptor; attributes}
+
   let decode is_interface pool m =
-    let name = match ConstantPool.get_entry pool m.M.name_index with
-    | ConstantPool.UTF8 n ->
-        if Name.is_valid_for_method n then
-          n
-        else
-          fail Invalid_method_name
-    | _ -> fail Invalid_method_name in
-    let descriptor = match ConstantPool.get_entry pool m.M.descriptor_index with
-     | ConstantPool.UTF8 d -> Descriptor.method_of_utf8 d
-     | _ -> fail Invalid_descriptor in
-     let attributes =
-         U.map_array_to_list
-            (HighAttribute.decode_method Attribute.Method pool)
-            m.M.attributes_array in
-     U.switch
-       U.UTF8.equal
-       [ C.class_initializer,
-         (fun _ ->
-           let flags =
-             AccessFlag.check_initializer_flags (AccessFlag.from_u2 true m.M.access_flags) in
-           Initializer { init_flags = flags; init_attributes = attributes });
-
-         C.class_constructor,
-         (fun _ ->
-           let flags =
-             AccessFlag.check_constructor_flags (AccessFlag.from_u2 true m.M.access_flags) in
-           Constructor { cstr_flags = flags; cstr_descriptor = fst descriptor; cstr_attributes = attributes }) ]
-       (fun _ ->
-         let flags =
-           AccessFlag.check_method_flags is_interface
-            (AccessFlag.from_u2 true m.M.access_flags) in
-         let name = Name.make_for_method name in
-         Regular { flags; name; descriptor; attributes })
-       name
-end (* }}} *)
-
-module HA = HighAttribute
+    let name = utf8_of_pool pool m.M.name_index in
+    let indaf = (* is_interface, name, descriptor, attributes, flags *)
+      is_interface,
+      Name.make_for_method name,
+      descriptor_of_index pool m.M.descriptor_index,
+      U.map_array_to_list (HA.decode_method pool) m.M.attributes_array,
+      AccessFlag.from_u2 true m.M.access_flags in
+    U.switch
+      U.UTF8.equal
+      [ C.class_initializer, decode_initializer indaf
+      ; C.class_constructor, decode_constructor indaf ]
+      (decode_regular indaf)
+      name
+end
+(* }}} *)
 module HM = HighMethod
+(* }}} *)
 
 type t = {
     access_flags : AccessFlag.for_class list;

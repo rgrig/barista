@@ -42,7 +42,6 @@ let is_valid_for_method s =
       && not (UTF8.contains lower_than s)
       && not (UTF8.contains greater_than s))
 
-
 (* Exception *)
 
 type error =

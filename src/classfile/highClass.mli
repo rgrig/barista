@@ -134,8 +134,8 @@ type error =
   | Invalid_constant_value
   | Invalid_descriptor
   | Invalid_exception_name
-  | Invalid_method_name
   | Invalid_module
+  | Invalid_pool_entry_type of (ConstantPool.element * string)
 
   | Invalid_pool_element
   | Invalid_field

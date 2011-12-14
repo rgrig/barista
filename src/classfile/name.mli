@@ -44,7 +44,6 @@ val is_valid_for_method : Utils.UTF8.t -> bool
     the class constructor/initializer, or a valid unqualified name that
     does not contain any '<' or '>'. *)
 
-
 (** {6 Exception} *)
 
 type error =
