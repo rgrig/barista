@@ -58,13 +58,23 @@ one: FORCE
 	fi
 	@echo ""
 
-clean: FORCE
-	@rm -f _log
-	@rm -fr classes/pack
-	@rm -fr 315-asm-errors/pack
-	@rm -f ocaml/*.cm*
-	@rm -f ocaml/*.jo
-	@rm -f ocaml/*.o
+clean: 
+	@for dir in `ls -d [0-9]*`; do \
+	  if [ -d $$dir ]; then \
+	    $(MAKE) clean_one NAME=$$dir; \
+	  fi \
+	done 2>&1
+
+clean_one: FORCE
+	@if [ -z $(NAME) ]; then echo "*** value for 'NAME' is missing"; exit 1; fi
+	@echo "Cleaning '$(NAME)' ..."
+	@ls $(NAME)
+	@rm -f $(NAME)/_log
+	@rm -f $(NAME)/*.cm*
+	@rm -f $(NAME)/*.jo
+	@rm -f $(NAME)/*.o
+	@ls $(NAME)
+	@$(MAKE) -f Makefile.ocaml -C $(NAME) clean || true
 
 log: FORCE
 	@cat _log

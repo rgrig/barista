@@ -11,10 +11,12 @@ let check fn =
   let ch = open_in fn in
   let cl_in = IS.make_of_channel ch in
   let cf = CF.read cl_in in
-  let _ = HC.decode cf in
+  let _ = HC.decode ~version:Version.Java_1_7 cf in
   printf "@[%s@." fn
 
 let () =
   for i = 1 to Array.length Sys.argv - 1 do
-    check Sys.argv.(i)
+    try
+      check Sys.argv.(i)
+    with Version.Exception e -> printf "@[%s@." (Version.string_of_error e)
   done

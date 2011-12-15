@@ -161,6 +161,7 @@ type error =
   | Unknown_instruction
   | Invalid_method_handle
   | Too_many_bootstrap_specifiers
+  | Unsupported_instruction of string
 
 exception Exception of error
 

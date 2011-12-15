@@ -46,6 +46,7 @@ type error =
   | Unknown_instruction
   | Invalid_method_handle
   | Too_many_bootstrap_specifiers
+  | Unsupported_instruction of string
 
 exception Exception of error
 
@@ -53,11 +54,17 @@ let fail e = raise (Exception e)
 
 let string_of_error = function
   | Invalid_pool_entry_type (_, t) -> "expected pool entry of type " ^ t
+  | Unsupported_instruction s -> "unsupported instruction: " ^ s
   | _ -> "undescribed error (todo)"
 
 (* }}} *)
 module Instruction = struct (* {{{ *)
   type label = int
+      
+  type iinc = { ii_var: int; ii_inc: int }
+  type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
+  type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }
+
 type t =
   | AALOAD
   | AASTORE
@@ -154,12 +161,12 @@ type t =
   | IFNE of label
   | IFNONNULL of label
   | IFNULL of label
-  | IINC of int * int
+  | IINC of iinc
   | ILOAD of int
   | IMUL
   | INEG
   | INSTANCEOF of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
-  | INVOKEDYNAMIC of (Bootstrap.method_specifier * Name.for_method * Descriptor.for_method)
+(*  | INVOKEDYNAMIC of (Bootstrap.method_specifier * Name.for_method * Descriptor.for_method) *)
   | INVOKEINTERFACE of (Name.for_class * Name.for_method * Descriptor.for_method) * U.u1
   | INVOKESPECIAL of (Name.for_class * Name.for_method * Descriptor.for_method)
   | INVOKESTATIC of (Name.for_class * Name.for_method * Descriptor.for_method)
@@ -184,13 +191,19 @@ type t =
   | LCMP
   | LCONST_0
   | LCONST_1
-  | LDC of [`Int of int32 | `Float of float | `String of U.UTF8.t | `Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type | `Method_type of Descriptor.for_method | `Method_handle of Bootstrap.method_handle]
-  | LDC2_W of [`Long of int64 | `Double of float]
+  | LDC of [ `Int of int32
+	   | `Float of float
+	   | `String of U.UTF8.t
+	   | `Class_or_interface of Name.for_class
+	   | `Array_type of Descriptor.array_type
+	   | `Method_type of Descriptor.for_method
+	   | `Method_handle of Bootstrap.method_handle ]
+  | LDC2_W of [ `Long of int64 | `Double of float ]
   | LDIV
   | LLOAD of int
   | LMUL
   | LNEG
-  | LOOKUPSWITCH of label * U.s4 * ((U.s4 * label) list)
+  | LOOKUPSWITCH of lookupswitch
   | LOR
   | LREM
   | LRETURN
@@ -216,7 +229,7 @@ type t =
   | SASTORE
   | SIPUSH of int
   | SWAP
-  | TABLESWITCH of label * U.s4 * U.s4 * (label list)
+  | TABLESWITCH of tableswitch
 
   module LabelHash = Hashtbl.Make (struct
     type t = label
@@ -226,19 +239,16 @@ type t =
 
   let s1_to_int (s : U.s1) = (s :> int)
   let s2_to_int (s : U.s2) = (s :> int)
+  let s4_to_int (s : U.s4) = ((Int32.to_int (s :> Int32.t)) :> int)
 
   let u1_to_int (u : U.u1) = (u :> int)
   let u2_to_int (u : U.u2) = (u :> int)
 
-  let s2_to_lbl (s : U.s2) = (s :> label)
-  (* TODO: Int32 is larger than int, so this may not be ok *)
-  (* Check specification to see if label should perhaps be Int32 *)
-  (* (since there is a GOTO_W of s4 in ByteCode.instruction) *)
-  let s4_to_lbl (s : U.s4) = ((Int32.to_int (s :> Int32.t)) :> label)
-
-  let decode cpool ofs_to_lbl =
-    let s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (Int32.of_int (s :> int)) in
-    let l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (s :> Int32.t) in
+  let decode cpool ofs_to_lbl ofs =
+    let abs_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (s :> int) in
+    let abs_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (Int32.to_int (s :> Int32.t)) in
+    let rel_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (ofs + (s :> int)) in
+    let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + Int32.to_int (s :> Int32.t)) in
   let get_entry idx =
     try
       ConstantPool.get_entry cpool idx
@@ -270,20 +280,6 @@ type t =
       when U.UTF8.equal (get_utf8 i2) class_constructor ->
       (Name.make_for_class_from_internal (get_utf8 i1)),
       (fst (Descriptor.method_of_utf8 (get_utf8 i3)))
-    | _ -> fail Invalid_pool_entry in
-(* TODO *)
-  let dummy_element =
-    `getField (Name.make_for_class_from_external (U.UTF8.of_string "dummy_package.DummyClass"),
-               Name.make_for_field (U.UTF8.of_string "dummyField"),
-               `Boolean),
-    [] in
-  let bsi = ExtendableArray.make 0 128 dummy_element in
-  let get_dynamic idx nat = match get_entry nat with
-    | ConstantPool.NameAndType (idx2, idx3)
-        when ((idx : U.u2 :> int) < ExtendableArray.length bsi) ->
-      ExtendableArray.get bsi idx,
-          (Name.make_for_method (get_utf8 idx2)),
-          (Descriptor.method_of_utf8 (get_utf8 idx3))
     | _ -> fail Invalid_pool_entry in
   let get_array_method_ref cls nat = match (get_entry cls), (get_entry nat) with
     | (ConstantPool.Class i1), (ConstantPool.NameAndType (i2, i3)) ->
@@ -411,8 +407,8 @@ type t =
   | ByteCode.FSUB -> FSUB
   | ByteCode.GETFIELD p1 -> GETFIELD (match get_entry p1 with | ConstantPool.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
   | ByteCode.GETSTATIC p1 -> GETSTATIC (match get_entry p1 with | ConstantPool.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-  | ByteCode.GOTO p1 -> GOTO (s_ofs_to_lbl p1)
-  | ByteCode.GOTO_W p1 -> GOTO (l_ofs_to_lbl p1)
+  | ByteCode.GOTO p1 -> GOTO (abs_s_ofs_to_lbl p1)
+  | ByteCode.GOTO_W p1 -> GOTO (abs_l_ofs_to_lbl p1)
   | ByteCode.I2B -> I2B
   | ByteCode.I2C -> I2C
   | ByteCode.I2D -> I2D
@@ -431,23 +427,23 @@ type t =
   | ByteCode.ICONST_5 -> ICONST_5
   | ByteCode.ICONST_M1 -> ICONST_M1
   | ByteCode.IDIV -> IDIV
-  | ByteCode.IF_ACMPEQ p1 -> IF_ACMPEQ (s_ofs_to_lbl p1)
-  | ByteCode.IF_ACMPNE p1 -> IF_ACMPNE (s_ofs_to_lbl p1)
-  | ByteCode.IF_ICMPEQ p1 -> IF_ICMPEQ (s_ofs_to_lbl p1)
-  | ByteCode.IF_ICMPGE p1 -> IF_ICMPGE (s_ofs_to_lbl p1)
-  | ByteCode.IF_ICMPGT p1 -> IF_ICMPGT (s_ofs_to_lbl p1)
-  | ByteCode.IF_ICMPLE p1 -> IF_ICMPLE (s_ofs_to_lbl p1)
-  | ByteCode.IF_ICMPLT p1 -> IF_ICMPLT (s_ofs_to_lbl p1)
-  | ByteCode.IF_ICMPNE p1 -> IF_ICMPNE (s_ofs_to_lbl p1)
-  | ByteCode.IFEQ p1 -> IFEQ (s_ofs_to_lbl p1)
-  | ByteCode.IFGE p1 -> IFGE (s_ofs_to_lbl p1)
-  | ByteCode.IFGT p1 -> IFGT (s_ofs_to_lbl p1)
-  | ByteCode.IFLE p1 -> IFLE (s_ofs_to_lbl p1)
-  | ByteCode.IFLT p1 -> IFLT (s_ofs_to_lbl p1)
-  | ByteCode.IFNE p1 -> IFNE (s_ofs_to_lbl p1)
-  | ByteCode.IFNONNULL p1 -> IFNONNULL (s_ofs_to_lbl p1)
-  | ByteCode.IFNULL p1 -> IFNULL (s_ofs_to_lbl p1)
-  | ByteCode.IINC (p1, p2) -> IINC (u1_to_int p1, s1_to_int p2)
+  | ByteCode.IF_ACMPEQ p1 -> IF_ACMPEQ (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ACMPNE p1 -> IF_ACMPNE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ICMPEQ p1 -> IF_ICMPEQ (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ICMPGE p1 -> IF_ICMPGE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ICMPGT p1 -> IF_ICMPGT (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ICMPLE p1 -> IF_ICMPLE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ICMPLT p1 -> IF_ICMPLT (abs_s_ofs_to_lbl p1)
+  | ByteCode.IF_ICMPNE p1 -> IF_ICMPNE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFEQ p1 -> IFEQ (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFGE p1 -> IFGE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFGT p1 -> IFGT (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFLE p1 -> IFLE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFLT p1 -> IFLT (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFNE p1 -> IFNE (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFNONNULL p1 -> IFNONNULL (abs_s_ofs_to_lbl p1)
+  | ByteCode.IFNULL p1 -> IFNULL (abs_s_ofs_to_lbl p1)
+  | ByteCode.IINC (p1, p2) -> IINC { ii_var = u1_to_int p1; ii_inc = s1_to_int p2 }
   | ByteCode.ILOAD p1 -> ILOAD (u1_to_int p1)
   | ByteCode.ILOAD_0 -> ILOAD 0
   | ByteCode.ILOAD_1 -> ILOAD 1
@@ -456,7 +452,7 @@ type t =
   | ByteCode.IMUL -> IMUL
   | ByteCode.INEG -> INEG
   | ByteCode.INSTANCEOF p1 -> INSTANCEOF (match get_entry p1 with | ConstantPool.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-  | ByteCode.INVOKEDYNAMIC p1 -> INVOKEDYNAMIC (match get_entry p1 with | ConstantPool.InvokeDynamic (idx, nat) -> get_dynamic idx nat | _ -> fail Invalid_pool_element)
+  | ByteCode.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
   | ByteCode.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match get_entry p1 with | ConstantPool.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
   | ByteCode.INVOKESPECIAL p1 -> INVOKESPECIAL (match get_entry p1 with | ConstantPool.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
   | ByteCode.INVOKESTATIC p1 -> INVOKESTATIC (match get_entry p1 with | ConstantPool.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
@@ -474,8 +470,8 @@ type t =
   | ByteCode.ISUB -> ISUB
   | ByteCode.IUSHR -> IUSHR
   | ByteCode.IXOR -> IXOR
-  | ByteCode.JSR p1 -> JSR (s_ofs_to_lbl p1)
-  | ByteCode.JSR_W p1 -> JSR (l_ofs_to_lbl p1)
+  | ByteCode.JSR p1 -> JSR (abs_s_ofs_to_lbl p1)
+  | ByteCode.JSR_W p1 -> JSR (abs_l_ofs_to_lbl p1)
   | ByteCode.L2D -> L2D
   | ByteCode.L2F -> L2F
   | ByteCode.L2I -> L2I
@@ -499,8 +495,12 @@ type t =
   | ByteCode.LNEG -> LNEG
   | ByteCode.LOOKUPSWITCH (p1, p2, p3) ->
     let keys, offsets = List.split p3 in
-    let labels = List.map l_ofs_to_lbl offsets in
-    LOOKUPSWITCH (s4_to_lbl p1, p2, List.combine keys labels)
+    let labels = List.map rel_l_ofs_to_lbl offsets in
+    let items = List.map s4_to_int keys in
+    (* bytecode parser should ensure this *)
+    assert (s4_to_int p2 = List.length p3);
+    LOOKUPSWITCH { ls_def = rel_l_ofs_to_lbl p1
+		 ; ls_branches = List.combine items labels }
   | ByteCode.LOR -> LOR
   | ByteCode.LREM -> LREM
   | ByteCode.LRETURN -> LRETURN
@@ -530,14 +530,20 @@ type t =
   | ByteCode.SASTORE -> SASTORE
   | ByteCode.SIPUSH p1 -> SIPUSH (s2_to_int p1)
   | ByteCode.SWAP -> SWAP
-  | ByteCode.TABLESWITCH (p1, p2, p3, p4) -> TABLESWITCH (l_ofs_to_lbl p1, p2, p3, List.map l_ofs_to_lbl p4)
+  | ByteCode.TABLESWITCH (p1, p2, p3, p4) ->
+    TABLESWITCH {
+      ts_lbl = abs_l_ofs_to_lbl p1;
+      ts_low = s4_to_int p2;
+      ts_high = s4_to_int p3;
+      ts_ofss = List.map abs_l_ofs_to_lbl p4 }
   | ByteCode.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
   | ByteCode.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
   | ByteCode.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
   | ByteCode.WIDE_DSTORE p1 -> DSTORE (u2_to_int p1)
   | ByteCode.WIDE_FLOAD p1 -> FLOAD (u2_to_int p1)
   | ByteCode.WIDE_FSTORE p1 -> FSTORE (u2_to_int p1)
-  | ByteCode.WIDE_IINC (p1, p2) -> IINC (u2_to_int p1, s2_to_int p2)
+  | ByteCode.WIDE_IINC (p1, p2) -> IINC { ii_var = u2_to_int p1
+					; ii_inc = s2_to_int p2 }
   | ByteCode.WIDE_ILOAD p1 -> ILOAD (u2_to_int p1)
   | ByteCode.WIDE_ISTORE p1 -> ISTORE (u2_to_int p1)
   | ByteCode.WIDE_LLOAD p1 -> LLOAD (u2_to_int p1)
@@ -752,10 +758,8 @@ module HighAttribute = struct (* {{{ *)
     let ofs_to_label ofs =
       let (_, _, lbl) = List.find (fun (_, o, _) -> o = ofs) instr_codes_annot in
       lbl in
-    let u2_ofs_to_label ofs = ofs_to_label (ofs : Utils.u2 :> int) in
-    (* TODO: make offsets Int32? *)
-    let l_ofs_to_label ofs = ofs_to_label (Int32.to_int ofs) in
-    let instrs = List.map (Instruction.decode pool l_ofs_to_label) instr_codes in
+    let decode_inst_code (inst, ofs, _) = Instruction.decode pool ofs_to_label ofs inst in
+    let instrs = List.map decode_inst_code instr_codes_annot in
     let exceptions =
       InputStream.read_elements
         st
@@ -769,6 +773,7 @@ module HighAttribute = struct (* {{{ *)
               Some (get_class_name pool catch_index Invalid_exception_name)
             else
               None in
+	  let u2_ofs_to_label ofs = ofs_to_label (ofs : Utils.u2 :> int) in
           { try_start = u2_ofs_to_label start_pc;
             try_end = u2_ofs_to_label end_pc;
             catch = u2_ofs_to_label handler_pc;
@@ -784,30 +789,30 @@ module HighAttribute = struct (* {{{ *)
             attributes = check_code_attributes attrs; }
       (* TODO: should code attributes be checked here? *)
 
-  let decode_attr_exceptions _ = failwith "todo"
-  let decode_attr_inner_classes _ = failwith "todo"
-  let decode_attr_enclosing_method _ = failwith "todo"
-  let decode_attr_synthetic _ = failwith "todo"
-  let decode_attr_signature _ = failwith "todo"
-  let decode_attr_source_file _ = failwith "todo"
-  let decode_attr_source_debug_extension _ = failwith "todo"
-  let decode_attr_line_number_table _ = failwith "todo"
-  let decode_attr_local_variable_table _ = failwith "todo"
-  let decode_attr_local_variable_type_table _ = failwith "todo"
-  let decode_attr_deprecated _ = failwith "todo"
-  let decode_attr_runtime_visible_annotations _ = failwith "todo"
-  let decode_attr_runtime_invisible_annotations _ = failwith "todo"
-  let decode_attr_runtime_visible_parameter_annotations _ = failwith "todo"
-  let decode_attr_runtime_invisible_parameter_annotations _ = failwith "todo"
-  let decode_attr_runtime_visible_type_annotations _ = failwith "todo"
-  let decode_attr_runtime_invisible_type_annotations _ = failwith "todo"
-  let decode_attr_annotation_default _ = failwith "todo"
-  let decode_attr_stack_map_table _ = failwith "todo"
-  let decode_attr_bootstrap_methods _ = failwith "todo"
-  let decode_attr_module _ = failwith "todo"
-  let decode_attr_module_requires _ = failwith "todo"
-  let decode_attr_module_permits _ = failwith "todo"
-  let decode_attr_module_provides _ = failwith "todo"
+  let decode_attr_exceptions _ = failwith "todo:decode_attr_exceptions"
+  let decode_attr_inner_classes _ = failwith "todo:decode_attr_inner_classes"
+  let decode_attr_enclosing_method _ = failwith "todo:decode_attr_enclosing_method"
+  let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
+  let decode_attr_signature _ = failwith "todo:decode_attr_signature"
+  let decode_attr_source_file _ = failwith "todo:decode_attr_source_file"
+  let decode_attr_source_debug_extension _ = failwith "todo:decode_attr_source_debug_extension"
+  let decode_attr_line_number_table _ = failwith "todo:decode_attr_line_number_table"
+  let decode_attr_local_variable_table _ = failwith "todo:decode_attr_local_variable_table"
+  let decode_attr_local_variable_type_table _ = failwith "todo:decode_attr_local_variable_type_table"
+  let decode_attr_deprecated _ = failwith "todo:decode_attr_deprecated"
+  let decode_attr_runtime_visible_annotations _ = failwith "todo:decode_attr_runtime_visible_annotations"
+  let decode_attr_runtime_invisible_annotations _ = failwith "todo:decode_attr_runtime_invisible_annotations"
+  let decode_attr_runtime_visible_parameter_annotations _ = failwith "todo:decode_attr_runtime_visible_parameter_annotations"
+  let decode_attr_runtime_invisible_parameter_annotations _ = failwith "todo:decode_attr_runtime_invisible_parameter_annotations"
+  let decode_attr_runtime_visible_type_annotations _ = failwith "todo:decode_attr_runtime_visible_type_annotations"
+  let decode_attr_runtime_invisible_type_annotations _ = failwith "todo:decode_attr_runtime_invisible_type_annotations"
+  let decode_attr_annotation_default _ = failwith "todo:decode_attr_annotation_default"
+  let decode_attr_stack_map_table _ = failwith "todo:decode_attr_stack_map_table"
+  let decode_attr_bootstrap_methods _ = failwith "todo:decode_attr_bootstrap_methods"
+  let decode_attr_module _ = failwith "todo:decode_attr_module"
+  let decode_attr_module_requires _ = failwith "todo:decode_attr_module_requires"
+  let decode_attr_module_permits _ = failwith "todo:decode_attr_module_permits"
+  let decode_attr_module_provides _ = failwith "todo:decode_attr_module_provides"
 
   module UTF8Hashtbl = Hashtbl.Make (Utils.UTF8)
 
@@ -947,7 +952,7 @@ let decode ?(version = Version.default) cf =
   let check_version v =
     let v' = cf.CF.major_version, cf.CF.minor_version in
     let v' = Version.version_of_major_minor v' in
-    Version.at_most "class file version" v v';
+    Version.at_least "class file version" v' v;
     (* TODO: The following line should be [ClassFile.check ...]. *)
     ConstantPool.check_version v' pool in
   let get_class_name idx = match ConstantPool.get_entry pool idx with
