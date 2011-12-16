@@ -747,15 +747,9 @@ module HighAttribute = struct (* {{{ *)
 	length = len;
 	data = dat; }
 
-  let check_code_attributes l =
-    let map = function
-      | (`LineNumberTable _ as x)
-(*TODO| (`LocalVariableTable _ as x)
-      | (`LocalVariableTypeTable _ as x)
-      | (`StackMapTable _ as x) *)
-      | (`Unknown _ as x) -> x
-      | #t -> fail Invalid_code_attribute in
-    List.map map l
+  let check_code_attribute = function
+    | #code_attribute as g -> g
+    | b -> fail (Misplaced_attribute (name_of_attribute b, "code"))
 
   (* actual decoders for attributes *)
 
@@ -822,14 +816,24 @@ module HighAttribute = struct (* {{{ *)
             try_end = u2_ofs_to_label end_pc;
             catch = u2_ofs_to_label handler_pc;
             caught = catch_type; }) in
-    let attrs =
-      InputStream.read_elements
+    let attrs = IS.read_elements
         st
         (fun st -> decode { r with da_i = read_info st }) in
+    let update_lnt = function
+      | `LineNumberTable h ->
+          let r = HI.LabelHash.create 13 in
+          let f ofs ln =
+            let label = ofs_to_label ofs in
+            assert (not (HI.LabelHash.mem r label));
+            HI.LabelHash.add r label ln in
+          HI.LabelHash.iter f h;
+          `LineNumberTable r
+      | x -> x in
+    let attrs = List.map check_code_attribute attrs in
+    let attrs = List.map update_lnt attrs in
     `Code { code = instrs;
             exception_table = exceptions;
-            attributes = check_code_attributes attrs; }
-      (* TODO: should code attributes be checked here? *)
+            attributes = attrs }
 
   let decode_attr_exceptions _ = failwith "todo:decode_attr_exceptions"
   let decode_attr_inner_classes _ = failwith "todo:decode_attr_inner_classes"
@@ -911,23 +915,22 @@ module HighAttribute = struct (* {{{ *)
 
   (* knot tying and visible functions *)
 
-  let rec decode_rec r =
+  let rec decode r =
     let st = IS.make_of_string r.da_i.A.data in
     let attr_name =
       get_utf8 r.da_pool r.da_i.A.name_index Invalid_attribute_name in
-    try UTF8Hashtbl.find decoders attr_name decode_rec r st
+    try UTF8Hashtbl.find decoders attr_name decode r st
     with Not_found -> `Unknown (attr_name, r.da_i.A.data)
 
-  let decode da_element da_pool da_i =
-    decode_rec { da_element; da_pool; da_i }
+  let decode_class da_pool da_i =
+    match decode { da_element = A.Class; da_pool; da_i } with
+      | #for_class as g -> g
+      | b -> fail (Misplaced_attribute (name_of_attribute b, "class"))
 
-  let decode_class pool i = match decode A.Class pool i with
-    | #for_class as g -> g
-    | b -> fail (Misplaced_attribute (name_of_attribute b, "class"))
-
-  let decode_method pool i = match decode A.Method pool i with
-    | #for_method as g -> g
-    | b -> fail (Misplaced_attribute (name_of_attribute b, "method"))
+  let decode_method da_pool da_i =
+    match decode { da_element = A.Method; da_pool; da_i } with
+      | #for_method as g -> g
+      | b -> fail (Misplaced_attribute (name_of_attribute b, "method"))
 
 end
 (* }}} *)
