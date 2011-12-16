@@ -80,6 +80,8 @@ let attr_stack_map_table = UTF8.of_string "StackMapTable"
 
 let attr_synthetic = UTF8.of_string "Synthetic"
 
+let attr_unknown = UTF8.of_string "Unknown"
+
 let attr_all = [ attr_annotation_default;
                  attr_bootstrap_methods;
                  attr_code;

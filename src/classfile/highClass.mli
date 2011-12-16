@@ -103,11 +103,13 @@ module HighAttribute : sig (* {{{ *)
     | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
     | `Unknown of Utils.UTF8.t * string ]
 
-  type t = [ for_class | for_method | for_field ]
+  type t = [ for_class | for_method | for_field | code_attribute ]
 
-  val decode_method : ConstantPool.t -> Attribute.info -> for_field
+  val decode_method : ConstantPool.t -> Attribute.info -> for_method
 
-  val decode : Attribute.enclosing_element -> ConstantPool.t -> Attribute.info -> for_class
+  val decode_class :  ConstantPool.t -> Attribute.info -> for_class
+
+  val decode : Attribute.enclosing_element -> ConstantPool.t -> Attribute.info -> t
 
 end (* }}} *)
 
@@ -136,6 +138,8 @@ type error =
   | Invalid_exception_name
   | Invalid_module
   | Invalid_pool_entry_type of (ConstantPool.element * string)
+  | Invalid_source_file
+  | Misplaced_attribute of (string * string)
 
   | Invalid_pool_element
   | Invalid_field

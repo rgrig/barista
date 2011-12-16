@@ -80,6 +80,8 @@ val attr_stack_map_table : Utils.UTF8.t
 
 val attr_synthetic : Utils.UTF8.t
 
+val attr_unknown : Utils.UTF8.t
+
 val attr_all : Utils.UTF8.t list
 
 (** {7 Miscellaneous strings} *)

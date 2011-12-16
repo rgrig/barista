@@ -68,13 +68,11 @@ clean:
 clean_one: FORCE
 	@if [ -z $(NAME) ]; then echo "*** value for 'NAME' is missing"; exit 1; fi
 	@echo "Cleaning '$(NAME)' ..."
-	@ls $(NAME)
 	@rm -f $(NAME)/_log
 	@rm -f $(NAME)/*.cm*
 	@rm -f $(NAME)/*.jo
 	@rm -f $(NAME)/*.o
-	@ls $(NAME)
-	@$(MAKE) -f Makefile.ocaml -C $(NAME) clean || true
+	@$(MAKE) -f Makefile.ocaml -C $(NAME) clean 2> /dev/null || true
 
 log: FORCE
 	@cat _log
