@@ -64,7 +64,9 @@ let string_of_error = function
   | _ -> "undescribed error (todo)"
 
 (* }}} *)
-module Instruction = struct (* {{{ *)
+
+(* HighInstruction, HighAttribute, and HighMethod *) (* {{{ *)
+module HighInstruction = struct (* {{{ *)
   type label = int
       
   type iinc = { ii_var: int; ii_inc: int }
@@ -555,8 +557,8 @@ type t =
   | ByteCode.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
   | ByteCode.WIDE_RET p1 -> RET (u2_to_int p1)
 end (* }}} *)
+module HI = HighInstruction
 
-(* HighAttribute and HighMethod *) (* {{{ *)
 module A = Attribute
 module HighAttribute = struct (* {{{ *)
   open Consts
@@ -587,7 +589,7 @@ module HighAttribute = struct (* {{{ *)
     }
 
   type code_attribute = [
-    | `LineNumberTable of int Instruction.LabelHash.t
+    | `LineNumberTable of int HI.LabelHash.t
     | `Unknown of Utils.UTF8.t * string ]
 (* TODO
     | `LocalVariableTable of unit (** types for local variables *)
@@ -596,14 +598,14 @@ module HighAttribute = struct (* {{{ *)
  *)
 
   type exception_table_element = {
-      try_start : Instruction.label;
-      try_end : Instruction.label;
-      catch : Instruction.label;
+      try_start : HI.label;
+      try_end : HI.label;
+      catch : HI.label;
       caught : Name.for_class option;
     }
 
   type code_value = {
-      code : Instruction.t list;
+      code : HI.t list;
       exception_table : exception_table_element list;
       attributes : code_attribute list;
     }
@@ -679,6 +681,11 @@ module HighAttribute = struct (* {{{ *)
 
   (* helper functions *)
 
+  let hash_of_list create add xs =
+    let h = create 61 in
+    List.iter (fun (k, v) -> add h k v) xs;
+    h
+
   let get_utf8 pool idx err =
     match CP.get_entry pool idx with
     | CP.UTF8 v -> v
@@ -750,6 +757,8 @@ module HighAttribute = struct (* {{{ *)
       | #t -> fail Invalid_code_attribute in
     List.map map l
 
+  (* actual decoders for attributes *)
+
   type decoding_arguments =
     { da_element : A.enclosing_element
     ; da_pool : CP.t
@@ -793,7 +802,7 @@ module HighAttribute = struct (* {{{ *)
     let ofs_to_label ofs =
       let (_, _, lbl) = List.find (fun (_, o, _) -> o = ofs) instr_codes_annot in
       lbl in
-    let decode_inst_code (inst, ofs, _) = Instruction.decode r.da_pool ofs_to_label ofs inst in
+    let decode_inst_code (inst, ofs, _) = HI.decode r.da_pool ofs_to_label ofs inst in
     let instrs = List.map decode_inst_code instr_codes_annot in
     let exceptions =
       InputStream.read_elements
@@ -834,15 +843,18 @@ module HighAttribute = struct (* {{{ *)
 
   let decode_attr_source_debug_extension _ = failwith "todo:decode_attr_source_debug_extension"
 
+  (* We provisionally build a table using program counters instead of labels,
+  because we might have not yet seen the code. The decoding of methods must
+  post-process to change program counters into labels. *)
   let decode_attr_line_number_table _ _ st =
-    let res =
-      IS.read_elements
-        st
-        (fun st ->
-          let start_pc = InputStream.read_u2 st in
-          let line_number = InputStream.read_u2 st in
-          (start_pc, line_number)) in
-    `LineNumberTable (failwith "todo")
+    let h = IS.read_elements
+      st
+      (fun st ->
+        let start_pc = IS.read_u2 st in
+        let line_number = IS.read_u2 st in
+        ((start_pc :> HI.label), (line_number :> int))) in
+    let h = hash_of_list HI.LabelHash.create HI.LabelHash.add h in
+    `LineNumberTable h
 
   let decode_attr_local_variable_table _ = failwith "todo:decode_attr_local_variable_table"
   let decode_attr_local_variable_type_table _ = failwith "todo:decode_attr_local_variable_type_table"
@@ -895,22 +907,19 @@ module HighAttribute = struct (* {{{ *)
       attr_module_permits, decode_attr_module_permits;
       attr_module_provides, decode_attr_module_provides
     ] in
-    let r = UTF8Hashtbl.create 61 in
-    List.iter (fun (k, v) -> UTF8Hashtbl.add r k v) ds;
-    r
+    hash_of_list UTF8Hashtbl.create UTF8Hashtbl.add ds
 
-  (* visible functions *)
+  (* knot tying and visible functions *)
 
-  let rec decode element pool i =
-    let st = InputStream.make_of_string i.A.data in
-    let attr_name = get_utf8 pool i.A.name_index Invalid_attribute_name in
-    try
-      let decode_rec { da_element; da_pool; da_i } =
-        decode da_element da_pool da_i in
-      let r = { da_element = element; da_pool = pool; da_i = i } in
-      UTF8Hashtbl.find decoders attr_name decode_rec r st
-    with Not_found ->
-      `Unknown (attr_name, i.A.data)
+  let rec decode_rec r =
+    let st = IS.make_of_string r.da_i.A.data in
+    let attr_name =
+      get_utf8 r.da_pool r.da_i.A.name_index Invalid_attribute_name in
+    try UTF8Hashtbl.find decoders attr_name decode_rec r st
+    with Not_found -> `Unknown (attr_name, r.da_i.A.data)
+
+  let decode da_element da_pool da_i =
+    decode_rec { da_element; da_pool; da_i }
 
   let decode_class pool i = match decode A.Class pool i with
     | #for_class as g -> g

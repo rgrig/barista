@@ -10,7 +10,7 @@
 (* NOTE: This is supposed to be what [ClassDefinition] should have been in
 the first place. *)
 
-module Instruction : sig (* {{{ *)
+module HighInstruction : sig (* {{{ *)
   type t
   type label
   module LabelHash : Hashtbl.S with type key = label
@@ -40,7 +40,7 @@ module HighAttribute : sig (* {{{ *)
     }
 
   type code_attribute = [
-    | `LineNumberTable of int Instruction.LabelHash.t
+    | `LineNumberTable of int HighInstruction.LabelHash.t
     | `Unknown of Utils.UTF8.t * string ]
 (* TODO
     | `LocalVariableTable of unit (** types for local variables *)
@@ -49,14 +49,14 @@ module HighAttribute : sig (* {{{ *)
  *)
 
   type exception_table_element = {
-      try_start : Instruction.label;
-      try_end : Instruction.label;
-      catch : Instruction.label;
+      try_start : HighInstruction.label;
+      try_end : HighInstruction.label;
+      catch : HighInstruction.label;
       caught : Name.for_class option;
     }
 
   type code_value = {
-      code : Instruction.t list;
+      code : HighInstruction.t list;
       exception_table : exception_table_element list;
       attributes : code_attribute list;
     }
