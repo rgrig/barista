@@ -749,12 +749,12 @@ module HighAttribute = struct (* {{{ *)
 
   type code_attribute = [
     | `LineNumberTable of int HI.LabelHash.t
-    | `Unknown of Utils.UTF8.t * string ]
-(* TODO
+    | `Unknown of Utils.UTF8.t * string
+
+    (* TODO: Treating these properly requires some symbolic execution. *)
     | `LocalVariableTable of unit (** types for local variables *)
-    | `LocalVariableTypeTable of local_variable_type_table_element list (** signatures for local variables *)
-    | `StackMapTable of stack_map_frame list
- *)
+    | `LocalVariableTypeTable of unit (** signatures for local variables *)
+  ]
 
   type exception_table_element = {
       try_start : HI.label;
@@ -824,6 +824,8 @@ module HighAttribute = struct (* {{{ *)
     | `Exceptions _ -> attr_exceptions
     | `InnerClasses _ -> attr_inner_classes
     | `LineNumberTable _ -> attr_line_number_table
+    | `LocalVariableTable _ -> attr_local_variable_table
+    | `LocalVariableTypeTable _ -> attr_local_variable_type_table
     | `MethodSignature _ -> attr_signature
     | `Module _ -> attr_module
     | `RuntimeInvisibleAnnotations _ -> attr_runtime_invisible_annotations
@@ -1019,7 +1021,10 @@ module HighAttribute = struct (* {{{ *)
     let h = hash_of_list HI.LabelHash.create HI.LabelHash.add h in
     `LineNumberTable h
 
-  let decode_attr_local_variable_table _ = failwith "todo:decode_attr_local_variable_table"
+  let decode_attr_local_variable_table _ _ _ =
+    (* See TODO note on type code_attribute. *)
+    `LocalVariableTable ()
+
   let decode_attr_local_variable_type_table _ = failwith "todo:decode_attr_local_variable_type_table"
   let decode_attr_deprecated _ = failwith "todo:decode_attr_deprecated"
   let decode_attr_runtime_visible_annotations _ = failwith "todo:decode_attr_runtime_visible_annotations"
@@ -1116,6 +1121,10 @@ module HighAttribute = struct (* {{{ *)
         Version.make_bounds "'SourceDebugExtension' attribute" Version.Java_1_5 None
     | `LineNumberTable _ ->
         Version.make_bounds "'LineNumberTable' attribute" Version.Java_1_0 None
+    | `LocalVariableTable _ ->
+        Version.make_bounds "'LocalVariableTable' attribute" Version.Java_1_0 None
+    | `LocalVariableTypeTable _ ->
+        Version.make_bounds "'LocalVariableTypeTable' attribute" Version.Java_1_5 None
     | `MethodSignature _ ->
         Version.make_bounds "'MethodSignature' attribute" Version.Java_1_5 None
     | `Deprecated ->
@@ -1140,8 +1149,6 @@ module HighAttribute = struct (* {{{ *)
         Version.make_bounds "'Module' attribute" Version.Java_1_8 None
     | `Unknown _ ->
         Version.make_bounds "'Unknown' attribute" Version.Java_1_0 None
-
-    
 
 end
 (* }}} *)

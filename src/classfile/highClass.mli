@@ -36,19 +36,20 @@ module HighAttribute : sig (* {{{ *)
       inner_name : Utils.UTF8.t option;
       inner_flags : AccessFlag.for_inner_class list;
     }
-  and enclosing_method_value = {
+
+  type enclosing_method_value = {
       innermost_class : Name.for_class;
       enclosing_method : (Name.for_method * Descriptor.for_method) option;
     }
 
   type code_attribute = [
     | `LineNumberTable of int HighInstruction.LabelHash.t
-    | `Unknown of Utils.UTF8.t * string ]
-(* TODO
+    | `Unknown of Utils.UTF8.t * string
+
+    (* TODO: Treating these properly requires some symbolic execution. *)
     | `LocalVariableTable of unit (** types for local variables *)
-    | `LocalVariableTypeTable of local_variable_type_table_element list (** signatures for local variables *)
-    | `StackMapTable of stack_map_frame list
- *)
+    | `LocalVariableTypeTable of unit (** signatures for local variables *)
+  ]
 
   type exception_table_element = {
       try_start : HighInstruction.label;
