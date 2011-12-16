@@ -14,6 +14,8 @@ module HighInstruction : sig (* {{{ *)
   type t
   type label
   module LabelHash : Hashtbl.S with type key = label
+
+  val version_bounds : t -> Version.bounds
 end (* }}} *)
 
 module HighAttribute : sig (* {{{ *)
@@ -105,6 +107,8 @@ module HighAttribute : sig (* {{{ *)
 
   type t = [ for_class | for_method | for_field | code_attribute ]
 
+  val version_bounds : t -> Version.bounds
+
   val decode_method : ConstantPool.t -> Attribute.info -> for_method
 
   val decode_class :  ConstantPool.t -> Attribute.info -> for_class
@@ -112,7 +116,29 @@ module HighAttribute : sig (* {{{ *)
 end (* }}} *)
 
 module HighMethod : sig (* {{{ *)
-  type t
+  type regular = {
+      flags : AccessFlag.for_method list;
+      name : Name.for_method;
+      descriptor : Descriptor.for_method;
+      attributes : HighAttribute.for_method list;
+    }
+
+  type constructor = {
+      cstr_flags : AccessFlag.for_constructor list;
+      cstr_descriptor : Descriptor.for_parameter list;
+      cstr_attributes : HighAttribute.for_method list;
+    }
+
+  type class_initializer = {
+      init_flags : AccessFlag.for_initializer list;
+      init_attributes : HighAttribute.for_method list;
+    }
+
+  type t =
+    | Regular of regular
+    | Constructor of constructor
+    | Initializer of class_initializer
+
   val decode : bool -> ConstantPool.t -> Method.info -> t
 end (* }}} *)
 

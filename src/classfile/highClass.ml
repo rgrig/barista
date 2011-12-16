@@ -556,6 +556,165 @@ type t =
   | ByteCode.WIDE_LLOAD p1 -> LLOAD (u2_to_int p1)
   | ByteCode.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
   | ByteCode.WIDE_RET p1 -> RET (u2_to_int p1)
+
+  let version_bounds = function
+    | AALOAD -> Version.make_bounds "'AALOAD' instruction" Version.Java_1_0 None
+    | AASTORE -> Version.make_bounds "'AASTORE' instruction" Version.Java_1_0 None
+    | ACONST_NULL -> Version.make_bounds "'ACONST_NULL' instruction" Version.Java_1_0 None
+    | ALOAD _ -> Version.make_bounds "'ALOAD' instruction" Version.Java_1_0 None
+    | ANEWARRAY _ -> Version.make_bounds "'ANEWARRAY' instruction" Version.Java_1_0 None
+    | ARETURN -> Version.make_bounds "'ARETURN' instruction" Version.Java_1_0 None
+    | ARRAYLENGTH -> Version.make_bounds "'ARRAYLENGTH' instruction" Version.Java_1_0 None
+    | ASTORE _ -> Version.make_bounds "'ASTORE' instruction" Version.Java_1_0 None
+    | ATHROW -> Version.make_bounds "'ATHROW' instruction" Version.Java_1_0 None
+    | BALOAD -> Version.make_bounds "'BALOAD' instruction" Version.Java_1_0 None
+    | BASTORE -> Version.make_bounds "'BASTORE' instruction" Version.Java_1_0 None
+    | BIPUSH _ -> Version.make_bounds "'BIPUSH' instruction" Version.Java_1_0 None
+    | CALOAD -> Version.make_bounds "'CALOAD' instruction" Version.Java_1_0 None
+    | CASTORE -> Version.make_bounds "'CASTORE' instruction" Version.Java_1_0 None
+    | CHECKCAST _ -> Version.make_bounds "'CHECKCAST' instruction" Version.Java_1_0 None
+    | D2F -> Version.make_bounds "'D2F' instruction" Version.Java_1_0 None
+    | D2I -> Version.make_bounds "'D2I' instruction" Version.Java_1_0 None
+    | D2L -> Version.make_bounds "'D2L' instruction" Version.Java_1_0 None
+    | DADD -> Version.make_bounds "'DADD' instruction" Version.Java_1_0 None
+    | DALOAD -> Version.make_bounds "'DALOAD' instruction" Version.Java_1_0 None
+    | DASTORE -> Version.make_bounds "'DASTORE' instruction" Version.Java_1_0 None
+    | DCMPG -> Version.make_bounds "'DCMPG' instruction" Version.Java_1_0 None
+    | DCMPL -> Version.make_bounds "'DCMPL' instruction" Version.Java_1_0 None
+    | DCONST_0 -> Version.make_bounds "'DCONST_0' instruction" Version.Java_1_0 None
+    | DCONST_1 -> Version.make_bounds "'DCONST_1' instruction" Version.Java_1_0 None
+    | DDIV -> Version.make_bounds "'DDIV' instruction" Version.Java_1_0 None
+    | DLOAD _ -> Version.make_bounds "'DLOAD' instruction" Version.Java_1_0 None
+    | DMUL -> Version.make_bounds "'DMUL' instruction" Version.Java_1_0 None
+    | DNEG -> Version.make_bounds "'DNEG' instruction" Version.Java_1_0 None
+    | DREM -> Version.make_bounds "'DREM' instruction" Version.Java_1_0 None
+    | DRETURN -> Version.make_bounds "'DRETURN' instruction" Version.Java_1_0 None
+    | DSTORE _ -> Version.make_bounds "'DSTORE' instruction" Version.Java_1_0 None
+    | DSUB -> Version.make_bounds "'DSUB' instruction" Version.Java_1_0 None
+    | DUP -> Version.make_bounds "'DUP' instruction" Version.Java_1_0 None
+    | DUP2 -> Version.make_bounds "'DUP2' instruction" Version.Java_1_0 None
+    | DUP2_X1 -> Version.make_bounds "'DUP2_X1' instruction" Version.Java_1_0 None
+    | DUP2_X2 -> Version.make_bounds "'DUP2_X2' instruction" Version.Java_1_0 None
+    | DUP_X1 -> Version.make_bounds "'DUP_X1' instruction" Version.Java_1_0 None
+    | DUP_X2 -> Version.make_bounds "'DUP_X2' instruction" Version.Java_1_0 None
+    | F2D -> Version.make_bounds "'F2D' instruction" Version.Java_1_0 None
+    | F2I -> Version.make_bounds "'F2I' instruction" Version.Java_1_0 None
+    | F2L -> Version.make_bounds "'F2L' instruction" Version.Java_1_0 None
+    | FADD -> Version.make_bounds "'FADD' instruction" Version.Java_1_0 None
+    | FALOAD -> Version.make_bounds "'FALOAD' instruction" Version.Java_1_0 None
+    | FASTORE -> Version.make_bounds "'FASTORE' instruction" Version.Java_1_0 None
+    | FCMPG -> Version.make_bounds "'FCMPG' instruction" Version.Java_1_0 None
+    | FCMPL -> Version.make_bounds "'FCMPL' instruction" Version.Java_1_0 None
+    | FCONST_0 -> Version.make_bounds "'FCONST_0' instruction" Version.Java_1_0 None
+    | FCONST_1 -> Version.make_bounds "'FCONST_1' instruction" Version.Java_1_0 None
+    | FCONST_2 -> Version.make_bounds "'FCONST_2' instruction" Version.Java_1_0 None
+    | FDIV -> Version.make_bounds "'FDIV' instruction" Version.Java_1_0 None
+    | FLOAD _ -> Version.make_bounds "'FLOAD' instruction" Version.Java_1_0 None
+    | FMUL -> Version.make_bounds "'FMUL' instruction" Version.Java_1_0 None
+    | FNEG -> Version.make_bounds "'FNEG' instruction" Version.Java_1_0 None
+    | FREM -> Version.make_bounds "'FREM' instruction" Version.Java_1_0 None
+    | FRETURN -> Version.make_bounds "'FRETURN' instruction" Version.Java_1_0 None
+    | FSTORE _ -> Version.make_bounds "'FSTORE' instruction" Version.Java_1_0 None
+    | FSUB -> Version.make_bounds "'FSUB' instruction" Version.Java_1_0 None
+    | GETFIELD _ -> Version.make_bounds "'GETFIELD' instruction" Version.Java_1_0 None
+    | GETSTATIC _ -> Version.make_bounds "'GETSTATIC' instruction" Version.Java_1_0 None
+    | GOTO _ -> Version.make_bounds "'GOTO' instruction" Version.Java_1_0 None
+    | I2B -> Version.make_bounds "'I2B' instruction" Version.Java_1_0 None
+    | I2C -> Version.make_bounds "'I2C' instruction" Version.Java_1_0 None
+    | I2D -> Version.make_bounds "'I2D' instruction" Version.Java_1_0 None
+    | I2F -> Version.make_bounds "'I2F' instruction" Version.Java_1_0 None
+    | I2L -> Version.make_bounds "'I2L' instruction" Version.Java_1_0 None
+    | I2S -> Version.make_bounds "'I2S' instruction" Version.Java_1_0 None
+    | IADD -> Version.make_bounds "'IADD' instruction" Version.Java_1_0 None
+    | IALOAD -> Version.make_bounds "'IALOAD' instruction" Version.Java_1_0 None
+    | IAND -> Version.make_bounds "'IAND' instruction" Version.Java_1_0 None
+    | IASTORE -> Version.make_bounds "'IASTORE' instruction" Version.Java_1_0 None
+    | ICONST_0 -> Version.make_bounds "'ICONST_0' instruction" Version.Java_1_0 None
+    | ICONST_1 -> Version.make_bounds "'ICONST_1' instruction" Version.Java_1_0 None
+    | ICONST_2 -> Version.make_bounds "'ICONST_2' instruction" Version.Java_1_0 None
+    | ICONST_3 -> Version.make_bounds "'ICONST_3' instruction" Version.Java_1_0 None
+    | ICONST_4 -> Version.make_bounds "'ICONST_4' instruction" Version.Java_1_0 None
+    | ICONST_5 -> Version.make_bounds "'ICONST_5' instruction" Version.Java_1_0 None
+    | ICONST_M1 -> Version.make_bounds "'ICONST_M1' instruction" Version.Java_1_0 None
+    | IDIV -> Version.make_bounds "'IDIV' instruction" Version.Java_1_0 None
+    | IF_ACMPEQ _ -> Version.make_bounds "'IF_ACMPEQ' instruction" Version.Java_1_0 None
+    | IF_ACMPNE _ -> Version.make_bounds "'IF_ACMPNE' instruction" Version.Java_1_0 None
+    | IF_ICMPEQ _ -> Version.make_bounds "'IF_ICMPEQ' instruction" Version.Java_1_0 None
+    | IF_ICMPGE _ -> Version.make_bounds "'IF_ICMPGE' instruction" Version.Java_1_0 None
+    | IF_ICMPGT _ -> Version.make_bounds "'IF_ICMPGT' instruction" Version.Java_1_0 None
+    | IF_ICMPLE _ -> Version.make_bounds "'IF_ICMPLE' instruction" Version.Java_1_0 None
+    | IF_ICMPLT _ -> Version.make_bounds "'IF_ICMPLT' instruction" Version.Java_1_0 None
+    | IF_ICMPNE _ -> Version.make_bounds "'IF_ICMPNE' instruction" Version.Java_1_0 None
+    | IFEQ _ -> Version.make_bounds "'IFEQ' instruction" Version.Java_1_0 None
+    | IFGE _ -> Version.make_bounds "'IFGE' instruction" Version.Java_1_0 None
+    | IFGT _ -> Version.make_bounds "'IFGT' instruction" Version.Java_1_0 None
+    | IFLE _ -> Version.make_bounds "'IFLE' instruction" Version.Java_1_0 None
+    | IFLT _ -> Version.make_bounds "'IFLT' instruction" Version.Java_1_0 None
+    | IFNE _ -> Version.make_bounds "'IFNE' instruction" Version.Java_1_0 None
+    | IFNONNULL _ -> Version.make_bounds "'IFNONNULL' instruction" Version.Java_1_0 None
+    | IFNULL _ -> Version.make_bounds "'IFNULL' instruction" Version.Java_1_0 None
+    | IINC _ -> Version.make_bounds "'IINC' instruction" Version.Java_1_0 None
+    | ILOAD _ -> Version.make_bounds "'ILOAD' instruction" Version.Java_1_0 None
+    | IMUL -> Version.make_bounds "'IMUL' instruction" Version.Java_1_0 None
+    | INEG -> Version.make_bounds "'INEG' instruction" Version.Java_1_0 None
+    | INSTANCEOF _ -> Version.make_bounds "'INSTANCEOF' instruction" Version.Java_1_0 None
+    | INVOKEINTERFACE _ -> Version.make_bounds "'INVOKEINTERFACE' instruction" Version.Java_1_0 None
+    | INVOKESPECIAL _ -> Version.make_bounds "'INVOKESPECIAL' instruction" Version.Java_1_0 None
+    | INVOKESTATIC _ -> Version.make_bounds "'INVOKESTATIC' instruction" Version.Java_1_0 None
+    | INVOKEVIRTUAL _ -> Version.make_bounds "'INVOKEVIRTUAL' instruction" Version.Java_1_0 None
+    | IOR -> Version.make_bounds "'IOR' instruction" Version.Java_1_0 None
+    | IREM -> Version.make_bounds "'IREM' instruction" Version.Java_1_0 None
+    | IRETURN -> Version.make_bounds "'IRETURN' instruction" Version.Java_1_0 None
+    | ISHL -> Version.make_bounds "'ISHL' instruction" Version.Java_1_0 None
+    | ISHR -> Version.make_bounds "'ISHR' instruction" Version.Java_1_0 None
+    | ISTORE _ -> Version.make_bounds "'ISTORE' instruction" Version.Java_1_0 None
+    | ISUB -> Version.make_bounds "'ISUB' instruction" Version.Java_1_0 None
+    | IUSHR -> Version.make_bounds "'IUSHR' instruction" Version.Java_1_0 None
+    | IXOR -> Version.make_bounds "'IXOR' instruction" Version.Java_1_0 None
+    | JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+    | L2D -> Version.make_bounds "'L2D' instruction" Version.Java_1_0 None
+    | L2F -> Version.make_bounds "'L2F' instruction" Version.Java_1_0 None
+    | L2I -> Version.make_bounds "'L2I' instruction" Version.Java_1_0 None
+    | LADD -> Version.make_bounds "'LADD' instruction" Version.Java_1_0 None
+    | LALOAD -> Version.make_bounds "'LALOAD' instruction" Version.Java_1_0 None
+    | LAND -> Version.make_bounds "'LAND' instruction" Version.Java_1_0 None
+    | LASTORE -> Version.make_bounds "'LASTORE' instruction" Version.Java_1_0 None
+    | LCMP -> Version.make_bounds "'LCMP' instruction" Version.Java_1_0 None
+    | LCONST_0 -> Version.make_bounds "'LCONST_0' instruction" Version.Java_1_0 None
+    | LCONST_1 -> Version.make_bounds "'LCONST_1' instruction" Version.Java_1_0 None
+    | LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_1_5 | `Method_type _ -> Version.Java_1_7 | `Method_handle _ -> Version.Java_1_7 | _ -> Version.Java_1_0) None
+    | LDC2_W _ -> Version.make_bounds "'LDC2_W' instruction" Version.Java_1_0 None
+    | LDIV -> Version.make_bounds "'LDIV' instruction" Version.Java_1_0 None
+    | LLOAD _ -> Version.make_bounds "'LLOAD' instruction" Version.Java_1_0 None
+    | LMUL -> Version.make_bounds "'LMUL' instruction" Version.Java_1_0 None
+    | LNEG -> Version.make_bounds "'LNEG' instruction" Version.Java_1_0 None
+    | LOOKUPSWITCH _ -> Version.make_bounds "'LOOKUPSWITCH' instruction" Version.Java_1_0 None
+    | LOR -> Version.make_bounds "'LOR' instruction" Version.Java_1_0 None
+    | LREM -> Version.make_bounds "'LREM' instruction" Version.Java_1_0 None
+    | LRETURN -> Version.make_bounds "'LRETURN' instruction" Version.Java_1_0 None
+    | LSHL -> Version.make_bounds "'LSHL' instruction" Version.Java_1_0 None
+    | LSHR -> Version.make_bounds "'LSHR' instruction" Version.Java_1_0 None
+    | LSTORE _ -> Version.make_bounds "'LSTORE' instruction" Version.Java_1_0 None
+    | LSUB -> Version.make_bounds "'LSUB' instruction" Version.Java_1_0 None
+    | LUSHR -> Version.make_bounds "'LUSHR' instruction" Version.Java_1_0 None
+    | LXOR -> Version.make_bounds "'LXOR' instruction" Version.Java_1_0 None
+    | MONITORENTER -> Version.make_bounds "'MONITORENTER' instruction" Version.Java_1_0 None
+    | MONITOREXIT -> Version.make_bounds "'MONITOREXIT' instruction" Version.Java_1_0 None
+    | MULTIANEWARRAY _ -> Version.make_bounds "'MULTIANEWARRAY' instruction" Version.Java_1_0 None
+    | NEW _ -> Version.make_bounds "'NEW' instruction" Version.Java_1_0 None
+    | NEWARRAY _ -> Version.make_bounds "'NEWARRAY' instruction" Version.Java_1_0 None
+    | NOP -> Version.make_bounds "'NOP' instruction" Version.Java_1_0 None
+    | POP -> Version.make_bounds "'POP' instruction" Version.Java_1_0 None
+    | POP2 -> Version.make_bounds "'POP2' instruction" Version.Java_1_0 None
+    | PUTFIELD _ -> Version.make_bounds "'PUTFIELD' instruction" Version.Java_1_0 None
+    | PUTSTATIC _ -> Version.make_bounds "'PUTSTATIC' instruction" Version.Java_1_0 None
+    | RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+    | RETURN -> Version.make_bounds "'RETURN' instruction" Version.Java_1_0 None
+    | SALOAD -> Version.make_bounds "'SALOAD' instruction" Version.Java_1_0 None
+    | SASTORE -> Version.make_bounds "'SASTORE' instruction" Version.Java_1_0 None
+    | SIPUSH _ -> Version.make_bounds "'SIPUSH' instruction" Version.Java_1_0 None
+    | SWAP -> Version.make_bounds "'SWAP' instruction" Version.Java_1_0 None
+    | TABLESWITCH _ -> Version.make_bounds "'TABLESWITCH' instruction" Version.Java_1_0 None
 end (* }}} *)
 module HI = HighInstruction
 
@@ -932,6 +1091,58 @@ module HighAttribute = struct (* {{{ *)
       | #for_method as g -> g
       | b -> fail (Misplaced_attribute (name_of_attribute b, "method"))
 
+  let rec version_bounds : t -> Version.bounds = function
+    | `ConstantValue _ ->
+        Version.make_bounds "'ConstantValue' attribute" Version.Java_1_0 None
+    | `ClassSignature _ ->
+        Version.make_bounds "'ClassSignature' attribute" Version.Java_1_5 None
+    | `Code cv ->
+        let instrs_bounds = List.map HI.version_bounds cv.code in
+        let attrs_bounds = List.map version_bounds (cv.attributes :> t list) in
+        Version.intersect_list (instrs_bounds @ attrs_bounds)
+    | `Exceptions _ ->
+        Version.make_bounds "'Exceptions' attribute" Version.Java_1_0 None
+    | `InnerClasses _ ->
+        Version.make_bounds "'InnerClasses' attribute" Version.Java_1_1 None
+    | `EnclosingMethod _ ->
+        Version.make_bounds "'EnclosingMethod' attribute" Version.Java_1_5 None
+    | `Synthetic ->
+        Version.make_bounds "'Synthetic' attribute" Version.Java_1_1 None
+    | `Signature _ ->
+        Version.make_bounds "'Signature' attribute" Version.Java_1_5 None
+    | `SourceFile _ ->
+        Version.make_bounds "'SourceFile' attribute" Version.Java_1_0 None
+    | `SourceDebugExtension _ ->
+        Version.make_bounds "'SourceDebugExtension' attribute" Version.Java_1_5 None
+    | `LineNumberTable _ ->
+        Version.make_bounds "'LineNumberTable' attribute" Version.Java_1_0 None
+    | `MethodSignature _ ->
+        Version.make_bounds "'MethodSignature' attribute" Version.Java_1_5 None
+    | `Deprecated ->
+        Version.make_bounds "'Deprecated' attribute" Version.Java_1_1 None
+    | `RuntimeVisibleAnnotations _ ->
+        Version.make_bounds "'RuntimeVisibleAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeInvisibleAnnotations _ ->
+        Version.make_bounds "'RuntimeInvisibleAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeVisibleParameterAnnotations _ ->
+        Version.make_bounds "'RuntimeVisibleParameterAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeInvisibleParameterAnnotations _ ->
+        Version.make_bounds "'RuntimeInvisibleParameterAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeVisibleTypeAnnotations _ ->
+        Version.make_bounds "'RuntimeVisibleTypeAnnotations' attribute" Version.Java_1_7 None
+    | `RuntimeInvisibleTypeAnnotations _ ->
+        Version.make_bounds "'RuntimeInvisibleTypeAnnotations' attribute" Version.Java_1_7 None
+    | `AnnotationDefault _ ->
+        Version.make_bounds "'AnnotationDefault' attribute" Version.Java_1_5 None
+    | `BootstrapMethods _ ->
+        Version.make_bounds "'BootstrapMethods' attribute" Version.Java_1_7 None
+    | `Module _ ->
+        Version.make_bounds "'Module' attribute" Version.Java_1_8 None
+    | `Unknown _ ->
+        Version.make_bounds "'Unknown' attribute" Version.Java_1_0 None
+
+    
+
 end
 (* }}} *)
 module HA = HighAttribute
@@ -1007,8 +1218,21 @@ type t = {
   }
 
 let check_version_high ?(version = Version.default) c =
-  ignore version;
-  if true then failwith "todo";
+  let check_flag x = Version.check (AF.version_bounds x) version in
+  let check_field _ = failwith "todo" in
+  let check_attribute x = Version.check (HA.version_bounds x) version in
+  let check_method =
+    let cfa f a =
+      List.iter check_flag (f :> AF.t list);
+      List.iter check_attribute (a :> HA.t list) in
+    function
+      | HM.Regular { HM.flags = f; attributes = a; _ } -> cfa f a
+      | HM.Constructor { HM.cstr_flags = f; cstr_attributes = a; _ } -> cfa f a
+      | HM.Initializer { HM.init_flags = f; init_attributes = a; _ } -> cfa f a
+  in
+  List.iter check_field c.fields;
+  List.iter check_method c.methods;
+  List.iter check_attribute (c.attributes :> HA.t list);
   c
 
 let decode ?(version = Version.default) cf =
