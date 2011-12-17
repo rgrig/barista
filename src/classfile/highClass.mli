@@ -161,35 +161,15 @@ type error =
   | Invalid_constant_value
   | Invalid_descriptor
   | Invalid_exception_name
+  | Invalid_method_handle
   | Invalid_module
+  | Invalid_pool_element
+  | Invalid_pool_entry
   | Invalid_pool_entry_type of (ConstantPool.element * string)
+  | Invalid_pool_index
+  | Invalid_primitive_array_type
   | Invalid_source_file
   | Misplaced_attribute of (string * string)
-
-  | Invalid_pool_element
-  | Invalid_field
-  | Invalid_dynamic_method
-  | Invalid_interface_method
-  | Invalid_method
-  | Invalid_parameter
-  | Invalid_primitive_type
-  | Invalid_switch_cases
-  | Invalid_pool_index
-  | Invalid_pool_entry
-  | Invalid_primitive_array_type
-  | Invalid_index
-  | Invalid_array_element
-  | Invalid_unsigned_byte
-  | Invalid_byte
-  | Invalid_unsigned_short
-  | Invalid_signed_short
-  | Invalid_signed_long
-  | Invalid_short_offset
-  | Invalid_long_offset
-  | Invalid_number_of_arguments
-  | Unknown_instruction
-  | Invalid_method_handle
-  | Too_many_bootstrap_specifiers
   | Unsupported_instruction of string
 
 exception Exception of error
