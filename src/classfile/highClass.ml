@@ -1254,5 +1254,15 @@ let decode ?(version = Version.default) cf =
     methods = List.map method_decode (Array.to_list cf.CF.methods);
     attributes = List.map attribute_decode (Array.to_list cf.CF.attributes); }
 
-let encode ?(version = Version.default) _ = ignore version; failwith "todo"
+(* TODO should this be in consts? *)
+let no_super_class = U.u2 0
 
+let encode ?(version = Version.default) cd =
+  check_version_high ~version:version cd;
+  let major, minor = Version.major_minor_of_version version in
+  let pool = CP.make_extendable () in
+  let this_index = CP.add_class pool cd.name in
+  let super_index = match cd.extends with
+  | Some n -> CP.add_class pool n
+  | None -> no_super_class in
+  failwith "todo"
