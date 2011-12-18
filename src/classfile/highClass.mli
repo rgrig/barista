@@ -111,8 +111,10 @@ module HighAttribute : sig (* {{{ *)
   val version_bounds : t -> Version.bounds
 
   val decode_method : ConstantPool.t -> Attribute.info -> for_method
-
   val decode_class :  ConstantPool.t -> Attribute.info -> for_class
+
+  val encode_method :  ConstantPool.t -> for_method -> Attribute.info
+  val encode_class :  ConstantPool.t -> for_class -> Attribute.info
 
 end (* }}} *)
 
@@ -141,6 +143,8 @@ module HighMethod : sig (* {{{ *)
     | Initializer of class_initializer
 
   val decode : bool -> ConstantPool.t -> Method.info -> t
+
+  val encode : ConstantPool.extendable -> t -> Method.info
 end (* }}} *)
 
 type t = {
@@ -170,6 +174,7 @@ type error =
   | Invalid_primitive_array_type
   | Invalid_source_file
   | Misplaced_attribute of (string * string)
+  | Too_many of string
   | Unsupported_instruction of string
 
 exception Exception of error

@@ -29,6 +29,7 @@ type error =
   | Invalid_primitive_array_type
   | Invalid_source_file
   | Misplaced_attribute of (string * string)
+  | Too_many of string
   | Unsupported_instruction of string
 
 exception Exception of error
@@ -40,6 +41,7 @@ let string_of_error = function
   | Unsupported_instruction s -> "unsupported instruction: " ^ s
   | Invalid_source_file -> "non-string used for file name"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
+  | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
   | _ -> "undescribed error (todo)"
 
 (* }}} *)
@@ -1129,6 +1131,8 @@ module HighAttribute = struct (* {{{ *)
     | `Unknown _ ->
         Version.make_bounds "'Unknown' attribute" Version.Java_1_0 None
 
+  let encode_method _ _ = failwith "todo"
+  let encode_class _ _ = failwith "todo"
 end
 (* }}} *)
 module HA = HighAttribute
@@ -1188,6 +1192,33 @@ module HighMethod = struct (* {{{ *)
       ; class_constructor, decode_constructor descriptor attributes flags ]
       (decode_regular is_interface name descriptor attributes flags)
       utf8_name
+
+  let encode pool m =
+    let flags, name, desc, attrs = match m with
+      | Regular r ->
+	r.flags,
+	r.name,
+	r.descriptor,
+	r.attributes
+      | Constructor c ->
+	(c.cstr_flags :> AF.for_method list),
+	(Name.make_for_method class_constructor),
+	(c.cstr_descriptor, `Void),
+	c.cstr_attributes
+      | Initializer i ->
+	(i.init_flags :> AF.for_method list),
+	(Name.make_for_method class_initializer),
+	([], `Void),
+	i.init_attributes in
+    let acc_flags = AF.list_to_u2 (flags :> AF.t list) in
+    let name_idx = CP.add_utf8 pool (Name.utf8_for_method name) in
+    let desc_utf8 = Descriptor.utf8_of_method desc in
+    let desc_idx = CP.add_utf8 pool desc_utf8 in
+    { M.access_flags = acc_flags;
+      name_index = name_idx;
+      descriptor_index = desc_idx;
+      attributes_count = U.u2 (List.length attrs);
+      attributes_array = U.map_list_to_array (HA.encode_method pool) (attrs :> HA.t list); }
 end
 (* }}} *)
 module HM = HighMethod
@@ -1265,4 +1296,34 @@ let encode ?(version = Version.default) cd =
   let super_index = match cd.extends with
   | Some n -> CP.add_class pool n
   | None -> no_super_class in
-  failwith "todo"
+  let itfs = U.map_list_to_array (fun s -> CP.add_class pool s) cd.implements in
+  let flds = U.map_list_to_array (Field.encode pool) cd.fields in
+  let mths = U.map_list_to_array (HM.encode pool) cd.methods in
+  let atts = U.map_list_to_array (HA.encode_class pool) cd.attributes in
+  let cpool = CP.to_pool pool in
+  let checked_length s sz =
+    if sz <= U.max_u2 then
+      U.u2 sz
+    else
+      fail (Too_many s) in
+  let checked_length_array s arr =
+    let res = Array.length arr in
+    checked_length s res in
+  CP.check_version version cpool;
+  { CF.magic = U.u4 magic_number;
+    CF.minor_version = minor;
+    CF.major_version = major;
+    CF.constant_pool_count = CP.size cpool;
+    CF.constant_pool = cpool;
+    CF.access_flags = AF.list_to_u2 (cd.access_flags :> AF.t list);
+    CF.this_class = this_index;
+    CF.super_class = super_index;
+    CF.interfaces_count = checked_length_array "interfaces" itfs;
+    CF.interfaces = itfs;
+    CF.fields_count = checked_length_array "fields" flds;
+    CF.fields = flds;
+    CF.methods_count = checked_length_array "methods" mths;
+    CF.methods = mths;
+    CF.attributes_count = checked_length_array "attributes" atts;
+    CF.attributes = atts; }
+
