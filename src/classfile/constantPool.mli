@@ -137,6 +137,7 @@ type error =
   | Malformed_MethodType_entry of Utils.u2
   | Malformed_InvokeDynamic_entry of Utils.u2 * Utils.u2
   | Malformed_ModuleId_entry of Utils.u2 * Utils.u2
+  | Unexpected_tag of int * int (* fst expected, snd found *)
 
 exception Exception of error
 (** Exception to be raised when a function of this module fails. *)
@@ -169,7 +170,7 @@ val write : OutputStream.t -> t -> unit
    Raises [Exception] if pool is too large. *)
 
 
-(** {6 Check functions} *)
+(** {6 Checking and queries} *)
 
 val size : t -> Utils.u2
 (** Returns the size of the passed pool. *)
@@ -178,6 +179,14 @@ val get_entry : t -> Utils.u2 -> element
 (** [get_entry pool index] returns the entry at [index] in [pool] if
     [index] is valid, raising [Exception] otherwise.
     Raises [Exception] if an attempt is made to get a dummy element. *)
+
+val get_utf8_entry : t -> Utils.u2 -> Utils.UTF8.t
+(** A specialized version of [get_entry] that unpacks a UTF8 string if the entry
+    is a UTF8 string, and raises an exception otherwise. *)
+
+val get_class_name : t -> Utils.u2 -> Name.for_class
+(** A specialized version of [get_entry] that also builds a high-level name.
+    An exception is raised if the given index does not point to a class name. *)
 
 val check : t -> unit
 (** Checks the passed pool for consistency.

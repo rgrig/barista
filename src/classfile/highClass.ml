@@ -1,7 +1,6 @@
 (* open modules *) (* {{{ *)
 open Consts
 (* }}} *)
-
 (* module shorthands *) (* {{{ *)
 module AF = AccessFlag
 module CF = ClassFile
@@ -10,24 +9,16 @@ module IS = InputStream
 module U = Utils
 
 (* }}} *)
-
 (* errors *) (* {{{ *)
 type error =
-  | Invalid_attribute_name
   | Invalid_class_name
-  | Invalid_code_attribute
   | Invalid_code_length
   | Invalid_constant_value
-  | Invalid_descriptor
-  | Invalid_exception_name
   | Invalid_method_handle
   | Invalid_module
   | Invalid_pool_element
   | Invalid_pool_entry
-  | Invalid_pool_entry_type of (CP.element * string)
-  | Invalid_pool_index
   | Invalid_primitive_array_type
-  | Invalid_source_file
   | Misplaced_attribute of (string * string)
   | Too_many of string
   | Unsupported_instruction of string
@@ -37,19 +28,16 @@ exception Exception of error
 let fail e = raise (Exception e)
 
 let string_of_error = function
-  | Invalid_pool_entry_type (_, t) -> "expected pool entry of type " ^ t
   | Unsupported_instruction s -> "unsupported instruction: " ^ s
-  | Invalid_source_file -> "non-string used for file name"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
   | _ -> "undescribed error (todo)"
 
 (* }}} *)
-
 (* HighInstruction, HighAttribute, and HighMethod *) (* {{{ *)
 module HighInstruction = struct (* {{{ *)
   type label = int
-      
+
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
   type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }
@@ -226,6 +214,7 @@ type t =
     let hash x = x
   end)
 
+  (* TODO(rgrig): Why is [s1_to_int x] any better than [(x : U.s1 :> int)] ? *)
   let s1_to_int (s : U.s1) = (s :> int)
   let s2_to_int (s : U.s2) = (s :> int)
   let s4_to_int (s : U.s4) = ((Int32.to_int (s :> Int32.t)) :> int)
@@ -233,51 +222,42 @@ type t =
   let u1_to_int (u : U.u1) = (u :> int)
   let u2_to_int (u : U.u2) = (u :> int)
 
-  let decode cpool ofs_to_lbl ofs =
+  let decode pool ofs_to_lbl ofs =
     let abs_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (s :> int) in
     let abs_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (Int32.to_int (s :> Int32.t)) in
     let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + Int32.to_int (s :> Int32.t)) in
-  let get_entry idx =
-    try
-      CP.get_entry cpool idx
-    with _ -> fail Invalid_pool_index in
-  let get_utf8 idx = match get_entry idx with
-    | CP.UTF8 v -> v
+  let entry = CP.get_entry pool in
+  let utf8 = CP.get_utf8_entry pool in
+  let get_class_or_array i =
+    let s = utf8 i in
+    if U.UChar.equal opening_square_bracket (U.UTF8.get s 0) then
+      let t = Descriptor.java_type_of_internal_utf8 s in
+      `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type t)
+    else
+      `Class_or_interface (Name.make_for_class_from_internal s) in
+  let get_field_ref cls nat = match entry cls, entry nat with
+    | CP.Class i1, CP.NameAndType (i2, i3) ->
+        (Name.make_for_class_from_internal (utf8 i1),
+         Name.make_for_field (utf8 i2),
+         Descriptor.field_of_utf8 (utf8 i3))
     | _ -> fail Invalid_pool_entry in
-  let get_class_or_array idx = match get_entry idx with
-    | CP.UTF8 v ->
-        if U.UChar.equal opening_square_bracket (U.UTF8.get v 0) then
-          let t = Descriptor.java_type_of_internal_utf8 v in `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type t)
-        else
-          `Class_or_interface (Name.make_for_class_from_internal v)
+  let get_method_ref cls nat = match entry cls, entry nat with
+    | CP.Class i1, CP.NameAndType (i2, i3) ->
+        (Name.make_for_class_from_internal (utf8 i1),
+          Name.make_for_method (utf8 i2),
+          Descriptor.method_of_utf8 (utf8 i3))
     | _ -> fail Invalid_pool_entry in
-  let get_field_ref cls nat = match (get_entry cls), (get_entry nat) with
-    | (CP.Class i1), (CP.NameAndType (i2, i3)) ->
-      ((Name.make_for_class_from_internal (get_utf8 i1)),
-       (Name.make_for_field (get_utf8 i2)),
-       (Descriptor.field_of_utf8 (get_utf8 i3)))
+  let get_special_ref cls nat = match entry cls, entry nat with
+    | CP.Class i1, CP.NameAndType (i2, i3)
+      when U.UTF8.equal (utf8 i2) class_constructor ->
+        (Name.make_for_class_from_internal (utf8 i1),
+          fst (Descriptor.method_of_utf8 (utf8 i3)))
     | _ -> fail Invalid_pool_entry in
-  let get_method_ref cls nat = match (get_entry cls), (get_entry nat) with
-    | (CP.Class i1), (CP.NameAndType (i2, i3)) ->
-      (Name.make_for_class_from_internal (get_utf8 i1)),
-      (Name.make_for_method (get_utf8 i2)),
-      (Descriptor.method_of_utf8 (get_utf8 i3))
-    | _ -> fail Invalid_pool_entry in
-  let get_special_ref cls nat = match (get_entry cls), (get_entry nat) with
-    | (CP.Class i1), (CP.NameAndType (i2, i3))
-      when U.UTF8.equal (get_utf8 i2) class_constructor ->
-      (Name.make_for_class_from_internal (get_utf8 i1)),
-      (fst (Descriptor.method_of_utf8 (get_utf8 i3)))
-    | _ -> fail Invalid_pool_entry in
-  let get_array_method_ref cls nat = match (get_entry cls), (get_entry nat) with
-    | (CP.Class i1), (CP.NameAndType (i2, i3)) ->
-      let s = get_utf8 i1 in
-      (if not (U.UChar.equal opening_square_bracket (U.UTF8.get s 0)) then
-         `Class_or_interface (Name.make_for_class_from_internal s)
-      else
-        `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type (Descriptor.java_type_of_internal_utf8 s))),
-      (Name.make_for_method (get_utf8 i2)),
-      (Descriptor.method_of_utf8 (get_utf8 i3))
+  let get_array_method_ref cls nat = match entry cls, entry nat with
+    | CP.Class i1, CP.NameAndType (i2, i3) ->
+        (get_class_or_array i1,
+          Name.make_for_method (utf8 i2),
+          Descriptor.method_of_utf8 (utf8 i3))
     | _ -> fail Invalid_pool_entry in
   let primitive_array_type_of_int = function
     | 4 -> `Boolean
@@ -290,7 +270,7 @@ type t =
     | 11 -> `Long
     | _ -> fail Invalid_primitive_array_type in
   let get_method_handle kind idx =
-    match kind, (get_entry idx) with
+    match kind, entry idx with
     | CP.REF_getField, CP.Fieldref (fc, nt) ->
       `getField (get_field_ref fc nt)
     | CP.REF_getStatic, CP.Fieldref (fc, nt) ->
@@ -319,7 +299,7 @@ type t =
   | ByteCode.ALOAD_1 -> ALOAD 1
   | ByteCode.ALOAD_2 -> ALOAD 2
   | ByteCode.ALOAD_3 -> ALOAD 3
-  | ByteCode.ANEWARRAY p1 -> ANEWARRAY (match get_entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+  | ByteCode.ANEWARRAY p1 -> ANEWARRAY (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
   | ByteCode.ARETURN -> ARETURN
   | ByteCode.ARRAYLENGTH -> ARRAYLENGTH
   | ByteCode.ASTORE p1 -> ASTORE (u1_to_int p1)
@@ -333,7 +313,7 @@ type t =
   | ByteCode.BIPUSH p1 -> BIPUSH (s1_to_int p1)
   | ByteCode.CALOAD -> CALOAD
   | ByteCode.CASTORE -> CASTORE
-  | ByteCode.CHECKCAST p1 -> CHECKCAST (match get_entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+  | ByteCode.CHECKCAST p1 -> CHECKCAST (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
   | ByteCode.D2F -> D2F
   | ByteCode.D2I -> D2I
   | ByteCode.D2L -> D2L
@@ -393,8 +373,8 @@ type t =
   | ByteCode.FSTORE_2 -> FSTORE 2
   | ByteCode.FSTORE_3 -> FSTORE 3
   | ByteCode.FSUB -> FSUB
-  | ByteCode.GETFIELD p1 -> GETFIELD (match get_entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-  | ByteCode.GETSTATIC p1 -> GETSTATIC (match get_entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
   | ByteCode.GOTO p1 -> GOTO (abs_s_ofs_to_lbl p1)
   | ByteCode.GOTO_W p1 -> GOTO (abs_l_ofs_to_lbl p1)
   | ByteCode.I2B -> I2B
@@ -439,12 +419,12 @@ type t =
   | ByteCode.ILOAD_3 -> ILOAD 3
   | ByteCode.IMUL -> IMUL
   | ByteCode.INEG -> INEG
-  | ByteCode.INSTANCEOF p1 -> INSTANCEOF (match get_entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+  | ByteCode.INSTANCEOF p1 -> INSTANCEOF (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
   | ByteCode.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
-  | ByteCode.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match get_entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
-  | ByteCode.INVOKESPECIAL p1 -> INVOKESPECIAL (match get_entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-  | ByteCode.INVOKESTATIC p1 -> INVOKESTATIC (match get_entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-  | ByteCode.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match get_entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
+  | ByteCode.INVOKESPECIAL p1 -> INVOKESPECIAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.INVOKESTATIC p1 -> INVOKESTATIC (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
   | ByteCode.IOR -> IOR
   | ByteCode.IREM -> IREM
   | ByteCode.IRETURN -> IRETURN
@@ -470,9 +450,9 @@ type t =
   | ByteCode.LCMP -> LCMP
   | ByteCode.LCONST_0 -> LCONST_0
   | ByteCode.LCONST_1 -> LCONST_1
-  | ByteCode.LDC p1 -> LDC (match get_entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (get_utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (get_utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-  | ByteCode.LDC2_W p1 -> LDC2_W (match get_entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
-  | ByteCode.LDC_W p1 -> LDC (match get_entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (get_utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (get_utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+  | ByteCode.LDC p1 -> LDC (match entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+  | ByteCode.LDC2_W p1 -> LDC2_W (match entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
+  | ByteCode.LDC_W p1 -> LDC (match entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
   | ByteCode.LDIV -> LDIV
   | ByteCode.LLOAD p1 -> LLOAD (u1_to_int p1)
   | ByteCode.LLOAD_0 -> LLOAD 0
@@ -504,14 +484,14 @@ type t =
   | ByteCode.LXOR -> LXOR
   | ByteCode.MONITORENTER -> MONITORENTER
   | ByteCode.MONITOREXIT -> MONITOREXIT
-  | ByteCode.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match get_entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
-  | ByteCode.NEW p1 -> NEW (match get_entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (get_utf8 idx)) | _ -> fail Invalid_pool_element)
+  | ByteCode.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
+  | ByteCode.NEW p1 -> NEW (match entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (utf8 idx)) | _ -> fail Invalid_pool_element)
   | ByteCode.NEWARRAY p1 -> NEWARRAY (primitive_array_type_of_int (p1 :> int))
   | ByteCode.NOP -> NOP
   | ByteCode.POP -> POP
   | ByteCode.POP2 -> POP2
-  | ByteCode.PUTFIELD p1 -> PUTFIELD (match get_entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-  | ByteCode.PUTSTATIC p1 -> PUTSTATIC (match get_entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.PUTFIELD p1 -> PUTFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+  | ByteCode.PUTSTATIC p1 -> PUTSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
   | ByteCode.RET p1 -> RET (u1_to_int p1)
   | ByteCode.RETURN -> RETURN
   | ByteCode.SALOAD -> SALOAD
@@ -828,18 +808,6 @@ module HighAttribute = struct (* {{{ *)
     List.iter (fun (k, v) -> add h k v) xs;
     h
 
-  let get_utf8 pool idx err =
-    match CP.get_entry pool idx with
-    | CP.UTF8 v -> v
-    | _ -> fail err
-
-  let get_class_name pool idx err =
-    match CP.get_entry pool idx with
-      | CP.Class idx ->
-	let n = get_utf8 pool idx err in
-	Name.make_for_class_from_internal n
-      | _ -> fail err
-
   let read_annotations pool st =
     InputStream.read_elements
       st
@@ -874,9 +842,9 @@ module HighAttribute = struct (* {{{ *)
       match CP.get_entry pool module_index with
       | CP.ModuleId (n, v) -> n, v
       | _ -> fail Invalid_module in
-    let name = get_utf8 pool name_index Invalid_module in
-    let version = get_utf8 pool version_index Invalid_module in
-    name, version
+    let name = CP.get_utf8_entry pool name_index in
+    let version = CP.get_utf8_entry pool version_index in
+    (name, version)
 
   let read_info st =
     let name = InputStream.read_u2 st in
@@ -914,7 +882,7 @@ module HighAttribute = struct (* {{{ *)
         | CP.Integer v ->
             `ConstantValue (Integer_value v)
         | CP.String idx ->
-            `ConstantValue (String_value (get_utf8 r.da_pool idx Invalid_constant_value))
+            `ConstantValue (String_value (CP.get_utf8_entry r.da_pool idx))
         | _ -> fail Invalid_constant_value
 
   let decode_attr_code decode r st =
@@ -950,7 +918,7 @@ module HighAttribute = struct (* {{{ *)
           let catch_index = InputStream.read_u2 st in
           let catch_type =
             if (catch_index :> int) <> 0 then
-              Some (get_class_name r.da_pool catch_index Invalid_exception_name)
+              Some (CP.get_class_name r.da_pool catch_index)
             else
               None in
 	  let u2_ofs_to_label ofs = ofs_to_label (ofs : Utils.u2 :> int) in
@@ -981,11 +949,24 @@ module HighAttribute = struct (* {{{ *)
   let decode_attr_inner_classes _ = failwith "todo:decode_attr_inner_classes"
   let decode_attr_enclosing_method _ = failwith "todo:decode_attr_enclosing_method"
   let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
-  let decode_attr_signature _ = failwith "todo:decode_attr_signature"
+
+  (* TODO: Continue here. *)
+  let decode_attr_signature _ r st : t =
+    failwith "continue here"
+    (*
+    let signature_index = InputStream.read_u2 st in
+    let s = get_utf8 r.da_pool signature_index Invalid_signature in
+    let s' = (match element with
+      | Class -> `Class (Signature.class_signature_of_utf8 s)
+      | Method -> `Method (Signature.method_signature_of_utf8 s)
+      | Field -> `Field (Signature.field_type_signature_of_utf8 s)
+      | Package -> fail Invalid_package_attribute
+      | Module -> fail Invalid_module_attribute) in
+    `Signature s' *)
 
   let decode_attr_source_file _ r st =
     let sourcefile_index = IS.read_u2 st in
-    `SourceFile (get_utf8 r.da_pool sourcefile_index Invalid_source_file)
+    `SourceFile (CP.get_utf8_entry r.da_pool sourcefile_index)
 
   let decode_attr_source_debug_extension _ = failwith "todo:decode_attr_source_debug_extension"
 
@@ -1063,7 +1044,7 @@ module HighAttribute = struct (* {{{ *)
   let rec decode r =
     let st = IS.make_of_string r.da_i.A.data in
     let attr_name =
-      get_utf8 r.da_pool r.da_i.A.name_index Invalid_attribute_name in
+      CP.get_utf8_entry r.da_pool r.da_i.A.name_index in
     try UTF8Hashtbl.find decoders attr_name decode r st
     with Not_found -> `Unknown (attr_name, r.da_i.A.data)
 
@@ -1162,11 +1143,6 @@ module HighMethod = struct (* {{{ *)
     | Constructor of constructor
     | Initializer of class_initializer
 
-  let utf8_from_pool pool i =
-    match CP.get_entry pool i with
-      | CP.UTF8 n -> n
-      | e -> fail (Invalid_pool_entry_type (e, "UTF8"))
-
   let decode_initializer init_attributes flags _ =
     let init_flags = AccessFlag.check_initializer_flags flags in
     Initializer { init_flags; init_attributes }
@@ -1180,10 +1156,11 @@ module HighMethod = struct (* {{{ *)
     Regular { flags; name; descriptor; attributes}
 
   let decode is_interface pool m =
-    let utf8_name = utf8_from_pool pool m.M.name_index in
+    let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
+    let utf8_name = utf8 m.M.name_index in
     let name = Name.make_for_method utf8_name in
     let descriptor =
-      Descriptor.method_of_utf8 (utf8_from_pool pool m.M.descriptor_index) in
+      Descriptor.method_of_utf8 (utf8 m.M.descriptor_index) in
     let attributes =
       U.map_array_to_list (HA.decode_method pool) m.M.attributes_array in
     let flags = AccessFlag.from_u2 true m.M.access_flags in
@@ -1223,7 +1200,7 @@ end
 (* }}} *)
 module HM = HighMethod
 (* }}} *)
-
+(* rest/most of HighClass *) (* {{{ *)
 type t = {
     access_flags : AccessFlag.for_class list;
     name : Name.for_class;
@@ -1260,27 +1237,21 @@ let decode ?(version = Version.default) cf =
     Version.at_least "class file version" v' v;
     (* TODO: The following line should be [ClassFile.check ...]. *)
     CP.check_version v' pool in
-  let get_class_name idx = match CP.get_entry pool idx with
-    | CP.Class idx' ->
-        (match CP.get_entry pool idx' with
-          | CP.UTF8 n ->
-              Name.make_for_class_from_internal n
-          | _ -> fail Invalid_class_name)
-    | _ -> fail Invalid_class_name in
   check_version version;
   let flags = AF.check_class_flags (AF.from_u2 false cf.CF.access_flags) in
+  let class_name = CP.get_class_name pool in
   let extends =
     if cf.CF.super_class = U.u2 0
     then None
-    else Some (get_class_name cf.ClassFile.super_class) in
+    else Some (class_name cf.ClassFile.super_class) in
   let is_interface = List.mem `Interface flags in
   let field_decode = Field.decode is_interface pool in
   let method_decode = HM.decode is_interface pool in
   let attribute_decode = HA.decode_class pool in
   check_version_high ~version:version { access_flags = flags;
-    name = get_class_name cf.CF.this_class;
+    name = class_name cf.CF.this_class;
     extends = extends;
-    implements = List.map get_class_name (Array.to_list cf.CF.interfaces);
+    implements = List.map class_name (Array.to_list cf.CF.interfaces);
     fields = List.map field_decode (Array.to_list cf.CF.fields);
     methods = List.map method_decode (Array.to_list cf.CF.methods);
     attributes = List.map attribute_decode (Array.to_list cf.CF.attributes); }
@@ -1327,3 +1298,4 @@ let encode ?(version = Version.default) cd =
     CF.attributes_count = checked_length_array "attributes" atts;
     CF.attributes = atts; }
 
+(* }}} *)

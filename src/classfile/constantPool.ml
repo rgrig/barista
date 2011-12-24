@@ -120,6 +120,7 @@ type error =
   | Malformed_MethodType_entry of u2
   | Malformed_InvokeDynamic_entry of u2 * u2
   | Malformed_ModuleId_entry of u2 * u2
+  | Unexpected_tag of int * int
 
 exception Exception of error
 
@@ -158,6 +159,8 @@ let string_of_error = function
       Printf.sprintf "malformed InvokeDynamic entry (indexes %d and %d)" (x :> int) (y :> int)
   | Malformed_ModuleId_entry (x, y) ->
       Printf.sprintf "malformed ModuleId entry (indexes %d and %d)" (x :> int) (y :> int)
+  | Unexpected_tag (x, y) ->
+      Printf.sprintf "expected tag %d, found tag %d" x y (* see tag_of_int *)
 
 let () =
   Printexc.register_printer
@@ -234,6 +237,23 @@ let tag_of_int = function
   | 16 -> CONSTANT_MethodType
   | 18 -> CONSTANT_InvokeDynamic
   | x -> fail (Invalid_tag (u1 x))
+
+let tag_of_entry = function
+  | Class _ -> CONSTANT_Class
+  | Fieldref _ -> CONSTANT_Fieldref
+  | Methodref _ -> CONSTANT_Methodref
+  | InterfaceMethodref _ -> CONSTANT_InterfaceMethodref
+  | String _ -> CONSTANT_String
+  | Integer _ -> CONSTANT_Integer
+  | Float _ -> CONSTANT_Float
+  | Long _ -> CONSTANT_Long
+  | Double _ -> CONSTANT_Double
+  | NameAndType _ -> CONSTANT_NameAndType
+  | UTF8 _ -> CONSTANT_Utf8
+  | MethodHandle _ -> CONSTANT_MethodHandle
+  | MethodType _ -> CONSTANT_MethodType
+  | InvokeDynamic _ -> CONSTANT_InvokeDynamic
+  | ModuleId _ -> CONSTANT_ModuleId
 
 let read_element st =
   match tag_of_int ((InputStream.read_u1 st) :> int) with
@@ -393,6 +413,22 @@ let get_entry pool i =
     else
       res
 
+(* used only by the next few functions *)
+let unexpected_tag et entry =
+  let ei = int_of_tag et in
+  let fi = int_of_tag (tag_of_entry entry) in
+  Unexpected_tag (ei, fi)
+
+let get_utf8_entry pool i =
+  match get_entry pool i with
+    | UTF8 n -> n
+    | e -> fail (unexpected_tag CONSTANT_Utf8 e)
+
+let get_class_name pool i =
+  match get_entry pool i with
+    | Class n -> Name.make_for_class_from_internal (get_utf8_entry pool n)
+    | e -> fail (unexpected_tag CONSTANT_Class e)
+
 let check pool =
   let get_entry = get_entry pool in
   let check_entry = function
@@ -452,25 +488,7 @@ let check pool =
   Array.iter check_entry pool
 
 let check_entry_for_kind cpool idx tag =
-  try
-    match tag, (get_entry cpool idx) with
-    | CONSTANT_Class, Class _
-    | CONSTANT_Fieldref, Fieldref _
-    | CONSTANT_Methodref, Methodref _
-    | CONSTANT_InterfaceMethodref, InterfaceMethodref _
-    | CONSTANT_String, String _
-    | CONSTANT_Integer, Integer _
-    | CONSTANT_Float, Float _
-    | CONSTANT_Long, Long _
-    | CONSTANT_Double, Double _
-    | CONSTANT_NameAndType, NameAndType _
-    | CONSTANT_Utf8, UTF8 _
-    | CONSTANT_MethodHandle, MethodHandle _
-    | CONSTANT_MethodType, MethodType _
-    | CONSTANT_InvokeDynamic, InvokeDynamic _
-    | CONSTANT_ModuleId, ModuleId _ -> true
-    | _ -> false
-  with _ -> false
+  try tag = tag_of_entry (get_entry cpool idx) with _ -> false
 
 let version_bounds = function
   | Class _ ->

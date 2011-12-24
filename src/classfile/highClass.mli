@@ -158,21 +158,14 @@ type t = {
   }
 
 type error =
-  | Invalid_attribute_name
   | Invalid_class_name
-  | Invalid_code_attribute
   | Invalid_code_length
   | Invalid_constant_value
-  | Invalid_descriptor
-  | Invalid_exception_name
   | Invalid_method_handle
   | Invalid_module
   | Invalid_pool_element
   | Invalid_pool_entry
-  | Invalid_pool_entry_type of (ConstantPool.element * string)
-  | Invalid_pool_index
   | Invalid_primitive_array_type
-  | Invalid_source_file
   | Misplaced_attribute of (string * string)
   | Too_many of string
   | Unsupported_instruction of string
