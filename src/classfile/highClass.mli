@@ -98,7 +98,7 @@ module HighAttribute : sig (* {{{ *)
   type for_field =
     [ `ConstantValue of constant_value
     | `Synthetic
-    | `Signature of [`Field of Signature.field_type_signature]
+    | `FieldSignature of Signature.field_type_signature
     | `Deprecated
     | `RuntimeVisibleAnnotations of Annotation.t list
     | `RuntimeInvisibleAnnotations of Annotation.t list
@@ -158,6 +158,7 @@ type t = {
   }
 
 type error =
+  | Invalid_attribute
   | Invalid_class_name
   | Invalid_code_length
   | Invalid_constant_value

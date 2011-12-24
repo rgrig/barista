@@ -11,6 +11,7 @@ module U = Utils
 (* }}} *)
 (* errors *) (* {{{ *)
 type error =
+  | Invalid_attribute
   | Invalid_class_name
   | Invalid_code_length
   | Invalid_constant_value
@@ -764,7 +765,7 @@ module HighAttribute = struct (* {{{ *)
   type for_field =
     [ `ConstantValue of constant_value
     | `Synthetic
-    | `Signature of [`Field of Signature.field_type_signature]
+    | `FieldSignature of Signature.field_type_signature
     | `Deprecated
     | `RuntimeVisibleAnnotations of Annotation.t list
     | `RuntimeInvisibleAnnotations of Annotation.t list
@@ -783,6 +784,7 @@ module HighAttribute = struct (* {{{ *)
     | `Deprecated -> attr_deprecated
     | `EnclosingMethod _ -> attr_enclosing_method
     | `Exceptions _ -> attr_exceptions
+    | `FieldSignature _ -> attr_signature
     | `InnerClasses _ -> attr_inner_classes
     | `LineNumberTable _ -> attr_line_number_table
     | `LocalVariableTable _ -> attr_local_variable_table
@@ -795,7 +797,6 @@ module HighAttribute = struct (* {{{ *)
     | `RuntimeVisibleAnnotations _ -> attr_runtime_visible_annotations
     | `RuntimeVisibleParameterAnnotations _ -> attr_runtime_visible_parameter_annotations
     | `RuntimeVisibleTypeAnnotations _ -> attr_runtime_visible_type_annotations
-    | `Signature _ -> attr_signature
     | `SourceDebugExtension _ -> attr_source_debug_extension
     | `SourceFile _ -> attr_source_file
     | `Synthetic -> attr_synthetic
@@ -950,19 +951,14 @@ module HighAttribute = struct (* {{{ *)
   let decode_attr_enclosing_method _ = failwith "todo:decode_attr_enclosing_method"
   let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
 
-  (* TODO: Continue here. *)
   let decode_attr_signature _ r st : t =
-    failwith "continue here"
-    (*
     let signature_index = InputStream.read_u2 st in
-    let s = get_utf8 r.da_pool signature_index Invalid_signature in
-    let s' = (match element with
-      | Class -> `Class (Signature.class_signature_of_utf8 s)
-      | Method -> `Method (Signature.method_signature_of_utf8 s)
-      | Field -> `Field (Signature.field_type_signature_of_utf8 s)
-      | Package -> fail Invalid_package_attribute
-      | Module -> fail Invalid_module_attribute) in
-    `Signature s' *)
+    let s = CP.get_utf8_entry r.da_pool signature_index in
+    match r.da_element with
+      | A.Class -> `ClassSignature (Signature.class_signature_of_utf8 s)
+      | A.Method -> `MethodSignature (Signature.method_signature_of_utf8 s)
+      | A.Field -> `FieldSignature (Signature.field_type_signature_of_utf8 s)
+      | _ -> fail Invalid_attribute
 
   let decode_attr_source_file _ r st =
     let sourcefile_index = IS.read_u2 st in
@@ -1058,6 +1054,7 @@ module HighAttribute = struct (* {{{ *)
       | #for_method as g -> g
       | b -> fail (Misplaced_attribute (name_of_attribute b, "method"))
 
+  (* TODO(rgrig): Sort alphabetically. *)
   let rec version_bounds : t -> Version.bounds = function
     | `ConstantValue _ ->
         Version.make_bounds "'ConstantValue' attribute" Version.Java_1_0 None
@@ -1075,7 +1072,7 @@ module HighAttribute = struct (* {{{ *)
         Version.make_bounds "'EnclosingMethod' attribute" Version.Java_1_5 None
     | `Synthetic ->
         Version.make_bounds "'Synthetic' attribute" Version.Java_1_1 None
-    | `Signature _ ->
+    | `FieldSignature _ ->
         Version.make_bounds "'Signature' attribute" Version.Java_1_5 None
     | `SourceFile _ ->
         Version.make_bounds "'SourceFile' attribute" Version.Java_1_0 None
@@ -1260,7 +1257,7 @@ let decode ?(version = Version.default) cf =
 let no_super_class = U.u2 0
 
 let encode ?(version = Version.default) cd =
-  check_version_high ~version:version cd;
+  ignore (check_version_high ~version:version cd);
   let major, minor = Version.major_minor_of_version version in
   let pool = CP.make_extendable () in
   let this_index = CP.add_class pool cd.name in
