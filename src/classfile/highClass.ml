@@ -946,7 +946,10 @@ module HighAttribute = struct (* {{{ *)
             exception_table = exceptions;
             attributes = attrs }
 
-  let decode_attr_exceptions _ = failwith "todo:decode_attr_exceptions"
+  let decode_attr_exceptions _ r st : t =
+    let f st = CP.get_class_name r.da_pool (IS.read_u2 st) in
+    `Exceptions (IS.read_elements st f)
+
   let decode_attr_inner_classes _ = failwith "todo:decode_attr_inner_classes"
   let decode_attr_enclosing_method _ = failwith "todo:decode_attr_enclosing_method"
   let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
