@@ -14,6 +14,7 @@ type error =
   | Invalid_attribute
   | Invalid_code_length
   | Invalid_constant_value
+  | Invalid_enclosing_method
   | Invalid_method_handle
   | Invalid_module
   | Invalid_name
@@ -812,7 +813,7 @@ module HighAttribute = struct (* {{{ *)
     h
 
   let read_annotations pool st =
-    InputStream.read_elements
+    IS.read_elements
       st
       (fun st ->
         let a = Annotation.read_info st in
@@ -863,6 +864,9 @@ module HighAttribute = struct (* {{{ *)
   let check_code_attribute = function
     | #code_attribute as g -> g
     | b -> fail (Misplaced_attribute (name_of_attribute b, "code"))
+
+  let option_of_u2 f (i : U.u2) =
+    if (i :> int) = 0 then None else Some (f i)
 
   (* actual decoders for attributes *)
 
@@ -958,17 +962,29 @@ module HighAttribute = struct (* {{{ *)
       let outer_class = IS.read_u2 st in
       let inner_name = IS.read_u2 st in
       let inner_flags = IS.read_u2 st in
-      let ooi f (i : U.u2) =
-        if (i :> int) = 0 then None else Some (f r.da_pool i) in
-      let inner_class = ooi CP.get_class_name inner_class in
-      let outer_class = ooi CP.get_class_name outer_class in
-      let inner_name = ooi CP.get_utf8_entry inner_name in
+      let cn = CP.get_class_name r.da_pool in
+      let utf8 = CP.get_utf8_entry r.da_pool in
+      let inner_class = option_of_u2 cn inner_class in
+      let outer_class = option_of_u2 cn outer_class in
+      let inner_name = option_of_u2 utf8 inner_name in
       let inner_flags = AF.from_u2 false inner_flags in
       let inner_flags = AF.check_inner_class_flags inner_flags in
       { inner_class; outer_class; inner_name; inner_flags } in
     `InnerClasses (IS.read_elements st one)
 
-  let decode_attr_enclosing_method _ = failwith "todo:decode_attr_enclosing_method"
+  let decode_attr_enclosing_method _ r st : t =
+    let f i = match CP.get_entry r.da_pool i with
+      | CP.NameAndType (name, desc) ->
+          let utf8 = CP.get_utf8_entry r.da_pool in
+          (Name.make_for_method (utf8 name),
+            Descriptor.method_of_utf8 (utf8 desc))
+      | _ -> fail Invalid_enclosing_method in
+    let innermost_class = IS.read_u2 st in
+    let enclosing_method = IS.read_u2 st in
+    let innermost_class = CP.get_class_name r.da_pool innermost_class in
+    let enclosing_method = option_of_u2 f enclosing_method in
+    `EnclosingMethod { innermost_class; enclosing_method }
+
   let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
 
   let decode_attr_signature _ r st : t =
@@ -1003,9 +1019,15 @@ module HighAttribute = struct (* {{{ *)
     (* See TODO note on type code_attribute. *)
     `LocalVariableTable ()
 
-  let decode_attr_local_variable_type_table _ = failwith "todo:decode_attr_local_variable_type_table"
-  let decode_attr_deprecated _ = failwith "todo:decode_attr_deprecated"
-  let decode_attr_runtime_visible_annotations _ = failwith "todo:decode_attr_runtime_visible_annotations"
+  let decode_attr_local_variable_type_table _ _ _ =
+    (* See TODO note on type code_attribute. *)
+    `LocalVariableTypeTable ()
+
+  let decode_attr_deprecated _ _ _ : t = `Deprecated
+
+  let decode_attr_runtime_visible_annotations _ r st : t =
+    `RuntimeVisibleAnnotations (read_annotations r.da_pool st)
+
   let decode_attr_runtime_invisible_annotations _ = failwith "todo:decode_attr_runtime_invisible_annotations"
   let decode_attr_runtime_visible_parameter_annotations _ = failwith "todo:decode_attr_runtime_visible_parameter_annotations"
   let decode_attr_runtime_invisible_parameter_annotations _ = failwith "todo:decode_attr_runtime_invisible_parameter_annotations"

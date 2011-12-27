@@ -171,6 +171,7 @@ type error =
   | Invalid_attribute
   | Invalid_code_length
   | Invalid_constant_value
+  | Invalid_enclosing_method
   | Invalid_method_handle
   | Invalid_module
   | Invalid_name
