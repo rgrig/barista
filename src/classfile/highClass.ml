@@ -952,7 +952,22 @@ module HighAttribute = struct (* {{{ *)
     let f st = CP.get_class_name r.da_pool (IS.read_u2 st) in
     `Exceptions (IS.read_elements st f)
 
-  let decode_attr_inner_classes _ = failwith "todo:decode_attr_inner_classes"
+  let decode_attr_inner_classes _ r st : t =
+    let one st =
+      let inner_class = IS.read_u2 st in
+      let outer_class = IS.read_u2 st in
+      let inner_name = IS.read_u2 st in
+      let inner_flags = IS.read_u2 st in
+      let ooi f (i : U.u2) =
+        if (i :> int) = 0 then None else Some (f r.da_pool i) in
+      let inner_class = ooi CP.get_class_name inner_class in
+      let outer_class = ooi CP.get_class_name outer_class in
+      let inner_name = ooi CP.get_utf8_entry inner_name in
+      let inner_flags = AF.from_u2 false inner_flags in
+      let inner_flags = AF.check_inner_class_flags inner_flags in
+      { inner_class; outer_class; inner_name; inner_flags } in
+    `InnerClasses (IS.read_elements st one)
+
   let decode_attr_enclosing_method _ = failwith "todo:decode_attr_enclosing_method"
   let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
 

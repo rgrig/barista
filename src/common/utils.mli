@@ -185,6 +185,10 @@ val map_list_to_array : ('a -> 'b) -> 'a list -> 'b array
 val map_array_to_list : ('a -> 'b) -> 'a array -> 'b list
 (** [map_array_to_list f a] is equivalent to [Array.to_list (List.map f l)]. *)
 
+val map2 : ('a -> 'b) -> ('a * 'a) -> ('b * 'b)
+val map3 : ('a -> 'b) -> ('a * 'a * 'a) -> ('b * 'b * 'b)
+val map4 : ('a -> 'b) -> ('a * 'a * 'a * 'a) -> ('b * 'b * 'b * 'b)
+
 val identity : 'a -> 'a
 (** The identity function. *)
 
