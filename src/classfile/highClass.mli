@@ -113,8 +113,8 @@ module HighAttribute : sig (* {{{ *)
   val decode_method : ConstantPool.t -> Attribute.info -> for_method
   val decode_class :  ConstantPool.t -> Attribute.info -> for_class
 
-  val encode_method :  ConstantPool.t -> for_method -> Attribute.info
-  val encode_class :  ConstantPool.t -> for_class -> Attribute.info
+  val encode_method :  ConstantPool.extendable -> for_method -> Attribute.info
+  val encode_class :  ConstantPool.extendable -> for_class -> Attribute.info
 
 end (* }}} *)
 
