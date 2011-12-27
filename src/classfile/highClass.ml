@@ -12,11 +12,11 @@ module U = Utils
 (* errors *) (* {{{ *)
 type error =
   | Invalid_attribute
-  | Invalid_class_name
   | Invalid_code_length
   | Invalid_constant_value
   | Invalid_method_handle
   | Invalid_module
+  | Invalid_name
   | Invalid_pool_element
   | Invalid_pool_entry
   | Invalid_primitive_array_type
@@ -1054,6 +1054,11 @@ module HighAttribute = struct (* {{{ *)
       | #for_class as g -> g
       | b -> fail (Misplaced_attribute (name_of_attribute b, "class"))
 
+  let decode_field da_pool da_i =
+    match decode { da_element = A.Field; da_pool; da_i } with
+      | #for_field as g -> g
+      | b -> fail (Misplaced_attribute (name_of_attribute b, "field"))
+
   let decode_method da_pool da_i =
     match decode { da_element = A.Method; da_pool; da_i } with
       | #for_method as g -> g
@@ -1224,11 +1229,37 @@ module HighAttribute = struct (* {{{ *)
     | `Code c -> encode_code enc c
     | _ -> failwith "todo"
 
-  let encode_method pool a = encode pool (a : for_method :> t)
   let encode_class pool a = encode pool (a : for_class :> t)
+  let encode_field pool a = encode pool (a : for_field :> t)
+  let encode_method pool a = encode pool (a : for_method :> t)
 end
 (* }}} *)
 module HA = HighAttribute
+
+module F = Field
+module HighField = struct (* {{{ *)
+  type t = {
+      flags : AF.for_field list; 
+      name : Name.for_field;
+      descriptor : Descriptor.for_field;
+      attributes : HA.for_field list;
+    }
+
+  let decode is_interface pool i =
+    let flags = AF.from_u2 false i.F.access_flags in
+    let flags = AF.check_field_flags is_interface flags in
+    let name = CP.get_utf8_entry pool i.F.name_index in
+    if not (Name.is_valid_unqualified name) then fail Invalid_name;
+    let name = Name.make_for_field name in
+    let descriptor = CP.get_utf8_entry pool i.F.descriptor_index in
+    let descriptor = Descriptor.field_of_utf8 descriptor in
+    let attributes =
+      U.map_array_to_list (HA.decode_field pool) i.F.attributes_array in
+    { flags; name; descriptor; attributes }
+
+  let encode _ = failwith "todo"
+end (* }}} *)
+module HF = HighField
 
 module M = Method
 module HighMethod = struct (* {{{ *)
@@ -1318,15 +1349,17 @@ type t = {
     name : Name.for_class;
     extends : Name.for_class option;
     implements : Name.for_class list;
-    fields : Field.t list;
+    fields : HF.t list;
     methods : HM.t list;
     attributes : HA.for_class list;
   }
 
 let check_version_high ?(version = Version.default) c =
   let check_flag x = Version.check (AF.version_bounds x) version in
-  let check_field _ = failwith "todo" in
   let check_attribute x = Version.check (HA.version_bounds x) version in
+  let check_field x =
+    List.iter check_flag (x.HF.flags :> AF.t list);
+    List.iter check_attribute (x.HF.attributes :> HA.t list) in
   let check_method =
     let cfa f a =
       List.iter check_flag (f :> AF.t list);
@@ -1357,7 +1390,7 @@ let decode ?(version = Version.default) cf =
     then None
     else Some (class_name cf.ClassFile.super_class) in
   let is_interface = List.mem `Interface flags in
-  let field_decode = Field.decode is_interface pool in
+  let field_decode = HF.decode is_interface pool in
   let method_decode = HM.decode is_interface pool in
   let attribute_decode = HA.decode_class pool in
   check_version_high ~version:version { access_flags = flags;
@@ -1380,7 +1413,7 @@ let encode ?(version = Version.default) cd =
   | Some n -> CP.add_class pool n
   | None -> no_super_class in
   let itfs = U.map_list_to_array (fun s -> CP.add_class pool s) cd.implements in
-  let flds = U.map_list_to_array (Field.encode pool) cd.fields in
+  let flds = U.map_list_to_array (HF.encode pool) cd.fields in
   let mths = U.map_list_to_array (HM.encode pool) cd.methods in
   let atts = U.map_list_to_array (HA.encode_class pool) cd.attributes in
   let cpool = CP.to_pool pool in

@@ -17,7 +17,6 @@ module HighInstruction : sig (* {{{ *)
 
   val version_bounds : t -> Version.bounds
 end (* }}} *)
-
 module HighAttribute : sig (* {{{ *)
   type constant_value =
     | Long_value of int64
@@ -110,14 +109,25 @@ module HighAttribute : sig (* {{{ *)
 
   val version_bounds : t -> Version.bounds
 
-  val decode_method : ConstantPool.t -> Attribute.info -> for_method
   val decode_class :  ConstantPool.t -> Attribute.info -> for_class
+  val decode_field : ConstantPool.t -> Attribute.info -> for_field
+  val decode_method : ConstantPool.t -> Attribute.info -> for_method
 
-  val encode_method :  ConstantPool.extendable -> for_method -> Attribute.info
   val encode_class :  ConstantPool.extendable -> for_class -> Attribute.info
+  val encode_field : ConstantPool.extendable -> for_field -> Attribute.info
+  val encode_method :  ConstantPool.extendable -> for_method -> Attribute.info
 
 end (* }}} *)
-
+module HighField : sig (* {{{ *)
+  type t ={
+      flags : AccessFlag.for_field list; 
+      name : Name.for_field;
+      descriptor : Descriptor.for_field;
+      attributes : HighAttribute.for_field list;
+    }
+  val decode : bool -> ConstantPool.t -> Field.info -> t
+  val encode : ConstantPool.extendable -> t -> Field.info
+end (* }}} *)
 module HighMethod : sig (* {{{ *)
   type regular = {
       flags : AccessFlag.for_method list;
@@ -152,18 +162,18 @@ type t = {
     name : Name.for_class;
     extends : Name.for_class option;
     implements : Name.for_class list;
-    fields : Field.t list;
+    fields : HighField.t list;
     methods : HighMethod.t list;
     attributes : HighAttribute.for_class list;
   }
 
 type error =
   | Invalid_attribute
-  | Invalid_class_name
   | Invalid_code_length
   | Invalid_constant_value
   | Invalid_method_handle
   | Invalid_module
+  | Invalid_name
   | Invalid_pool_element
   | Invalid_pool_entry
   | Invalid_primitive_array_type
