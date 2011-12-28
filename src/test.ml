@@ -12,7 +12,7 @@ let check fn =
   let cl_in = IS.make_of_channel ch in
   let cf = CF.read cl_in in
   let _ = HC.decode ~version:Version.Java_1_7 cf in
-  ()
+  close_in_noerr ch
 
 let () =
   for i = 1 to Array.length Sys.argv - 1 do

@@ -827,11 +827,11 @@ module HighAttribute = struct (* {{{ *)
         Annotation.decode_extended pool a)
 
   let read_annotations_list pool st =
-    let nb = InputStream.read_u1 st in
+    let nb = IS.read_u1 st in
     let res = ref [] in
     for i = 1 to (nb :> int) do
       let local =
-        InputStream.read_elements
+        IS.read_elements
           st
           (fun st ->
             let a = Annotation.read_info st in
@@ -985,7 +985,8 @@ module HighAttribute = struct (* {{{ *)
     let enclosing_method = option_of_u2 f enclosing_method in
     `EnclosingMethod { innermost_class; enclosing_method }
 
-  let decode_attr_synthetic _ = failwith "todo:decode_attr_synthetic"
+  let decode_attr_synthetic _ _ _ : t =
+    `Synthetic
 
   let decode_attr_signature _ r st : t =
     let signature_index = InputStream.read_u2 st in
@@ -1027,14 +1028,20 @@ module HighAttribute = struct (* {{{ *)
 
   let decode_attr_runtime_visible_annotations _ r st : t =
     `RuntimeVisibleAnnotations (read_annotations r.da_pool st)
+  let decode_attr_runtime_invisible_annotations _ r st : t =
+    `RuntimeInvisibleAnnotations (read_annotations r.da_pool st)
+  let decode_attr_runtime_visible_parameter_annotations _ r st : t =
+    `RuntimeVisibleParameterAnnotations (read_annotations_list r.da_pool st)
+  let decode_attr_runtime_invisible_parameter_annotations _ r st : t =
+    `RuntimeInvisibleParameterAnnotations (read_annotations_list r.da_pool st)
 
-  let decode_attr_runtime_invisible_annotations _ = failwith "todo:decode_attr_runtime_invisible_annotations"
-  let decode_attr_runtime_visible_parameter_annotations _ = failwith "todo:decode_attr_runtime_visible_parameter_annotations"
-  let decode_attr_runtime_invisible_parameter_annotations _ = failwith "todo:decode_attr_runtime_invisible_parameter_annotations"
   let decode_attr_runtime_visible_type_annotations _ = failwith "todo:decode_attr_runtime_visible_type_annotations"
   let decode_attr_runtime_invisible_type_annotations _ = failwith "todo:decode_attr_runtime_invisible_type_annotations"
-  let decode_attr_annotation_default _ = failwith "todo:decode_attr_annotation_default"
-  let decode_attr_stack_map_table _ = failwith "todo:decode_attr_stack_map_table"
+
+  let decode_attr_annotation_default _ r st : t =
+    let eiv = Annotation.read_info_element_value st in
+    `AnnotationDefault (Annotation.decode_element_value r.da_pool eiv)
+
   let decode_attr_bootstrap_methods _ = failwith "todo:decode_attr_bootstrap_methods"
   let decode_attr_module _ = failwith "todo:decode_attr_module"
   let decode_attr_module_requires _ = failwith "todo:decode_attr_module_requires"
@@ -1048,32 +1055,35 @@ module HighAttribute = struct (* {{{ *)
         decoding_arguments -> InputStream.t -> t)
       UTF8Hashtbl.t =
     let ds = [
-      attr_constant_value, decode_attr_constant_value;
+      attr_annotation_default, decode_attr_annotation_default;
+      attr_bootstrap_methods, decode_attr_bootstrap_methods;
       attr_code, decode_attr_code;
+      attr_constant_value, decode_attr_constant_value;
+      attr_deprecated, decode_attr_deprecated;
+      attr_enclosing_method, decode_attr_enclosing_method;
       attr_exceptions, decode_attr_exceptions;
       attr_inner_classes, decode_attr_inner_classes;
-      attr_enclosing_method, decode_attr_enclosing_method;
-      attr_synthetic, decode_attr_synthetic;
-      attr_signature, decode_attr_signature;
-      attr_source_file, decode_attr_source_file;
-      attr_source_debug_extension, decode_attr_source_debug_extension;
       attr_line_number_table, decode_attr_line_number_table;
       attr_local_variable_table, decode_attr_local_variable_table;
       attr_local_variable_type_table, decode_attr_local_variable_type_table;
-      attr_deprecated, decode_attr_deprecated;
-      attr_runtime_visible_annotations, decode_attr_runtime_visible_annotations;
-      attr_runtime_invisible_annotations, decode_attr_runtime_invisible_annotations;
-      attr_runtime_visible_parameter_annotations, decode_attr_runtime_visible_parameter_annotations;
-      attr_runtime_invisible_parameter_annotations, decode_attr_runtime_invisible_parameter_annotations;
-      attr_runtime_visible_type_annotations, decode_attr_runtime_visible_type_annotations;
-      attr_runtime_invisible_type_annotations, decode_attr_runtime_invisible_type_annotations;
-      attr_annotation_default, decode_attr_annotation_default;
-      attr_stack_map_table, decode_attr_stack_map_table;
-      attr_bootstrap_methods, decode_attr_bootstrap_methods;
       attr_module, decode_attr_module;
-      attr_module_requires, decode_attr_module_requires;
       attr_module_permits, decode_attr_module_permits;
-      attr_module_provides, decode_attr_module_provides
+      attr_module_provides, decode_attr_module_provides;
+      attr_module_requires, decode_attr_module_requires;
+      attr_runtime_invisible_annotations, decode_attr_runtime_invisible_annotations;
+      attr_runtime_invisible_parameter_annotations, decode_attr_runtime_invisible_parameter_annotations;
+      attr_runtime_invisible_type_annotations, decode_attr_runtime_invisible_type_annotations;
+      attr_runtime_visible_annotations, decode_attr_runtime_visible_annotations;
+      attr_runtime_visible_parameter_annotations, decode_attr_runtime_visible_parameter_annotations;
+      attr_runtime_visible_type_annotations, decode_attr_runtime_visible_type_annotations;
+      attr_signature, decode_attr_signature;
+      attr_source_debug_extension, decode_attr_source_debug_extension;
+      attr_source_file, decode_attr_source_file;
+      attr_synthetic, decode_attr_synthetic;
+
+(*  This one is too low-level to be decoded. It needs to be reconstructed
+    during encoding.
+      attr_stack_map_table, decode_attr_stack_map_table; *)
     ] in
     hash_of_list UTF8Hashtbl.create UTF8Hashtbl.add ds
 
