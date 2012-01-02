@@ -636,7 +636,7 @@ module HighInstruction = struct (* {{{ *)
     | ISUB -> Version.make_bounds "'ISUB' instruction" Version.Java_1_0 None
     | IUSHR -> Version.make_bounds "'IUSHR' instruction" Version.Java_1_0 None
     | IXOR -> Version.make_bounds "'IXOR' instruction" Version.Java_1_0 None
-    | JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+    | JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_1_6)
     | L2D -> Version.make_bounds "'L2D' instruction" Version.Java_1_0 None
     | L2F -> Version.make_bounds "'L2F' instruction" Version.Java_1_0 None
     | L2I -> Version.make_bounds "'L2I' instruction" Version.Java_1_0 None
@@ -673,7 +673,7 @@ module HighInstruction = struct (* {{{ *)
     | POP2 -> Version.make_bounds "'POP2' instruction" Version.Java_1_0 None
     | PUTFIELD _ -> Version.make_bounds "'PUTFIELD' instruction" Version.Java_1_0 None
     | PUTSTATIC _ -> Version.make_bounds "'PUTSTATIC' instruction" Version.Java_1_0 None
-    | RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+    | RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_1_6)
     | RETURN -> Version.make_bounds "'RETURN' instruction" Version.Java_1_0 None
     | SALOAD -> Version.make_bounds "'SALOAD' instruction" Version.Java_1_0 None
     | SASTORE -> Version.make_bounds "'SASTORE' instruction" Version.Java_1_0 None
@@ -907,6 +907,7 @@ module HighAttribute = struct (* {{{ *)
     let instr_codes = ByteCode.read code_stream 0 in
     let fold_size (l, ofs, lbl) inst =
       let s = ByteCode.size_of ofs inst in
+      assert (s > 0);
       (inst, ofs, lbl) :: l, ofs + s, lbl + 1 in
     let instr_codes_annot, _, _ = List.fold_left fold_size ([], 0, 0) instr_codes in
     (* TODO: faster structure for this? *)
@@ -1013,7 +1014,7 @@ module HighAttribute = struct (* {{{ *)
         let start_pc = IS.read_u2 st in
         let line_number = IS.read_u2 st in
         ((start_pc :> HI.label), (line_number :> int))) in
-    let h = hash_of_list HI.LabelHash.create HI.LabelHash.add h in
+    let h = hash_of_list HI.LabelHash.create HI.LabelHash.replace h in
     `LineNumberTable h
 
   let decode_attr_local_variable_table _ _ _ =

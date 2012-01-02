@@ -95,9 +95,9 @@ let make_for_class ch s =
   try
     let idx = UTF8.index_from s 0 dollar in
     let cls = UTF8.substring s 0 (pred idx) in
-    let inner = UTF8.substring s (succ idx) (pred (UTF8.length s)) in
-    (List.map check (UTF8.split ch cls)),
-    (List.map check (UTF8.split dollar inner))
+    let inner = check (UTF8.substring s (succ idx) (pred (UTF8.length s))) in
+    (List.map check (UTF8.split ch cls),
+      UTF8.split dollar inner)
   with Not_found -> (List.map check (UTF8.split ch s)), []
 
 let make_for_class_from_internal = make_for_class slash

@@ -17,8 +17,9 @@
  *)
 
 
-open Utils
 open Consts
+open Format
+open Utils
 
 (* Types *)
 
@@ -320,7 +321,7 @@ let check_class_flags fl =
   let ( ==> ) = implies fl in
   let ( =/> ) = implies_not fl in
   check_visibility true fl;
-  if (`Interface ==> `Abstract)
+  if (`Interface ==> `Abstract) (* Sometimes disobeyed http://goo.gl/PC9Ur *)
       && (`Interface =/> `Final)
       && (`Interface =/> `Super)
       && (`Interface =/> `Enum)
