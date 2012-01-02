@@ -35,6 +35,13 @@ let string_of_error = function
   | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
   | _ -> "undescribed error (todo)"
 
+let checked_length s l =
+  let res = List.length l in
+  if res <= U.max_u2 then
+    U.u2 res
+  else
+    fail (Too_many s)
+
 (* }}} *)
 (* HighInstruction, HighAttribute, and HighMethod *) (* {{{ *)
 module HighInstruction = struct (* {{{ *)
@@ -522,6 +529,10 @@ module HighInstruction = struct (* {{{ *)
     | ByteCode.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
     | ByteCode.WIDE_RET p1 -> RET (u2_to_int p1)
       
+  let encode _ = failwith "todo"
+    
+  let render_size o i = ByteCode.size_of o (encode i)
+
   let version_bounds (_, inst) = match inst with
     | AALOAD -> Version.make_bounds "'AALOAD' instruction" Version.Java_1_0 None
     | AASTORE -> Version.make_bounds "'AASTORE' instruction" Version.Java_1_0 None
@@ -1213,64 +1224,69 @@ module HighAttribute = struct (* {{{ *)
           OutputStream.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
 
-  let encode_code enc c = failwith "todo"
+  let write_info st i =
+    OutputStream.write_u2 st i.Attribute.name_index;
+    OutputStream.write_u4 st i.Attribute.length;
+    OutputStream.write_bytes st i.Attribute.data
+
+  let compute_max_stack_locals _ = failwith "todo"
+
+  let rec encode_code enc c =
     (* first compute maps:
        instruction -> offset
        label -> offset
        for this we need instructon -> size
     *)
-(* not ready yet
     let fold_size (l, ofs) inst = 
-      let s = ByteCode.render_size ofs inst in
+      let s = HI.render_size ofs inst in
       (inst, ofs) :: l, ofs + s in
-    let inst_ofs = List.fold_left fold_size ([], 0) c.code in
+    let inst_ofs, _ = List.fold_left fold_size ([], 0) c.code in
     let label_to_ofs lbl =
       let ((_, _), ofs) = List.find (fun ((l, _), _) -> l = lbl) inst_ofs in
-      ofs in
+      U.u2 ofs in
 
       let code_content =
         List.map
           (HI.encode enc.en_pool)
           c.code in
 
-      let code_enc = make_encoder 16 in
-      ByteCode.write code_enc.st 0 code_content;
-      OutputStream.close code_enc.st;
+      let code_enc = make_encoder enc.en_pool 16 in
+      ByteCode.write code_enc.en_st 0 code_content;
+      OutputStream.close code_enc.en_st;
 
-      let actual_code = Buffer.contents code_buffer in
-      OutputStream.write_u2 st c.max_stack;
-      OutputStream.write_u2 st c.max_locals;
+      let actual_code = Buffer.contents code_enc.en_buffer in
+      let max_stack, max_locals = compute_max_stack_locals () in
+      OutputStream.write_u2 enc.en_st max_stack;
+      OutputStream.write_u2 enc.en_st max_locals;
       let code_length = String.length actual_code in
-      if code_length > max_u2 then fail Invalid_code_length;
-      OutputStream.write_u4 st (u4 (Int64.of_int code_length));
-      OutputStream.write_bytes st actual_code;
+      if code_length > U.max_u2 then fail Invalid_code_length;
+      OutputStream.write_u4 enc.en_st (U.u4 (Int64.of_int code_length));
+      OutputStream.write_bytes enc.en_st actual_code;
       OutputStream.write_elements
-        checked_length
-        st
+        (checked_length "Exceptions")
+        enc.en_st
         (fun st elem ->
           let catch_idx = match elem.caught with
-          | Some exn_name -> ConstantPool.add_class pool exn_name
-          | None -> u2 0 in
-          OutputStream.write_u2 st elem.try_start;
-          OutputStream.write_u2 st elem.try_end;
-          OutputStream.write_u2 st elem.catch;
+          | Some exn_name -> ConstantPool.add_class enc.en_pool exn_name
+          | None -> U.u2 0 in
+          OutputStream.write_u2 st (label_to_ofs elem.try_start);
+          OutputStream.write_u2 st (label_to_ofs elem.try_end);
+          OutputStream.write_u2 st (label_to_ofs elem.catch);
           OutputStream.write_u2 st catch_idx)
         c.exception_table;
-      let len' = checked_length c.attributes in
-      OutputStream.write_u2 st len';
-      let sub_buffer = Buffer.create 16 in
-      let sub_st = OutputStream.make_of_buffer sub_buffer in
+      let len' = checked_length "Attributes" c.attributes in
+      OutputStream.write_u2 enc.en_st len';
+      let sub_enc = make_encoder enc.en_pool 16 in
       List.iter
         (fun a ->
-          let res = encode bsm pool (a :> t) in
-          write_info sub_st res)
+          let res = encode sub_enc.en_pool (a :> t) in
+          write_info sub_enc.en_st res)
         c.attributes;
-      OutputStream.close sub_st;
-      OutputStream.write_bytes st (Buffer.contents sub_buffer);
-      return attr_code
-*)
+      OutputStream.close sub_enc.en_st;
+      OutputStream.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
+      enc_return enc attr_code
 
-  let encode pool =
+  and encode pool =
     let enc = make_encoder pool 64 in
   function
     | `ConstantValue v -> encode_constant_value enc v
@@ -1465,14 +1481,14 @@ let encode ?(version = Version.default) cd =
   let mths = U.map_list_to_array (HM.encode pool) cd.methods in
   let atts = U.map_list_to_array (HA.encode_class pool) cd.attributes in
   let cpool = CP.to_pool pool in
-  let checked_length s sz =
+  let checked_number s sz =
     if sz <= U.max_u2 then
       U.u2 sz
     else
       fail (Too_many s) in
   let checked_length_array s arr =
     let res = Array.length arr in
-    checked_length s res in
+    checked_number s res in
   CP.check_version version cpool;
   { CF.magic = U.u4 magic_number;
     CF.minor_version = minor;
