@@ -47,6 +47,8 @@ let checked_length s l =
 module HighInstruction = struct (* {{{ *)
   type label = int
 
+  let fresh_label = let x = ref (-1) in fun () -> incr x; !x
+
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
   type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }

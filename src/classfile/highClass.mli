@@ -12,6 +12,7 @@ the first place. *)
 
 module HighInstruction : sig (* {{{ *)
   type label
+  val fresh_label : unit -> label
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
   type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }
