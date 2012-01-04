@@ -11,8 +11,176 @@
 the first place. *)
 
 module HighInstruction : sig (* {{{ *)
-  type t
   type label
+  type iinc = { ii_var: int; ii_inc: int }
+  type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
+  type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }
+  type instruction =
+    | AALOAD
+    | AASTORE
+    | ACONST_NULL
+    | ALOAD of int
+    | ANEWARRAY of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | ARETURN
+    | ARRAYLENGTH
+    | ASTORE of int
+    | ATHROW
+    | BALOAD
+    | BASTORE
+    | BIPUSH of int
+    | CALOAD
+    | CASTORE
+    | CHECKCAST of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | D2F
+    | D2I
+    | D2L
+    | DADD
+    | DALOAD
+    | DASTORE
+    | DCMPG
+    | DCMPL
+    | DCONST_0
+    | DCONST_1
+    | DDIV
+    | DLOAD of int
+    | DMUL
+    | DNEG
+    | DREM
+    | DRETURN
+    | DSTORE of int
+    | DSUB
+    | DUP
+    | DUP2
+    | DUP2_X1
+    | DUP2_X2
+    | DUP_X1
+    | DUP_X2
+    | F2D
+    | F2I
+    | F2L
+    | FADD
+    | FALOAD
+    | FASTORE
+    | FCMPG
+    | FCMPL
+    | FCONST_0
+    | FCONST_1
+    | FCONST_2
+    | FDIV
+    | FLOAD of int
+    | FMUL
+    | FNEG
+    | FREM
+    | FRETURN
+    | FSTORE of int
+    | FSUB
+    | GETFIELD of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | GETSTATIC of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | GOTO of label
+    | I2B
+    | I2C
+    | I2D
+    | I2F
+    | I2L
+    | I2S
+    | IADD
+    | IALOAD
+    | IAND
+    | IASTORE
+    | ICONST_0
+    | ICONST_1
+    | ICONST_2
+    | ICONST_3
+    | ICONST_4
+    | ICONST_5
+    | ICONST_M1
+    | IDIV
+    | IF_ACMPEQ of label
+    | IF_ACMPNE of label
+    | IF_ICMPEQ of label
+    | IF_ICMPGE of label
+    | IF_ICMPGT of label
+    | IF_ICMPLE of label
+    | IF_ICMPLT of label
+    | IF_ICMPNE of label
+    | IFEQ of label
+    | IFGE of label
+    | IFGT of label
+    | IFLE of label
+    | IFLT of label
+    | IFNE of label
+    | IFNONNULL of label
+    | IFNULL of label
+    | IINC of iinc
+    | ILOAD of int
+    | IMUL
+    | INEG
+    | INSTANCEOF of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+  (*  | INVOKEDYNAMIC of (Bootstrap.method_specifier * Name.for_method * Descriptor.for_method) *)
+    | INVOKEINTERFACE of (Name.for_class * Name.for_method * Descriptor.for_method) * Utils.u1
+    | INVOKESPECIAL of (Name.for_class * Name.for_method * Descriptor.for_method)
+    | INVOKESTATIC of (Name.for_class * Name.for_method * Descriptor.for_method)
+    | INVOKEVIRTUAL of ([`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type] * Name.for_method * Descriptor.for_method)
+    | IOR
+    | IREM
+    | IRETURN
+    | ISHL
+    | ISHR
+    | ISTORE of int
+    | ISUB
+    | IUSHR
+    | IXOR
+    | JSR of label
+    | L2D
+    | L2F
+    | L2I
+    | LADD
+    | LALOAD
+    | LAND
+    | LASTORE
+    | LCMP
+    | LCONST_0
+    | LCONST_1
+    | LDC of [ `Int of int32
+	     | `Float of float
+	     | `String of Utils.UTF8.t
+	     | `Class_or_interface of Name.for_class
+	     | `Array_type of Descriptor.array_type
+	     | `Method_type of Descriptor.for_method
+	     | `Method_handle of Bootstrap.method_handle ]
+    | LDC2_W of [ `Long of int64 | `Double of float ]
+    | LDIV
+    | LLOAD of int
+    | LMUL
+    | LNEG
+    | LOOKUPSWITCH of lookupswitch
+    | LOR
+    | LREM
+    | LRETURN
+    | LSHL
+    | LSHR
+    | LSTORE of int
+    | LSUB
+    | LUSHR
+    | LXOR
+    | MONITORENTER
+    | MONITOREXIT
+    | MULTIANEWARRAY of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type] * int
+    | NEW of Name.for_class
+    | NEWARRAY of Descriptor.java_type
+    | NOP
+    | POP
+    | POP2
+    | PUTFIELD of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | PUTSTATIC of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | RET of int
+    | RETURN
+    | SALOAD
+    | SASTORE
+    | SIPUSH of int
+    | SWAP
+    | TABLESWITCH of tableswitch
+  type t = label * instruction
   module LabelHash : Hashtbl.S with type key = label
 
   val version_bounds : t -> Version.bounds
