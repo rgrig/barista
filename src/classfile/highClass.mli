@@ -182,9 +182,17 @@ module HighInstruction : sig (* {{{ *)
     | SWAP
     | TABLESWITCH of tableswitch
   type t = label * instruction
+
+  val fold_instructions : ('a -> t -> 'a) -> 'a -> t list -> 'a
+
   module LabelHash : Hashtbl.S with type key = label
 
   val version_bounds : t -> Version.bounds
+end (* }}} *)
+module SymbExe : sig (* {{{ *)
+  type t
+  val make_empty : unit -> t
+  val step : t -> HighInstruction.t -> t
 end (* }}} *)
 module HighAttribute : sig (* {{{ *)
   type constant_value =
@@ -350,6 +358,14 @@ type error =
   | Misplaced_attribute of (string * string)
   | Too_many of string
   | Unsupported_instruction of string
+  | SE_empty_stack
+  | SE_invalid_stack_top of (string * string)
+  | SE_reference_expected of string
+  | SE_array_expected
+  | SE_invalid_local_index of (int * int)
+  | SE_invalid_local_contents of (int * string * string)
+  | SE_category1_expected
+  | SE_category2_expected
 
 exception Exception of error
 
