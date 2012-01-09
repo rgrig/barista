@@ -2286,13 +2286,15 @@ module HighAttribute = struct (* {{{ *)
   (* TODO(rlp) also compute stack map *)
   let compute_max_stack_locals is =
     let init = SE.make_empty (), 0, 0 in
-    let f (s, ms, ml) i =
-      let s' = SE.step s i in
+    let stackmap = HI.LabelHash.create 131 in
+    let f (s, ms, ml) (l, i) =
+      let s' = SE.step s (l, i) in
+      HI.LabelHash.replace stackmap l s;
       (s', max ms (SE.stack_size s), max ml (SE.locals_size s)) in
     let maxes = SE.fold_instructions f init is in
     let g (ms, ml) (_, s, l) = (max ms s, max ml l) in
     let max_stack, max_locals = List.fold_left g (0, 0) maxes in
-    max_stack, max_locals
+    stackmap, max_stack, max_locals
 
   let encode_attr_annotation_default _ = failwith "todo"
   let encode_attr_bootstrap_methods _ = failwith "todo"
@@ -2322,7 +2324,7 @@ module HighAttribute = struct (* {{{ *)
       OutputStream.close code_enc.en_st;
 
       let actual_code = Buffer.contents code_enc.en_buffer in
-      let max_stack, max_locals = compute_max_stack_locals c.code in
+      let stackmap, max_stack, max_locals = compute_max_stack_locals c.code in
       OutputStream.write_u2 enc.en_st (U.u2 max_stack);
       OutputStream.write_u2 enc.en_st (U.u2 max_locals);
       let code_length = String.length actual_code in
