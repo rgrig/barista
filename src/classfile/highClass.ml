@@ -2143,30 +2143,29 @@ module HighAttribute = struct (* {{{ *)
       | #for_method as g -> g
       | b -> fail (Misplaced_attribute (name_of_attribute b, "method"))
 
-  (* TODO(rgrig): Sort alphabetically. *)
   let rec version_bounds : t -> Version.bounds = function
-    | `ConstantValue _ ->
-        Version.make_bounds "'ConstantValue' attribute" Version.Java_1_0 None
+    | `AnnotationDefault _ ->
+        Version.make_bounds "'AnnotationDefault' attribute" Version.Java_1_5 None
+    | `BootstrapMethods _ ->
+        Version.make_bounds "'BootstrapMethods' attribute" Version.Java_1_7 None
     | `ClassSignature _ ->
         Version.make_bounds "'ClassSignature' attribute" Version.Java_1_5 None
     | `Code cv ->
         let instrs_bounds = List.map HI.version_bounds cv.code in
         let attrs_bounds = List.map version_bounds (cv.attributes :> t list) in
         Version.intersect_list (instrs_bounds @ attrs_bounds)
-    | `Exceptions _ ->
-        Version.make_bounds "'Exceptions' attribute" Version.Java_1_0 None
-    | `InnerClasses _ ->
-        Version.make_bounds "'InnerClasses' attribute" Version.Java_1_1 None
+    | `ConstantValue _ ->
+        Version.make_bounds "'ConstantValue' attribute" Version.Java_1_0 None
+    | `Deprecated ->
+        Version.make_bounds "'Deprecated' attribute" Version.Java_1_1 None
     | `EnclosingMethod _ ->
         Version.make_bounds "'EnclosingMethod' attribute" Version.Java_1_5 None
-    | `Synthetic ->
-        Version.make_bounds "'Synthetic' attribute" Version.Java_1_1 None
+    | `Exceptions _ ->
+        Version.make_bounds "'Exceptions' attribute" Version.Java_1_0 None
     | `FieldSignature _ ->
         Version.make_bounds "'Signature' attribute" Version.Java_1_5 None
-    | `SourceFile _ ->
-        Version.make_bounds "'SourceFile' attribute" Version.Java_1_0 None
-    | `SourceDebugExtension _ ->
-        Version.make_bounds "'SourceDebugExtension' attribute" Version.Java_1_5 None
+    | `InnerClasses _ ->
+        Version.make_bounds "'InnerClasses' attribute" Version.Java_1_1 None
     | `LineNumberTable _ ->
         Version.make_bounds "'LineNumberTable' attribute" Version.Java_1_0 None
     | `LocalVariableTable _ ->
@@ -2175,26 +2174,26 @@ module HighAttribute = struct (* {{{ *)
         Version.make_bounds "'LocalVariableTypeTable' attribute" Version.Java_1_5 None
     | `MethodSignature _ ->
         Version.make_bounds "'MethodSignature' attribute" Version.Java_1_5 None
-    | `Deprecated ->
-        Version.make_bounds "'Deprecated' attribute" Version.Java_1_1 None
-    | `RuntimeVisibleAnnotations _ ->
-        Version.make_bounds "'RuntimeVisibleAnnotations' attribute" Version.Java_1_5 None
-    | `RuntimeInvisibleAnnotations _ ->
-        Version.make_bounds "'RuntimeInvisibleAnnotations' attribute" Version.Java_1_5 None
-    | `RuntimeVisibleParameterAnnotations _ ->
-        Version.make_bounds "'RuntimeVisibleParameterAnnotations' attribute" Version.Java_1_5 None
-    | `RuntimeInvisibleParameterAnnotations _ ->
-        Version.make_bounds "'RuntimeInvisibleParameterAnnotations' attribute" Version.Java_1_5 None
-    | `RuntimeVisibleTypeAnnotations _ ->
-        Version.make_bounds "'RuntimeVisibleTypeAnnotations' attribute" Version.Java_1_7 None
-    | `RuntimeInvisibleTypeAnnotations _ ->
-        Version.make_bounds "'RuntimeInvisibleTypeAnnotations' attribute" Version.Java_1_7 None
-    | `AnnotationDefault _ ->
-        Version.make_bounds "'AnnotationDefault' attribute" Version.Java_1_5 None
-    | `BootstrapMethods _ ->
-        Version.make_bounds "'BootstrapMethods' attribute" Version.Java_1_7 None
     | `Module _ ->
         Version.make_bounds "'Module' attribute" Version.Java_1_8 None
+    | `RuntimeInvisibleAnnotations _ ->
+        Version.make_bounds "'RuntimeInvisibleAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeInvisibleParameterAnnotations _ ->
+        Version.make_bounds "'RuntimeInvisibleParameterAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeInvisibleTypeAnnotations _ ->
+        Version.make_bounds "'RuntimeInvisibleTypeAnnotations' attribute" Version.Java_1_7 None
+    | `RuntimeVisibleAnnotations _ ->
+        Version.make_bounds "'RuntimeVisibleAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeVisibleParameterAnnotations _ ->
+        Version.make_bounds "'RuntimeVisibleParameterAnnotations' attribute" Version.Java_1_5 None
+    | `RuntimeVisibleTypeAnnotations _ ->
+        Version.make_bounds "'RuntimeVisibleTypeAnnotations' attribute" Version.Java_1_7 None
+    | `SourceDebugExtension _ ->
+        Version.make_bounds "'SourceDebugExtension' attribute" Version.Java_1_5 None
+    | `SourceFile _ ->
+        Version.make_bounds "'SourceFile' attribute" Version.Java_1_0 None
+    | `Synthetic ->
+        Version.make_bounds "'Synthetic' attribute" Version.Java_1_1 None
     | `Unknown _ ->
         Version.make_bounds "'Unknown' attribute" Version.Java_1_0 None
 
@@ -2257,6 +2256,7 @@ module HighAttribute = struct (* {{{ *)
     let _, max_stack, max_locals = HI.fold_instructions f init is in
     max_stack, max_locals
 
+  (* TODO(rgrig): Does it need to be mutually recursive with [encode]? *)
   let rec encode_code enc c =
     (* first compute maps:
        instruction -> offset
@@ -2317,6 +2317,7 @@ module HighAttribute = struct (* {{{ *)
   function
     | `ConstantValue v -> encode_constant_value enc v
     | `Code c -> encode_code enc c
+    (* TODO(rgrig): CONTINUE HERE *)
     | _ -> failwith "todo"
 
   let encode_class pool a = encode pool (a : for_class :> t)
