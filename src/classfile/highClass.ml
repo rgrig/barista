@@ -2202,7 +2202,7 @@ module HighAttribute = struct (* {{{ *)
 		 ; en_st : OutputStream.t }
 
   let make_encoder pool n =
-    let buffer = Buffer.create 64 in
+    let buffer = Buffer.create n in
     let st = OutputStream.make_of_buffer buffer in
     { en_pool = pool; en_buffer = buffer; en_st = st }
 
@@ -2212,36 +2212,6 @@ module HighAttribute = struct (* {{{ *)
     { A.name_index = name_idx;
       length = U.u4 (Int64.of_int (String.length content));
       data = content; }
-
-  let encode_constant_value enc = function
-      | Long_value l ->
-          let idx = CP.add_long enc.en_pool l in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | Float_value f ->
-          let idx = CP.add_float enc.en_pool f in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | Double_value d ->
-          let idx = CP.add_double enc.en_pool d in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | Boolean_value b ->
-          let idx = CP.add_integer enc.en_pool (if b then 1l else 0l) in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | Byte_value v | Character_value v | Short_value v ->
-          let idx = CP.add_integer enc.en_pool (Int32.of_int v) in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | Integer_value i ->
-          let idx = CP.add_integer enc.en_pool i in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | String_value s ->
-          let idx = CP.add_string enc.en_pool s in
-          OutputStream.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
 
   let write_info st i =
     OutputStream.write_u2 st i.Attribute.name_index;
@@ -2256,8 +2226,11 @@ module HighAttribute = struct (* {{{ *)
     let _, max_stack, max_locals = HI.fold_instructions f init is in
     max_stack, max_locals
 
-  (* TODO(rgrig): Does it need to be mutually recursive with [encode]? *)
-  let rec encode_code enc c =
+  let encode_attr_annotation_default _ = failwith "todo"
+  let encode_attr_bootstrap_methods _ = failwith "todo"
+  let encode_attr_class_signature _ = failwith "todo"
+
+  let rec encode_attr_code enc encode c =
     (* first compute maps:
        instruction -> offset
        label -> offset
@@ -2312,13 +2285,85 @@ module HighAttribute = struct (* {{{ *)
       OutputStream.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
       enc_return enc attr_code
 
-  and encode pool =
+  let encode_attr_constant_value enc = function
+      | Boolean_value b ->
+          let idx = CP.add_integer enc.en_pool (if b then 1l else 0l) in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+      | Byte_value v | Character_value v | Short_value v ->
+          let idx = CP.add_integer enc.en_pool (Int32.of_int v) in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+      | Double_value d ->
+          let idx = CP.add_double enc.en_pool d in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+      | Float_value f ->
+          let idx = CP.add_float enc.en_pool f in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+      | Integer_value i ->
+          let idx = CP.add_integer enc.en_pool i in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+      | Long_value l ->
+          let idx = CP.add_long enc.en_pool l in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+      | String_value s ->
+          let idx = CP.add_string enc.en_pool s in
+          OutputStream.write_u2 enc.en_st idx;
+          enc_return enc attr_constant_value
+
+  let encode_attr_deprecated _ = failwith "todo"
+  let encode_attr_enclosing_method _ = failwith "todo"
+  let encode_attr_exceptions _ = failwith "todo"
+  let encode_attr_field_signature _ = failwith "todo"
+  let encode_attr_inner_classes _ = failwith "todo"
+  let encode_attr_line_number_table _ = failwith "todo"
+  let encode_attr_local_variable_table _ = failwith "todo"
+  let encode_attr_local_variable_type_table _ = failwith "todo"
+  let encode_attr_method_signature _ = failwith "todo"
+  let encode_attr_module _ = failwith "todo"
+  let encode_attr_runtime_invisible_annotations _ = failwith "todo"
+  let encode_attr_runtime_invisible_parameter_annotations _ = failwith "todo"
+  let encode_attr_runtime_invisible_type_annotations _ = failwith "todo"
+  let encode_attr_runtime_visible_annotations _ = failwith "todo"
+  let encode_attr_runtime_visible_parameter_annotations _ = failwith "todo"
+  let encode_attr_runtime_visible_type_annotations _ = failwith "todo"
+  let encode_attr_source_debug_extension _ = failwith "todo"
+  let encode_attr_source_file _ = failwith "todo"
+  let encode_attr_synthetic _ = failwith "todo"
+  let encode_attr_unknown _ = failwith "todo"
+
+  let rec encode pool : t -> A.info =
     let enc = make_encoder pool 64 in
   function
-    | `ConstantValue v -> encode_constant_value enc v
-    | `Code c -> encode_code enc c
-    (* TODO(rgrig): CONTINUE HERE *)
-    | _ -> failwith "todo"
+    | `AnnotationDefault _ -> encode_attr_annotation_default ()
+    | `BootstrapMethods _ -> encode_attr_bootstrap_methods ()
+    | `ClassSignature _ -> encode_attr_class_signature ()
+    | `Code c -> encode_attr_code enc encode c
+    | `ConstantValue v -> encode_attr_constant_value enc v
+    | `Deprecated -> encode_attr_deprecated ()
+    | `EnclosingMethod _ -> encode_attr_enclosing_method ()
+    | `Exceptions _ -> encode_attr_exceptions ()
+    | `FieldSignature _ -> encode_attr_field_signature ()
+    | `InnerClasses _ -> encode_attr_inner_classes ()
+    | `LineNumberTable _ -> encode_attr_line_number_table ()
+    | `LocalVariableTable _ -> encode_attr_local_variable_table ()
+    | `LocalVariableTypeTable _ -> encode_attr_local_variable_type_table ()
+    | `MethodSignature _ -> encode_attr_method_signature ()
+    | `Module _ -> encode_attr_module ()
+    | `RuntimeInvisibleAnnotations _ -> encode_attr_runtime_invisible_annotations ()
+    | `RuntimeInvisibleParameterAnnotations _ -> encode_attr_runtime_invisible_parameter_annotations ()
+    | `RuntimeInvisibleTypeAnnotations _ -> encode_attr_runtime_invisible_type_annotations ()
+    | `RuntimeVisibleAnnotations _ -> encode_attr_runtime_visible_annotations ()
+    | `RuntimeVisibleParameterAnnotations _ -> encode_attr_runtime_visible_parameter_annotations ()
+    | `RuntimeVisibleTypeAnnotations _ -> encode_attr_runtime_visible_type_annotations ()
+    | `SourceDebugExtension _ -> encode_attr_source_debug_extension ()
+    | `SourceFile _ -> encode_attr_source_file ()
+    | `Synthetic -> encode_attr_synthetic ()
+    | `Unknown (_, _) -> encode_attr_unknown ()
 
   let encode_class pool a = encode pool (a : for_class :> t)
   let encode_field pool a = encode pool (a : for_field :> t)
