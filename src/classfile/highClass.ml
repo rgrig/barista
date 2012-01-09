@@ -27,7 +27,7 @@ type error =
   | SE_empty_stack
   | SE_invalid_stack_top of (string * string)
   | SE_reference_expected of string
-  | SE_array_expected
+  | SE_array_expected of string
   | SE_invalid_local_index of (int * int)
   | SE_invalid_local_contents of (int * string * string)
   | SE_category1_expected
@@ -41,6 +41,14 @@ let string_of_error = function
   | Unsupported_instruction s -> "unsupported instruction: " ^ s
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
+  | SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
+  | SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
+  | SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
+  | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
+  | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size" ^ (string_of_int len)
+  | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
+  | SE_category1_expected s -> "SE: found " ^ s ^ " where a value of category 1 was expected"
+  | SE_category2_expected s -> "SE: found " ^ s ^ " where a value of category 2 was expected"
   | _ -> "undescribed error (todo)"
 
 let checked_length s l =
@@ -800,8 +808,13 @@ module SymbExe = struct  (* {{{ *)
 
   let report_reference_expected x = SE_reference_expected (string_of_verification_type_info x)
 
+  let report_array_expected x = SE_array_expected (string_of_verification_type_info x)
+
   let report_invalid_local_contents (i, v, v') =
     SE_invalid_local_contents (i, string_of_verification_type_info v, string_of_verification_type_info v')
+
+  let report_category1_expected x = SE_category1_expected (string_of_verification_type_info x)
+  let report_category2_expected x = SE_category2_expected (string_of_verification_type_info x)
   (* }}} *)
   (* symbolic stack {{{ *)
   type locals = verification_type_info array
@@ -856,11 +869,11 @@ module SymbExe = struct  (* {{{ *)
     | Double_variable_info -> false
       
   let pop_if_category1 = function
-    | hd :: tl -> if is_category1 hd then hd, tl else fail SE_category1_expected
+    | hd :: tl -> if is_category1 hd then hd, tl else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
       
   let pop_if_cat2 = function
-    | hd :: tl -> if not (is_category1 hd) then hd, tl else fail SE_category2_expected
+    | hd :: tl -> if not (is_category1 hd) then hd, tl else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
 
   let stack_size st =
@@ -935,7 +948,7 @@ let step st (lbl, i) =
         (match topv with
         | Null_variable_info -> push Null_variable_info stack
         | Object_variable_info (`Array_type (`Array t)) -> push (verification_type_info_of_parameter_descriptor t) stack
-        | _ -> fail SE_array_expected) in
+        | _ -> fail (report_array_expected topv)) in
       { locals = locals; stack = stack; }
   | HI.AASTORE ->
       let topv = top stack in
@@ -2218,6 +2231,7 @@ module HighAttribute = struct (* {{{ *)
     OutputStream.write_u4 st i.Attribute.length;
     OutputStream.write_bytes st i.Attribute.data
 
+  (* TODO(rlp) also compute stack map *)
   let compute_max_stack_locals is =
     let init = SE.make_empty (), 0, 0 in
     let f (s, ms, ml) i =
