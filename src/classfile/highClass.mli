@@ -361,11 +361,11 @@ type error =
   | SE_empty_stack
   | SE_invalid_stack_top of (string * string)
   | SE_reference_expected of string
-  | SE_array_expected
+  | SE_array_expected of string
   | SE_invalid_local_index of (int * int)
   | SE_invalid_local_contents of (int * string * string)
-  | SE_category1_expected
-  | SE_category2_expected
+  | SE_category1_expected of string
+  | SE_category2_expected of string
 
 exception Exception of error
 
