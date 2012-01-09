@@ -237,8 +237,6 @@ module HighInstruction = struct (* {{{ *)
 	
   type t = label * instruction
       
-  let fold_instructions _ _ _ = failwith "todo"
-
   module LabelHash = Hashtbl.Make (struct
     type t = label
     let equal = (=)
@@ -817,17 +815,7 @@ module SymbExe = struct  (* {{{ *)
   let report_category2_expected x = SE_category2_expected (string_of_verification_type_info x)
   (* }}} *)
   (* symbolic stack {{{ *)
-  type locals = verification_type_info array
-
   type stack = verification_type_info list (* stack top is list head *)
-
-  type t = {
-    locals : locals;
-    stack : stack;
-  }
-
-  let make_empty () =
-    { locals = [||]; stack = []; }
 
   let empty () = []
 
@@ -875,19 +863,10 @@ module SymbExe = struct  (* {{{ *)
   let pop_if_cat2 = function
     | hd :: tl -> if not (is_category1 hd) then hd, tl else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
-
-  let stack_size st =
-    List.fold_left
-      (fun acc x ->
-	acc +
-          (match x with
-            | Double_variable_info
-            | Long_variable_info -> 2
-            | _ -> 1))
-      0
-      st.stack
   (* }}} *)
   (* symbolic pool {{{ *)
+  type locals = verification_type_info array
+
   let load i l =
     let len = Array.length l in
     if i >= 0 && i < len then l.(i)
@@ -915,9 +894,6 @@ module SymbExe = struct  (* {{{ *)
       | Double_variable_info -> l'.(succ i) <- Top_variable_info
       | _ -> ());
     l'
-
-  let locals_size st =
-    Array.length st.locals
   (* }}} *)
   (* checks {{{ *)
   let check_reference x =
@@ -932,798 +908,874 @@ module SymbExe = struct  (* {{{ *)
       | Object_variable_info _
       | Uninitialized_variable_info _ -> ()
   (* }}} *)
-      
+  (* symbolic execution {{{ *)
+  type t = {
+    locals : locals;
+    stack : stack;
+  }
+
+  let make_empty () =
+    { locals = [||]; stack = []; }
+
+  let stack_size st =
+    List.fold_left
+      (fun acc x ->
+	acc +
+          (match x with
+            | Double_variable_info
+            | Long_variable_info -> 2
+            | _ -> 1))
+      0
+      st.stack
+
+  let locals_size st =
+    Array.length st.locals
+
+  let fold_instructions f init i_list =
+    let i_array = Array.of_list i_list in
+    let next_n lbl = 
+      let n, _ = List.find (fun (l, i) -> l = lbl) i_list in
+      n in
+    let rec g (acc, n) =
+      if n = Array.length i_array then [acc]
+      else let l, i = i_array.(n) in match i with
+	(* program ends *)
+	| HI.ARETURN
+	| HI.ATHROW
+	| HI.DRETURN
+	| HI.FRETURN
+(*	| HI.INVOKEDYNAMIC _ *)
+	| HI.INVOKEINTERFACE _
+	| HI.INVOKESPECIAL _
+	| HI.INVOKESTATIC _
+	| HI.INVOKEVIRTUAL _
+	| HI.IRETURN
+	| HI.LRETURN
+	| HI.RETURN -> [f acc (l, i)]
+	(* jumps *)
+	| HI.GOTO lbl
+	| HI.IF_ACMPEQ lbl
+	| HI.IF_ACMPNE lbl
+	| HI.IF_ICMPEQ lbl
+	| HI.IF_ICMPGE lbl
+	| HI.IF_ICMPGT lbl
+	| HI.IF_ICMPLE lbl
+	| HI.IF_ICMPLT lbl
+	| HI.IF_ICMPNE lbl
+	| HI.IFEQ lbl
+	| HI.IFGE lbl
+	| HI.IFGT lbl
+	| HI.IFLE lbl
+	| HI.IFLT lbl
+	| HI.IFNE lbl
+	| HI.IFNONNULL lbl
+	| HI.IFNULL lbl -> g (f acc (l, i), next_n lbl)
+	(* switches *)
+	| HI.LOOKUPSWITCH ls ->
+	  let targets = ls.HI.ls_def :: (List.map snd ls.HI.ls_branches) in
+	  g_set (List.map (fun t -> f acc (l, i), t) targets)
+	| HI.TABLESWITCH ts ->
+	  let targets = ts.HI.ts_lbl :: ts.HI.ts_ofss in
+	  g_set (List.map (fun t -> f acc (l, i), t) targets)
+	(* unsupported *)
+	| HI.JSR _ -> fail (Unsupported_instruction "JSR")
+	| HI.RET _ -> fail (Unsupported_instruction "RET")
+	(* everything else *)
+	| _ -> g (f acc (l, i), n + 1)
+    and g_set acc = List.flatten (List.map g acc) in
+    g_set [init, 0]
 	
-(* was StackState.update *)
-let step st (lbl, i) =
-  let locals = Array.copy st.locals in
-  let stack = st.stack in
-  match i with
-  | HI.AALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack =
-        (match topv with
-        | Null_variable_info -> push Null_variable_info stack
-        | Object_variable_info (`Array_type (`Array t)) -> push (verification_type_info_of_parameter_descriptor t) stack
-        | _ -> fail (report_array_expected topv)) in
-      { locals = locals; stack = stack; }
-  | HI.AASTORE ->
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = pop_if Integer_variable_info stack in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.ACONST_NULL ->
-      let stack = push Null_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ALOAD parameter ->
-      let loc = load parameter locals in
-      check_reference loc;
-      let stack = push loc stack in
-      { locals = locals; stack = stack; }
-  | HI.ANEWARRAY parameter ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push (verification_type_info_of_array_element parameter) stack in
-      { locals = locals; stack = stack; }
-  | HI.ARETURN ->
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.ARRAYLENGTH ->
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ASTORE parameter ->
-      let loc = top stack in
-      let stack = pop stack in
-      check_reference loc;
-      let locals = store parameter loc locals in
-      { locals = locals; stack = stack; }
-  | HI.ATHROW ->
-      let exc = top stack in
-      check_reference exc;
-      let stack = empty () in
-      let stack = push exc stack in
-      { locals = locals; stack = stack; }
-  | HI.BALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.BASTORE ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.BIPUSH _ ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.CALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.CASTORE ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.CHECKCAST parameter ->
-      let stack = pop stack in
-      let stack = push (verification_type_info_of_parameter_descriptor (match parameter with `Array_type at -> (at :> Descriptor.for_parameter) | `Class_or_interface cn -> `Class cn)) stack in
-      { locals = locals; stack = stack; }
-  | HI.D2F ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.D2I ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.D2L ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DADD ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DASTORE ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.DCMPG ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DCMPL ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DCONST_0 ->
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DCONST_1 ->
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DDIV ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DLOAD parameter ->
-      check_load parameter locals Double_variable_info;
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DMUL ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DNEG ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DREM ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DRETURN ->
-      let stack = pop_if Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DSTORE parameter ->
-      let stack = pop_if Double_variable_info stack in
-      let locals = store parameter Double_variable_info locals in
-      { locals = locals; stack = stack; }
-  | HI.DSUB ->
-      let stack = pop_if Double_variable_info stack in
-      let stack = pop_if Double_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.DUP ->
-      let v, stack = pop_if_category1 stack in
-      let stack = push v stack in
-      let stack = push v stack in
-      { locals = locals; stack = stack; }
-  | HI.DUP2 ->
-      let v1 = top stack in
-      let stack = pop stack in
-      let stack =
-        if is_category1 v1 then
-          let v2, stack = pop_if_category1 stack in
-          let stack = push v2 stack in
-          let stack = push v1 stack in
-          let stack = push v2 stack in
-          push v1 stack
-        else
-          push v1 (push v1 stack) in
-      { locals = locals; stack = stack; }
-  | HI.DUP2_X1 ->
-      let v1 = top stack in
-      let stack =
-        if is_category1 v1 then
-          let stack = pop stack in
-          let v2, stack = pop_if_category1 stack in
-          let v3, stack = pop_if_category1 stack in
-          let stack = push v2 stack in
-          let stack = push v1 stack in
-          let stack = push v3 stack in
-          let stack = push v2 stack in
-          push v1 stack
-        else
-          let stack = pop stack in
-          let v2, stack = pop_if_category1 stack in
-          let stack = push v1 stack in
-          let stack = push v2 stack in
-          push v1 stack in
-      { locals = locals; stack = stack; }
-  | HI.DUP2_X2 ->
-      let v1 = top stack in
-      let stack =
-        if is_category1 v1 then begin
-          let stack = pop stack in
-          let v2, stack = pop_if_category1 stack in
-          let v3 = top stack in
-          if is_category1 v3 then begin
-            let stack = pop stack in
-            let v4 = top stack in
-            let stack = pop stack in
+  (* was StackState.update *)
+  let step st (lbl, i) =
+    let locals = Array.copy st.locals in
+    let stack = st.stack in
+    match i with
+      | HI.AALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack =
+          (match topv with
+            | Null_variable_info -> push Null_variable_info stack
+            | Object_variable_info (`Array_type (`Array t)) -> push (verification_type_info_of_parameter_descriptor t) stack
+            | _ -> fail (report_array_expected topv)) in
+	{ locals = locals; stack = stack; }
+      | HI.AASTORE ->
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack = pop_if Integer_variable_info stack in
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.ACONST_NULL ->
+	let stack = push Null_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ALOAD parameter ->
+	let loc = load parameter locals in
+	check_reference loc;
+	let stack = push loc stack in
+	{ locals = locals; stack = stack; }
+      | HI.ANEWARRAY parameter ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push (verification_type_info_of_array_element parameter) stack in
+	{ locals = locals; stack = stack; }
+      | HI.ARETURN ->
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.ARRAYLENGTH ->
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ASTORE parameter ->
+	let loc = top stack in
+	let stack = pop stack in
+	check_reference loc;
+	let locals = store parameter loc locals in
+	{ locals = locals; stack = stack; }
+      | HI.ATHROW ->
+	let exc = top stack in
+	check_reference exc;
+	let stack = empty () in
+	let stack = push exc stack in
+	{ locals = locals; stack = stack; }
+      | HI.BALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.BASTORE ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.BIPUSH _ ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.CALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.CASTORE ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.CHECKCAST parameter ->
+	let stack = pop stack in
+	let stack = push (verification_type_info_of_parameter_descriptor (match parameter with `Array_type at -> (at :> Descriptor.for_parameter) | `Class_or_interface cn -> `Class cn)) stack in
+	{ locals = locals; stack = stack; }
+      | HI.D2F ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.D2I ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.D2L ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DADD ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DASTORE ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.DCMPG ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DCMPL ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DCONST_0 ->
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DCONST_1 ->
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DDIV ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DLOAD parameter ->
+	check_load parameter locals Double_variable_info;
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DMUL ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DNEG ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DREM ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DRETURN ->
+	let stack = pop_if Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DSTORE parameter ->
+	let stack = pop_if Double_variable_info stack in
+	let locals = store parameter Double_variable_info locals in
+	{ locals = locals; stack = stack; }
+      | HI.DSUB ->
+	let stack = pop_if Double_variable_info stack in
+	let stack = pop_if Double_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.DUP ->
+	let v, stack = pop_if_category1 stack in
+	let stack = push v stack in
+	let stack = push v stack in
+	{ locals = locals; stack = stack; }
+      | HI.DUP2 ->
+	let v1 = top stack in
+	let stack = pop stack in
+	let stack =
+          if is_category1 v1 then
+            let v2, stack = pop_if_category1 stack in
             let stack = push v2 stack in
             let stack = push v1 stack in
-            let stack = push v4 stack in
+            let stack = push v2 stack in
+            push v1 stack
+          else
+            push v1 (push v1 stack) in
+	{ locals = locals; stack = stack; }
+      | HI.DUP2_X1 ->
+	let v1 = top stack in
+	let stack =
+          if is_category1 v1 then
+            let stack = pop stack in
+            let v2, stack = pop_if_category1 stack in
+            let v3, stack = pop_if_category1 stack in
+            let stack = push v2 stack in
+            let stack = push v1 stack in
             let stack = push v3 stack in
             let stack = push v2 stack in
             push v1 stack
+          else
+            let stack = pop stack in
+            let v2, stack = pop_if_category1 stack in
+            let stack = push v1 stack in
+            let stack = push v2 stack in
+            push v1 stack in
+	{ locals = locals; stack = stack; }
+      | HI.DUP2_X2 ->
+	let v1 = top stack in
+	let stack =
+          if is_category1 v1 then begin
+            let stack = pop stack in
+            let v2, stack = pop_if_category1 stack in
+            let v3 = top stack in
+            if is_category1 v3 then begin
+              let stack = pop stack in
+              let v4 = top stack in
+              let stack = pop stack in
+              let stack = push v2 stack in
+              let stack = push v1 stack in
+              let stack = push v4 stack in
+              let stack = push v3 stack in
+              let stack = push v2 stack in
+              push v1 stack
+            end else begin
+              let stack = pop stack in
+              let stack = push v2 stack in
+              let stack = push v1 stack in
+              let stack = push v3 stack in
+              let stack = push v2 stack in
+              push v1 stack
+            end
           end else begin
             let stack = pop stack in
-            let stack = push v2 stack in
-            let stack = push v1 stack in
-            let stack = push v3 stack in
-            let stack = push v2 stack in
-            push v1 stack
-          end
-        end else begin
-          let stack = pop stack in
-          let v2 = top stack in
-          if is_category1 v2 then begin
-            let stack = pop stack in
+            let v2 = top stack in
+            if is_category1 v2 then begin
+              let stack = pop stack in
+              let v3, stack = pop_if_category1 stack in
+              let stack = push v1 stack in
+              let stack = push v3 stack in
+              let stack = push v2 stack in
+              push v1 stack
+            end else begin
+              let stack = pop stack in
+              let stack = push v1 stack in
+              let stack = push v2 stack in
+              push v1 stack
+            end
+          end in
+	{ locals = locals; stack = stack; }
+      | HI.DUP_X1 ->
+	let v1, stack = pop_if_category1 stack in
+	let v2, stack = pop_if_category1 stack in
+	let stack = push v1 stack in
+	let stack = push v2 stack in
+	let stack = push v1 stack in
+	{ locals = locals; stack = stack; }
+      | HI.DUP_X2 ->
+	let v1, stack = pop_if_category1 stack in
+	let v2 = top stack in
+	let stack =
+          if is_category1 v2 then
+            let v2, stack = pop_if_category1 stack in
             let v3, stack = pop_if_category1 stack in
             let stack = push v1 stack in
             let stack = push v3 stack in
             let stack = push v2 stack in
             push v1 stack
-          end else begin
-            let stack = pop stack in
+          else
+            let v2, stack = pop_if_cat2 stack in
             let stack = push v1 stack in
             let stack = push v2 stack in
-            push v1 stack
-          end
-        end in
-      { locals = locals; stack = stack; }
-  | HI.DUP_X1 ->
-      let v1, stack = pop_if_category1 stack in
-      let v2, stack = pop_if_category1 stack in
-      let stack = push v1 stack in
-      let stack = push v2 stack in
-      let stack = push v1 stack in
-      { locals = locals; stack = stack; }
-  | HI.DUP_X2 ->
-      let v1, stack = pop_if_category1 stack in
-      let v2 = top stack in
-      let stack =
-        if is_category1 v2 then
-          let v2, stack = pop_if_category1 stack in
-          let v3, stack = pop_if_category1 stack in
-          let stack = push v1 stack in
-          let stack = push v3 stack in
-          let stack = push v2 stack in
-          push v1 stack
-        else
-          let v2, stack = pop_if_cat2 stack in
-          let stack = push v1 stack in
-          let stack = push v2 stack in
-          push v1 stack in
-      { locals = locals; stack = stack; }
-  | HI.F2D ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.F2I ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.F2L ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FADD ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FASTORE ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.FCMPG ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FCMPL ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FCONST_0 ->
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FCONST_1 ->
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FCONST_2 ->
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FDIV ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FLOAD parameter ->
-      check_load parameter locals Float_variable_info;
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FMUL ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FNEG ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FREM ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FRETURN ->
-      let stack = pop_if Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.FSTORE parameter ->
-      let stack = pop_if Float_variable_info stack in
-      let locals = store parameter Float_variable_info locals in
-      { locals = locals; stack = stack; }
-  | HI.FSUB ->
-      let stack = pop_if Float_variable_info stack in
-      let stack = pop_if Float_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.GETFIELD (_, _, desc) ->
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
-      { locals = locals; stack = stack; }
-  | HI.GETSTATIC (_, _, desc) ->
-      let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
-      { locals = locals; stack = stack; }
-  | HI.GOTO _ ->
-      { locals = locals; stack = stack; }
-  | HI.I2B ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.I2C ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.I2D ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.I2F ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.I2L ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.I2S ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IADD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IAND ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IASTORE ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_0 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_1 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_2 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_3 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_4 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_5 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ICONST_M1 ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IDIV ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ACMPEQ _ ->
-      let stack = pop stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ACMPNE _ ->
-      let stack = pop stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ICMPEQ _ ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ICMPGE _ ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ICMPGT _ ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ICMPLE _ ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ICMPLT _ ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IF_ICMPNE _ ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFEQ _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFGE _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFGT _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFLE _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFLT _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFNE _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IFNONNULL _ ->
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.IFNULL _ ->
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.IINC ii ->
-      check_load ii.HI.ii_var locals Integer_variable_info;
-      let locals = store ii.HI.ii_var Integer_variable_info locals in
-      { locals = locals; stack = stack; }
-  | HI.ILOAD parameter ->
-      check_load parameter locals Integer_variable_info;
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IMUL ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.INEG ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.INSTANCEOF _ ->
-      let stack = pop stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-(*
-  | HI.INVOKEDYNAMIC (_, _, (params, ret)) ->
-      let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
-      let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = push_return_value ret stack in
-      { locals = locals; stack = stack; }
-*)
-  | HI.INVOKEINTERFACE ((_, _, (params, ret)), _) ->
-      let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
-      let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = push_return_value ret stack in
-      { locals = locals; stack = stack; }
-  | HI.INVOKESPECIAL (cn, mn, (params, ret)) ->
-      let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
-      let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = push_return_value ret stack in
-      let locals, stack =
+            push v1 stack in
+	{ locals = locals; stack = stack; }
+      | HI.F2D ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.F2I ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.F2L ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FADD ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FASTORE ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.FCMPG ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FCMPL ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FCONST_0 ->
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FCONST_1 ->
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FCONST_2 ->
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FDIV ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FLOAD parameter ->
+	check_load parameter locals Float_variable_info;
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FMUL ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FNEG ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FREM ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FRETURN ->
+	let stack = pop_if Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.FSTORE parameter ->
+	let stack = pop_if Float_variable_info stack in
+	let locals = store parameter Float_variable_info locals in
+	{ locals = locals; stack = stack; }
+      | HI.FSUB ->
+	let stack = pop_if Float_variable_info stack in
+	let stack = pop_if Float_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.GETFIELD (_, _, desc) ->
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
+	{ locals = locals; stack = stack; }
+      | HI.GETSTATIC (_, _, desc) ->
+	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
+	{ locals = locals; stack = stack; }
+      | HI.GOTO _ ->
+	{ locals = locals; stack = stack; }
+      | HI.I2B ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.I2C ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.I2D ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.I2F ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.I2L ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.I2S ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IADD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IAND ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IASTORE ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_0 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_1 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_2 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_3 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_4 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_5 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ICONST_M1 ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IDIV ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ACMPEQ _ ->
+	let stack = pop stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ACMPNE _ ->
+	let stack = pop stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ICMPEQ _ ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ICMPGE _ ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ICMPGT _ ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ICMPLE _ ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ICMPLT _ ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IF_ICMPNE _ ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFEQ _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFGE _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFGT _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFLE _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFLT _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFNE _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFNONNULL _ ->
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.IFNULL _ ->
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.IINC ii ->
+	check_load ii.HI.ii_var locals Integer_variable_info;
+	let locals = store ii.HI.ii_var Integer_variable_info locals in
+	{ locals = locals; stack = stack; }
+      | HI.ILOAD parameter ->
+	check_load parameter locals Integer_variable_info;
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IMUL ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.INEG ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.INSTANCEOF _ ->
+	let stack = pop stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+  (*
+    | HI.INVOKEDYNAMIC (_, _, (params, ret)) ->
+    let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+    let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
+    let topv = top stack in
+    check_reference topv;
+    let stack = pop stack in
+    let stack = push_return_value ret stack in
+    { locals = locals; stack = stack; }
+  *)
+      | HI.INVOKEINTERFACE ((_, _, (params, ret)), _) ->
+	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack = push_return_value ret stack in
+	{ locals = locals; stack = stack; }
+      | HI.INVOKESPECIAL (cn, mn, (params, ret)) ->
+	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack = push_return_value ret stack in
+	let locals, stack =
 	(* TODO(rlp) understand what happens here *)
-        if U.UTF8.equal Consts.class_constructor (Name.utf8_for_method mn) then
-          match topv with
-          | Uninitialized_variable_info ofs ->
-              let f = function
-		| Uninitialized_variable_info ofs' when ofs = ofs' ->
-		  Object_variable_info (`Class_or_interface cn)
-		| x -> x in
-              Array.map f locals, List.map f stack
-          | Uninitialized_this_variable_info ->
-              let f = function Uninitialized_this_variable_info -> Object_variable_info (`Class_or_interface cn) | x -> x in
-              Array.map f locals, List.map f stack
-          | _ -> locals, stack
-        else
-          locals, stack in
-      { locals = locals; stack = stack; }
-  | HI.INVOKESTATIC (_, _, (params, ret)) ->
-      let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
-      let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
-      let stack = push_return_value ret stack in
-      { locals = locals; stack = stack; }
-  | HI.INVOKEVIRTUAL (_, _, (params, ret)) ->
-      let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
-      let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      let stack = push_return_value ret stack in
-      { locals = locals; stack = stack; }
-  | HI.IOR ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IREM ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IRETURN ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ISHL ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ISHR ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.ISTORE parameter ->
-      let stack = pop_if Integer_variable_info stack in
-      let locals = store parameter Integer_variable_info locals in
-      { locals = locals; stack = stack; }
-  | HI.ISUB ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IUSHR ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.IXOR ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.JSR _ ->
-      fail (Unsupported_instruction "JSR")
-  | HI.L2D ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Double_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.L2F ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Float_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.L2I ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LADD ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LAND ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LASTORE ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.LCMP ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LCONST_0 ->
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LCONST_1 ->
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LDC parameter ->
-      let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
-      { locals = locals; stack = stack; }
-  | HI.LDC2_W parameter ->
-      let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
-      { locals = locals; stack = stack; }
-  | HI.LDIV ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LLOAD parameter ->
-      check_load parameter locals Long_variable_info;
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LMUL ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LNEG ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LOOKUPSWITCH _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LOR ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LREM ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LRETURN ->
-      let stack = pop_if Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LSHL ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LSHR ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LSTORE parameter ->
-      let stack = pop_if Long_variable_info stack in
-      let locals = store parameter Long_variable_info locals in
-      { locals = locals; stack = stack; }
-  | HI.LSUB ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LUSHR ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.LXOR ->
-      let stack = pop_if Long_variable_info stack in
-      let stack = pop_if Long_variable_info stack in
-      let stack = push Long_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.MONITORENTER ->
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.MONITOREXIT ->
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.MULTIANEWARRAY (at, dims) ->
-      let s = ref stack in
-      for i = 1 to (dims :> int) do
-        s := pop_if Integer_variable_info !s;
-      done;
-      let stack = push (Object_variable_info at) !s in
-      { locals = locals; stack = stack; }
-  | HI.NEW _ ->
+          if U.UTF8.equal Consts.class_constructor (Name.utf8_for_method mn) then
+            match topv with
+              | Uninitialized_variable_info lbl ->
+		let f = function
+		  | Uninitialized_variable_info lbl' when lbl = lbl' ->
+		    Object_variable_info (`Class_or_interface cn)
+		  | x -> x in
+		Array.map f locals, List.map f stack
+              | Uninitialized_this_variable_info ->
+		let f = function Uninitialized_this_variable_info -> Object_variable_info (`Class_or_interface cn) | x -> x in
+		Array.map f locals, List.map f stack
+              | _ -> locals, stack
+          else
+            locals, stack in
+	{ locals = locals; stack = stack; }
+      | HI.INVOKESTATIC (_, _, (params, ret)) ->
+	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
+	let stack = push_return_value ret stack in
+	{ locals = locals; stack = stack; }
+      | HI.INVOKEVIRTUAL (_, _, (params, ret)) ->
+	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	let stack = push_return_value ret stack in
+	{ locals = locals; stack = stack; }
+      | HI.IOR ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IREM ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IRETURN ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ISHL ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ISHR ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.ISTORE parameter ->
+	let stack = pop_if Integer_variable_info stack in
+	let locals = store parameter Integer_variable_info locals in
+	{ locals = locals; stack = stack; }
+      | HI.ISUB ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IUSHR ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.IXOR ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.JSR _ ->
+	fail (Unsupported_instruction "JSR")
+      | HI.L2D ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Double_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.L2F ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Float_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.L2I ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LADD ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LAND ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LASTORE ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.LCMP ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LCONST_0 ->
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LCONST_1 ->
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LDC parameter ->
+	let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
+	{ locals = locals; stack = stack; }
+      | HI.LDC2_W parameter ->
+	let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
+	{ locals = locals; stack = stack; }
+      | HI.LDIV ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LLOAD parameter ->
+	check_load parameter locals Long_variable_info;
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LMUL ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LNEG ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LOOKUPSWITCH _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LOR ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LREM ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LRETURN ->
+	let stack = pop_if Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LSHL ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LSHR ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LSTORE parameter ->
+	let stack = pop_if Long_variable_info stack in
+	let locals = store parameter Long_variable_info locals in
+	{ locals = locals; stack = stack; }
+      | HI.LSUB ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LUSHR ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.LXOR ->
+	let stack = pop_if Long_variable_info stack in
+	let stack = pop_if Long_variable_info stack in
+	let stack = push Long_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.MONITORENTER ->
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.MONITOREXIT ->
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.MULTIANEWARRAY (at, dims) ->
+	let s = ref stack in
+	for i = 1 to (dims :> int) do
+          s := pop_if Integer_variable_info !s;
+	done;
+	let stack = push (Object_variable_info at) !s in
+	{ locals = locals; stack = stack; }
+      | HI.NEW _ ->
       (* TODO(rlp) understand why the argument to NEW is thrown away *)
-      let stack = push (Uninitialized_variable_info lbl) stack in
-      { locals = locals; stack = stack; }
-  | HI.NEWARRAY parameter ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = push (verification_type_info_of_array_primitive parameter) stack in
-      { locals = locals; stack = stack; }
-  | HI.NOP ->
-      { locals = locals; stack = stack; }
-  | HI.POP ->
-      let _, stack = pop_if_category1 stack in
-      { locals = locals; stack = stack; }
-  | HI.POP2 ->
-      let v1 = top stack in
-      let stack =
-        if is_category1 v1 then
-          snd (pop_if_category1 (snd (pop_if_category1 stack)))
-        else
-          pop stack in
-      { locals = locals; stack = stack; }
-  | HI.PUTFIELD (_, _, desc) ->
-      let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
-      let topv = top stack in
-      check_reference topv;
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.PUTSTATIC (_, _, desc) ->
-      let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
-      { locals = locals; stack = stack; }
-  | HI.RET _ ->
-      fail (Unsupported_instruction "RET")
-  | HI.RETURN ->
-      { locals = locals; stack = stack; }
-  | HI.SALOAD ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.SASTORE ->
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop_if Integer_variable_info stack in
-      let stack = pop stack in
-      { locals = locals; stack = stack; }
-  | HI.SIPUSH _ ->
-      let stack = push Integer_variable_info stack in
-      { locals = locals; stack = stack; }
-  | HI.SWAP ->
-      let v1, stack = pop_if_category1 stack in
-      let v2, stack = pop_if_category1 stack in
-      let stack = push v1 stack in
-      let stack = push v2 stack in
-      { locals = locals; stack = stack; }
-  | HI.TABLESWITCH _ ->
-      let stack = pop_if Integer_variable_info stack in
-      { locals = locals; stack = stack; }
+	let stack = push (Uninitialized_variable_info lbl) stack in
+	{ locals = locals; stack = stack; }
+      | HI.NEWARRAY parameter ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = push (verification_type_info_of_array_primitive parameter) stack in
+	{ locals = locals; stack = stack; }
+      | HI.NOP ->
+	{ locals = locals; stack = stack; }
+      | HI.POP ->
+	let _, stack = pop_if_category1 stack in
+	{ locals = locals; stack = stack; }
+      | HI.POP2 ->
+	let v1 = top stack in
+	let stack =
+          if is_category1 v1 then
+            snd (pop_if_category1 (snd (pop_if_category1 stack)))
+          else
+            pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.PUTFIELD (_, _, desc) ->
+	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
+	let topv = top stack in
+	check_reference topv;
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.PUTSTATIC (_, _, desc) ->
+	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
+	{ locals = locals; stack = stack; }
+      | HI.RET _ ->
+	fail (Unsupported_instruction "RET")
+      | HI.RETURN ->
+	{ locals = locals; stack = stack; }
+      | HI.SALOAD ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.SASTORE ->
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop_if Integer_variable_info stack in
+	let stack = pop stack in
+	{ locals = locals; stack = stack; }
+      | HI.SIPUSH _ ->
+	let stack = push Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+      | HI.SWAP ->
+	let v1, stack = pop_if_category1 stack in
+	let v2, stack = pop_if_category1 stack in
+	let stack = push v1 stack in
+	let stack = push v2 stack in
+	{ locals = locals; stack = stack; }
+      | HI.TABLESWITCH _ ->
+	let stack = pop_if Integer_variable_info stack in
+	{ locals = locals; stack = stack; }
+  (* }}} *)
 end (* }}} *)
 module SE = SymbExe
 
@@ -2237,7 +2289,9 @@ module HighAttribute = struct (* {{{ *)
     let f (s, ms, ml) i =
       let s' = SE.step s i in
       (s', max ms (SE.stack_size s), max ml (SE.locals_size s)) in
-    let _, max_stack, max_locals = HI.fold_instructions f init is in
+    let maxes = SE.fold_instructions f init is in
+    let g (ms, ml) (_, s, l) = (max ms s, max ml l) in
+    let max_stack, max_locals = List.fold_left g (0, 0) maxes in
     max_stack, max_locals
 
   let encode_attr_annotation_default _ = failwith "todo"
@@ -2268,9 +2322,9 @@ module HighAttribute = struct (* {{{ *)
       OutputStream.close code_enc.en_st;
 
       let actual_code = Buffer.contents code_enc.en_buffer in
-      let max_stack, max_locals = compute_max_stack_locals () in
-      OutputStream.write_u2 enc.en_st max_stack;
-      OutputStream.write_u2 enc.en_st max_locals;
+      let max_stack, max_locals = compute_max_stack_locals c.code in
+      OutputStream.write_u2 enc.en_st (U.u2 max_stack);
+      OutputStream.write_u2 enc.en_st (U.u2 max_locals);
       let code_length = String.length actual_code in
       if code_length > U.max_u2 then fail Invalid_code_length;
       OutputStream.write_u4 enc.en_st (U.u4 (Int64.of_int code_length));

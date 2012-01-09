@@ -183,8 +183,6 @@ module HighInstruction : sig (* {{{ *)
     | TABLESWITCH of tableswitch
   type t = label * instruction
 
-  val fold_instructions : ('a -> t -> 'a) -> 'a -> t list -> 'a
-
   module LabelHash : Hashtbl.S with type key = label
 
   val version_bounds : t -> Version.bounds
@@ -192,6 +190,7 @@ end (* }}} *)
 module SymbExe : sig (* {{{ *)
   type t
   val make_empty : unit -> t
+  val fold_instructions : ('a -> HighInstruction.t -> 'a) -> 'a -> HighInstruction.t list -> 'a list
   val step : t -> HighInstruction.t -> t
 end (* }}} *)
 module HighAttribute : sig (* {{{ *)
