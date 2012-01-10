@@ -931,11 +931,21 @@ module SymbExe = struct  (* {{{ *)
   let locals_size st =
     Array.length st.locals
 
+  type 'a acc = Unseen | Seen of 'a
+  exception Found of int
+  exception Unbalanced_loop
+
   let fold_instructions f init i_list =
     let i_array = Array.of_list i_list in
-    let next_n lbl = 
-      let n, _ = List.find (fun (l, i) -> l = lbl) i_list in
-      n in
+    let s_array = Array.make (Array.length i_array) Unseen in
+    let record n acc = match s_array.(n) with
+      | Unseen -> s_array.(n) <- Seen acc; true
+      | Seen acc' when acc = acc' -> false
+      | _ -> raise Unbalanced_loop in
+    let next_n lbl =
+      (* TODO(rlp) utility function? could have exception in utils as well... *)
+      let check n (l, _) = if l = lbl then raise (Found n) else () in
+      try Array.iteri check i_array; -1 with (Found n) -> n in
     let rec g (acc, n) =
       if n = Array.length i_array then [acc]
       else let l, i = i_array.(n) in match i with
@@ -969,19 +979,29 @@ module SymbExe = struct  (* {{{ *)
 	| HI.IFLT lbl
 	| HI.IFNE lbl
 	| HI.IFNONNULL lbl
-	| HI.IFNULL lbl -> g (f acc (l, i), next_n lbl)
+	| HI.IFNULL lbl ->
+	  if (record n acc) then
+	  g (f acc (l, i), next_n lbl)
+	  else [acc]
 	(* switches *)
 	| HI.LOOKUPSWITCH ls ->
+	  if (record n acc) then
 	  let targets = ls.HI.ls_def :: (List.map snd ls.HI.ls_branches) in
 	  g_set (List.map (fun t -> f acc (l, i), t) targets)
+	  else [acc]
 	| HI.TABLESWITCH ts ->
+	  if (record n acc) then
 	  let targets = ts.HI.ts_lbl :: ts.HI.ts_ofss in
 	  g_set (List.map (fun t -> f acc (l, i), t) targets)
+	  else [acc]
 	(* unsupported *)
 	| HI.JSR _ -> fail (Unsupported_instruction "JSR")
 	| HI.RET _ -> fail (Unsupported_instruction "RET")
 	(* everything else *)
-	| _ -> g (f acc (l, i), n + 1)
+	| _ ->
+	  if (record n acc) then
+	  g (f acc (l, i), n + 1)
+	  else [acc]
     and g_set acc = List.flatten (List.map g acc) in
     g_set [init, 0]
 	
