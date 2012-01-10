@@ -933,15 +933,15 @@ module SymbExe = struct  (* {{{ *)
 
   type 'a acc = Unseen | Seen of 'a
   exception Found of int
-  exception Unbalanced_loop
 
-  let fold_instructions f init i_list =
+  let fold_instructions f init matches unify i_list =
     let i_array = Array.of_list i_list in
     let s_array = Array.make (Array.length i_array) Unseen in
     let record n acc = match s_array.(n) with
       | Unseen -> s_array.(n) <- Seen acc; true
-      | Seen acc' when acc = acc' -> false
-      | _ -> raise Unbalanced_loop in
+      | Seen acc' ->
+	if matches acc acc' then false
+	else (s_array.(n) <- Seen (unify acc acc'); true) in
     let next_n lbl =
       (* TODO(rlp) utility function? could have exception in utils as well... *)
       let check n (l, _) = if l = lbl then raise (Found n) else () in
@@ -2303,15 +2303,17 @@ module HighAttribute = struct (* {{{ *)
     OutputStream.write_u4 st i.Attribute.length;
     OutputStream.write_bytes st i.Attribute.data
 
-  (* TODO(rlp) also compute stack map *)
   let compute_max_stack_locals is =
     let init = SE.make_empty (), 0, 0 in
     let stackmap = HI.LabelHash.create 131 in
+    (* TODO(rlp) should really check if s and s' unify *)
+    let matches (s, _, _) (s', _, _) = s = s' in
+    let unify (s, ms, ml) (s', ms', ml') = (s, max ms ms', max ml ml') in
     let f (s, ms, ml) (l, i) =
       let s' = SE.step s (l, i) in
       HI.LabelHash.replace stackmap l s;
       (s', max ms (SE.stack_size s), max ml (SE.locals_size s)) in
-    let maxes = SE.fold_instructions f init is in
+    let maxes = SE.fold_instructions f init matches unify is in
     let g (ms, ml) (_, s, l) = (max ms s, max ml l) in
     let max_stack, max_locals = List.fold_left g (0, 0) maxes in
     stackmap, max_stack, max_locals

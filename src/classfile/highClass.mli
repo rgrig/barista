@@ -190,7 +190,12 @@ end (* }}} *)
 module SymbExe : sig (* {{{ *)
   type t
   val make_empty : unit -> t
-  val fold_instructions : ('a -> HighInstruction.t -> 'a) -> 'a -> HighInstruction.t list -> 'a list
+  val fold_instructions :
+    ('a -> HighInstruction.t -> 'a) -> (* fold *)
+    'a ->                              (* init *)
+    ('a -> 'a -> bool) ->              (* matches *)
+    ('a -> 'a -> 'a) ->                (* unify *)
+    HighInstruction.t list -> 'a list  (* instructions *)
   val step : t -> HighInstruction.t -> t
 end (* }}} *)
 module HighAttribute : sig (* {{{ *)
