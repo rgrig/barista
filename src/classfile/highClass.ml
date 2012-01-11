@@ -2630,11 +2630,24 @@ module HighAttribute = struct (* {{{ *)
       write_annotations_list enc l;
       enc_return enc attr_runtime_visible_parameter_annotations
 
-  let encode_attr_runtime_visible_type_annotations _ = failwith "todo" (* not decoded yet *)
-  let encode_attr_source_debug_extension _ = failwith "todo" (* not decoded yet *)
-  let encode_attr_source_file _ = failwith "todo"
-  let encode_attr_synthetic _ = failwith "todo"
-  let encode_attr_unknown _ = failwith "todo"
+  let encode_attr_runtime_visible_type_annotations enc l = (* not decoded yet *)
+      write_extended_annotations enc l;
+      enc_return enc attr_runtime_invisible_type_annotations
+
+  let encode_attr_source_debug_extension enc sde = (* not decoded yet *)
+      let bytes = U.UTF8.bytes_of_modified (U.UTF8.to_modified sde) in
+      Buffer.add_string enc.en_buffer bytes;
+      enc_return enc attr_source_debug_extension
+
+  let encode_attr_source_file enc sf =
+      let idx = CP.add_utf8 enc.en_pool sf in
+      OutputStream.write_u2 enc.en_st idx;
+      enc_return enc attr_source_file
+
+  let encode_attr_synthetic enc = enc_return enc attr_synthetic
+  let encode_attr_unknown enc (n, v) =
+      Buffer.add_string enc.en_buffer v;
+      enc_return enc n
 
   let rec encode pool : t -> A.info =
     let enc = make_encoder pool 64 in
@@ -2659,11 +2672,11 @@ module HighAttribute = struct (* {{{ *)
     | `RuntimeInvisibleTypeAnnotations l -> encode_attr_runtime_invisible_type_annotations enc l
     | `RuntimeVisibleAnnotations l -> encode_attr_runtime_visible_annotations enc l
     | `RuntimeVisibleParameterAnnotations l -> encode_attr_runtime_visible_parameter_annotations enc l
-    | `RuntimeVisibleTypeAnnotations _ -> encode_attr_runtime_visible_type_annotations ()
-    | `SourceDebugExtension _ -> encode_attr_source_debug_extension ()
-    | `SourceFile _ -> encode_attr_source_file ()
-    | `Synthetic -> encode_attr_synthetic ()
-    | `Unknown (_, _) -> encode_attr_unknown ()
+    | `RuntimeVisibleTypeAnnotations l -> encode_attr_runtime_visible_type_annotations enc l
+    | `SourceDebugExtension sde -> encode_attr_source_debug_extension enc sde
+    | `SourceFile sf -> encode_attr_source_file enc sf
+    | `Synthetic -> encode_attr_synthetic enc
+    | `Unknown u -> encode_attr_unknown enc u
 
   let encode_class pool a = encode pool (a : for_class :> t)
   let encode_field pool a = encode pool (a : for_field :> t)
