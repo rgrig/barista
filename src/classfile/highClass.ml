@@ -1796,6 +1796,121 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if Integer_variable_info stack in
 	{ locals = locals; stack = stack; }
   (* }}} *)
+  (* unification {{{ *)
+type 'a unifier = 'a -> 'a -> 'a
+
+let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
+
+let java_lang_Object = `Class_or_interface java_lang_Object_name
+
+let make_array_unifier (f : Name.for_class unifier) (x : Descriptor.array_type) (y : Descriptor.array_type) =
+  let rec ua (x : Descriptor.java_type) (y : Descriptor.java_type) = match x, y with
+    | (`Array x'), (`Array y') -> `Array (ua (x' :> Descriptor.java_type) (y' :> Descriptor.java_type))
+    | (`Array _), _ -> `Class java_lang_Object_name
+    | _, (`Array _) -> `Class java_lang_Object_name
+    | (`Class x'), (`Class y') -> `Class (f x' y')
+    | `Boolean, `Boolean -> `Boolean
+    | `Byte, `Byte -> `Byte
+    | `Char, `Char -> `Char
+    | `Double, `Double -> `Double
+    | `Float, `Float -> `Float
+    | `Int, `Int -> `Int
+    | `Long, `Long -> `Long
+    | `Short, `Short -> `Short
+    | _ -> raise Not_found in
+  try
+    (match ua (x :> Descriptor.java_type) (y :> Descriptor.java_type) with
+      | `Array x -> `Array_type (`Array x)
+      | _ -> java_lang_Object)
+  with Not_found -> java_lang_Object
+    
+let make_unifier f x y =
+  let array_unifier = make_array_unifier f in
+  match x, y with
+    | (`Array_type at1), (`Array_type at2) -> array_unifier at1 at2
+    | (`Class_or_interface cn1), (`Class_or_interface cn2) -> `Class_or_interface (f cn1 cn2)
+    | _ -> java_lang_Object
+      
+let unify_to_java_lang_Object =
+  let utjlo x y =
+    if Name.equal_for_class x y then
+      x
+    else
+      java_lang_Object_name in
+  make_unifier utjlo
+    
+let unify_to_closest_common_parent cl l =
+  let rec parents cn =
+    let hd, prn =
+      try
+        let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
+        (Name.internal_utf8_for_class c), p
+      with Not_found ->
+        let cd = ClassLoader.find_class cl (Name.external_utf8_for_class cn) in
+        (Name.internal_utf8_for_class cd.ClassDefinition.name),
+        cd.ClassDefinition.extends in
+    let tl = match prn with
+    | Some x -> parents x
+    | None -> [] in
+    hd :: tl in
+  let rec common_parent l = function
+  | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
+  | [] -> U.UTF8.of_string "java/lang/Object" in
+  let utccp x y =
+    let parents_x = parents x in
+    let parents_y = parents y in
+    Name.make_for_class_from_internal (common_parent parents_x parents_y) in
+    make_unifier utccp
+
+let unify_to_parent_list l =
+  let rec parents cn =
+    let hd, prn =
+      try
+        let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
+        (Name.internal_utf8_for_class c), p
+      with Not_found ->
+        (Name.internal_utf8_for_class cn), None in
+    let tl = match prn with
+    | Some x -> parents x
+    | None -> [] in
+    hd :: tl in
+  let rec common_parent l = function
+  | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
+  | [] -> U.UTF8.of_string "java/lang/Object" in
+  let utccp x y =
+    let parents_x = parents x in
+    let parents_y = parents y in
+    Name.make_for_class_from_internal (common_parent parents_x parents_y) in
+    make_unifier utccp
+
+let unify f st1 st2 =
+  let unify_elements vti1 vti2 =
+    match (vti1, vti2) with
+    | Top_variable_info, _
+    | _, Top_variable_info -> Top_variable_info
+    | (Object_variable_info o1), (Object_variable_info o2) -> Object_variable_info (f o1 o2)
+    | Null_variable_info, (Object_variable_info _) -> vti2
+    | (Object_variable_info _), Null_variable_info -> vti1
+    | _ -> if vti1 = vti2 then vti1 else Top_variable_info in
+  let sz1 = List.length st1.stack in
+  let sz2 = List.length st2.stack in
+  if sz1 = sz2 then begin
+    let len1 = Array.length st1.locals in
+    let len2 = Array.length st2.locals in
+    let len = max len1 len2 in
+    let locals =
+      Array.init
+        len
+        (fun i ->
+          if (i < len1) && (i < len2) then
+            unify_elements st1.locals.(i) st2.locals.(i)
+          else
+            Top_variable_info) in
+    let stack = List.map2 unify_elements st1.stack st2.stack in
+    { locals = locals; stack = stack; }
+  end else
+    failwith "(Different_stack_sizes (sz1, sz2))"
+  (* }}} *)
 end (* }}} *)
 module SE = SymbExe
 
@@ -2306,9 +2421,10 @@ module HighAttribute = struct (* {{{ *)
   let compute_max_stack_locals is =
     let init = SE.make_empty (), 0, 0 in
     let stackmap = HI.LabelHash.create 131 in
-    (* TODO(rlp) should really check if s and s' unify *)
-    let matches (s, _, _) (s', _, _) = s = s' in
-    let unify (s, ms, ml) (s', ms', ml') = (s, max ms ms', max ml ml') in
+    let matches (s, _, _) (s', _, _) = (SE.stack_size s) = (SE.stack_size s') in
+    (* TODO(rlp) is this the correct unification? *)
+    let unify_states = SE.unify SE.unify_to_java_lang_Object in
+    let unify (s, ms, ml) (s', ms', ml') = (unify_states s s', max ms ms', max ml ml') in
     let f (s, ms, ml) (l, i) =
       let s' = SE.step s (l, i) in
       HI.LabelHash.replace stackmap l s;
