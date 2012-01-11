@@ -32,6 +32,7 @@ type error =
   | SE_invalid_local_contents of (int * string * string)
   | SE_category1_expected of string
   | SE_category2_expected of string
+  | SE_different_stack_sizes of (int * int)
 
 exception Exception of error
 
@@ -45,16 +46,24 @@ let string_of_error = function
   | SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
   | SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
   | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
-  | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size" ^ (string_of_int len)
+  | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
   | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
   | SE_category1_expected s -> "SE: found " ^ s ^ " where a value of category 1 was expected"
   | SE_category2_expected s -> "SE: found " ^ s ^ " where a value of category 2 was expected"
+  | SE_different_stack_sizes (s, s') -> "SE: saw a stack with size " ^ (string_of_int s) ^ " but expected one with size " ^ (string_of_int s')
   | _ -> "undescribed error (todo)"
 
 let checked_length s l =
   let res = List.length l in
   if res <= U.max_u2 then
     U.u2 res
+  else
+    fail (Too_many s)
+
+let checked_length_u1 s l =
+  let res = List.length l in
+  if res <= U.max_u1 then
+    U.u1 res
   else
     fail (Too_many s)
 
@@ -1909,7 +1918,7 @@ let unify f st1 st2 =
     let stack = List.map2 unify_elements st1.stack st2.stack in
     { locals = locals; stack = stack; }
   end else
-    failwith "(Different_stack_sizes (sz1, sz2))"
+    fail (SE_different_stack_sizes (sz1, sz2))
   (* }}} *)
 end (* }}} *)
 module SE = SymbExe
@@ -2413,10 +2422,42 @@ module HighAttribute = struct (* {{{ *)
       length = U.u4 (Int64.of_int (String.length content));
       data = content; }
 
-  let write_info st i =
-    OutputStream.write_u2 st i.Attribute.name_index;
-    OutputStream.write_u4 st i.Attribute.length;
-    OutputStream.write_bytes st i.Attribute.data
+  let write_info enc i =
+    OutputStream.write_u2 enc.en_st i.Attribute.name_index;
+    OutputStream.write_u4 enc.en_st i.Attribute.length;
+    OutputStream.write_bytes enc.en_st i.Attribute.data
+
+  let write_annotations enc l =
+    OutputStream.write_elements
+      (checked_length "annotations")
+      enc.en_st
+      (fun st a ->
+        let a' = Annotation.encode enc.en_pool a in
+        Annotation.write_info st a')
+      l
+
+  let write_annotations_list enc l =
+    let len = checked_length_u1 "annotation lists" l in
+    OutputStream.write_u1 enc.en_st len;
+    List.iter
+      (fun l' ->
+        OutputStream.write_elements
+          (checked_length "annotations")
+          enc.en_st
+          (fun st a ->
+            let a' = Annotation.encode enc.en_pool a in
+            Annotation.write_info st a')
+          l')
+      l
+
+  let write_extended_annotations enc l =
+    OutputStream.write_elements
+      (checked_length "extended annotations")
+      enc.en_st
+      (fun st a ->
+        let a' = Annotation.encode_extended enc.en_pool a in
+        Annotation.write_extended_info st a')
+      l
 
   let compute_max_stack_locals is =
     let init = SE.make_empty (), 0, 0 in
@@ -2434,9 +2475,16 @@ module HighAttribute = struct (* {{{ *)
     let max_stack, max_locals = List.fold_left g (0, 0) maxes in
     stackmap, max_stack, max_locals
 
-  let encode_attr_annotation_default _ = failwith "todo"
-  let encode_attr_bootstrap_methods _ = failwith "todo"
-  let encode_attr_class_signature _ = failwith "todo"
+  let encode_attr_annotation_default enc ev =
+      let eiv = Annotation.encode_element_value enc.en_pool ev in
+      Annotation.write_info_element_value enc.en_st eiv;
+      enc_return enc attr_annotation_default
+
+  let encode_attr_bootstrap_methods _ = failwith "todo" (* not decoded yet *)
+  let encode_attr_class_signature enc s =
+      let idx = CP.add_utf8 enc.en_pool (Signature.utf8_of_class_signature s) in
+      OutputStream.write_u2 enc.en_st idx;
+      enc_return enc attr_signature
 
   let rec encode_attr_code enc encode c =
     (* first compute maps:
@@ -2487,7 +2535,7 @@ module HighAttribute = struct (* {{{ *)
       List.iter
         (fun a ->
           let res = encode sub_enc.en_pool (a :> t) in
-          write_info sub_enc.en_st res)
+          write_info sub_enc res)
         c.attributes;
       OutputStream.close sub_enc.en_st;
       OutputStream.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
@@ -2523,23 +2571,67 @@ module HighAttribute = struct (* {{{ *)
           OutputStream.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
 
-  let encode_attr_deprecated _ = failwith "todo"
-  let encode_attr_enclosing_method _ = failwith "todo"
-  let encode_attr_exceptions _ = failwith "todo"
-  let encode_attr_field_signature _ = failwith "todo"
+  let encode_attr_deprecated enc = enc_return enc attr_deprecated
+
+  let encode_attr_enclosing_method enc { innermost_class; enclosing_method } =
+      let class_idx = CP.add_class enc.en_pool innermost_class in
+      let meth_idx = match enclosing_method with
+      | Some (n, d) ->
+          CP.add_name_and_type enc.en_pool
+            (Name.utf8_for_method n)
+            (Descriptor.utf8_of_method d)
+      | None -> U.u2 0 in
+      OutputStream.write_u2 enc.en_st class_idx;
+      OutputStream.write_u2 enc.en_st meth_idx;
+      enc_return enc attr_enclosing_method
+
+  let encode_attr_exceptions enc l =
+      OutputStream.write_elements
+        (checked_length "exceptions")
+        enc.en_st
+        (fun st s ->
+          let idx = CP.add_class enc.en_pool s in
+          OutputStream.write_u2 st idx)
+        l;
+      enc_return enc attr_exceptions
+
+  let encode_attr_field_signature enc s =
+      let idx = CP.add_utf8 enc.en_pool (Signature.utf8_of_field_type_signature s) in
+      OutputStream.write_u2 enc.en_st idx;
+      enc_return enc attr_signature
+
   let encode_attr_inner_classes _ = failwith "todo"
   let encode_attr_line_number_table _ = failwith "todo"
   let encode_attr_local_variable_table _ = failwith "todo"
   let encode_attr_local_variable_type_table _ = failwith "todo"
-  let encode_attr_method_signature _ = failwith "todo"
-  let encode_attr_module _ = failwith "todo"
-  let encode_attr_runtime_invisible_annotations _ = failwith "todo"
-  let encode_attr_runtime_invisible_parameter_annotations _ = failwith "todo"
-  let encode_attr_runtime_invisible_type_annotations _ = failwith "todo"
-  let encode_attr_runtime_visible_annotations _ = failwith "todo"
-  let encode_attr_runtime_visible_parameter_annotations _ = failwith "todo"
-  let encode_attr_runtime_visible_type_annotations _ = failwith "todo"
-  let encode_attr_source_debug_extension _ = failwith "todo"
+  let encode_attr_method_signature enc s =
+      let idx = CP.add_utf8 enc.en_pool (Signature.utf8_of_method_signature s) in
+      OutputStream.write_u2 enc.en_st idx;
+      enc_return enc attr_signature
+
+  let encode_attr_module _ = failwith "todo" (* not decoded yet *)
+  let encode_attr_runtime_invisible_annotations enc l =
+      write_annotations enc l;
+      enc_return enc attr_runtime_invisible_annotations
+
+  let encode_attr_runtime_invisible_parameter_annotations enc l =
+      write_annotations_list enc l;
+      enc_return enc attr_runtime_invisible_parameter_annotations
+
+  let encode_attr_runtime_invisible_type_annotations enc l = (* not decoded yet *)
+      write_extended_annotations enc l;
+      enc_return enc attr_runtime_invisible_type_annotations
+
+  let encode_attr_runtime_visible_annotations enc l =
+      write_annotations enc l;
+      enc_return enc attr_runtime_visible_type_annotations
+
+  let encode_attr_runtime_visible_parameter_annotations enc l =
+      write_annotations_list enc l;
+      enc_return enc attr_runtime_visible_parameter_annotations
+
+  let encode_attr_runtime_visible_type_annotations _ = failwith "todo" (* not decoded yet *)
+  let encode_attr_source_debug_extension _ = failwith "todo" (* not decoded yet *)
   let encode_attr_source_file _ = failwith "todo"
   let encode_attr_synthetic _ = failwith "todo"
   let encode_attr_unknown _ = failwith "todo"
@@ -2547,26 +2639,26 @@ module HighAttribute = struct (* {{{ *)
   let rec encode pool : t -> A.info =
     let enc = make_encoder pool 64 in
   function
-    | `AnnotationDefault _ -> encode_attr_annotation_default ()
+    | `AnnotationDefault ev -> encode_attr_annotation_default enc ev
     | `BootstrapMethods _ -> encode_attr_bootstrap_methods ()
-    | `ClassSignature _ -> encode_attr_class_signature ()
+    | `ClassSignature s -> encode_attr_class_signature enc s
     | `Code c -> encode_attr_code enc encode c
     | `ConstantValue v -> encode_attr_constant_value enc v
-    | `Deprecated -> encode_attr_deprecated ()
-    | `EnclosingMethod _ -> encode_attr_enclosing_method ()
-    | `Exceptions _ -> encode_attr_exceptions ()
-    | `FieldSignature _ -> encode_attr_field_signature ()
+    | `Deprecated -> encode_attr_deprecated enc
+    | `EnclosingMethod em -> encode_attr_enclosing_method enc em
+    | `Exceptions l -> encode_attr_exceptions enc l
+    | `FieldSignature s -> encode_attr_field_signature enc s
     | `InnerClasses _ -> encode_attr_inner_classes ()
     | `LineNumberTable _ -> encode_attr_line_number_table ()
     | `LocalVariableTable _ -> encode_attr_local_variable_table ()
     | `LocalVariableTypeTable _ -> encode_attr_local_variable_type_table ()
-    | `MethodSignature _ -> encode_attr_method_signature ()
+    | `MethodSignature s -> encode_attr_method_signature enc s
     | `Module _ -> encode_attr_module ()
-    | `RuntimeInvisibleAnnotations _ -> encode_attr_runtime_invisible_annotations ()
-    | `RuntimeInvisibleParameterAnnotations _ -> encode_attr_runtime_invisible_parameter_annotations ()
-    | `RuntimeInvisibleTypeAnnotations _ -> encode_attr_runtime_invisible_type_annotations ()
-    | `RuntimeVisibleAnnotations _ -> encode_attr_runtime_visible_annotations ()
-    | `RuntimeVisibleParameterAnnotations _ -> encode_attr_runtime_visible_parameter_annotations ()
+    | `RuntimeInvisibleAnnotations l -> encode_attr_runtime_invisible_annotations enc l
+    | `RuntimeInvisibleParameterAnnotations l -> encode_attr_runtime_invisible_parameter_annotations enc l
+    | `RuntimeInvisibleTypeAnnotations l -> encode_attr_runtime_invisible_type_annotations enc l
+    | `RuntimeVisibleAnnotations l -> encode_attr_runtime_visible_annotations enc l
+    | `RuntimeVisibleParameterAnnotations l -> encode_attr_runtime_visible_parameter_annotations enc l
     | `RuntimeVisibleTypeAnnotations _ -> encode_attr_runtime_visible_type_annotations ()
     | `SourceDebugExtension _ -> encode_attr_source_debug_extension ()
     | `SourceFile _ -> encode_attr_source_file ()

@@ -370,6 +370,7 @@ type error =
   | SE_invalid_local_contents of (int * string * string)
   | SE_category1_expected of string
   | SE_category2_expected of string
+  | SE_different_stack_sizes of (int * int)
 
 exception Exception of error
 
