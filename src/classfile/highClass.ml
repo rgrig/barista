@@ -3,9 +3,11 @@ open Consts
 (* }}} *)
 (* module shorthands *) (* {{{ *)
 module AF = AccessFlag
+module BC = ByteCode
 module CF = ClassFile
 module CP = ConstantPool
 module IS = InputStream
+module OS = OutputStream
 module U = Utils
 
 (* }}} *)
@@ -59,7 +61,7 @@ let checked_length s l =
     fail (Too_many s)
 
 (* }}} *)
-(* HighInstruction, HighAttribute, and HighMethod *) (* {{{ *)
+(* HighInstruction, SymbExe, HighAttribute, HighField and HighMethod *) (* {{{ *)
 module HighInstruction = struct (* {{{ *)
   type label = int
 
@@ -201,8 +203,9 @@ module HighInstruction = struct (* {{{ *)
 	     | `Class_or_interface of Name.for_class
 	     | `Array_type of Descriptor.array_type
 	     | `Method_type of Descriptor.for_method
-	     | `Method_handle of Bootstrap.method_handle ]
-    | LDC2_W of [ `Long of int64 | `Double of float ]
+	     | `Method_handle of Bootstrap.method_handle
+             | `Long of int64
+             | `Double of float ]
     | LDIV
     | LLOAD of int
     | LMUL
@@ -234,9 +237,9 @@ module HighInstruction = struct (* {{{ *)
     | SIPUSH of int
     | SWAP
     | TABLESWITCH of tableswitch
-	
+
   type t = label * instruction
-      
+
   module LabelHash = Hashtbl.Make (struct
     type t = label
     let equal = (=)
@@ -320,177 +323,177 @@ module HighInstruction = struct (* {{{ *)
       `invokeInterface (get_method_ref mc mt)
     | _ -> fail Invalid_method_handle in
   function
-    | ByteCode.AALOAD -> AALOAD
-    | ByteCode.AASTORE -> AASTORE
-    | ByteCode.ACONST_NULL -> ACONST_NULL
-    | ByteCode.ALOAD p1 -> ALOAD (u1_to_int p1)
-    | ByteCode.ALOAD_0 -> ALOAD 0
-    | ByteCode.ALOAD_1 -> ALOAD 1
-    | ByteCode.ALOAD_2 -> ALOAD 2
-    | ByteCode.ALOAD_3 -> ALOAD 3
-    | ByteCode.ANEWARRAY p1 -> ANEWARRAY (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-    | ByteCode.ARETURN -> ARETURN
-    | ByteCode.ARRAYLENGTH -> ARRAYLENGTH
-    | ByteCode.ASTORE p1 -> ASTORE (u1_to_int p1)
-    | ByteCode.ASTORE_0 -> ASTORE 0
-    | ByteCode.ASTORE_1 -> ASTORE 1
-    | ByteCode.ASTORE_2 -> ASTORE 2
-    | ByteCode.ASTORE_3 -> ASTORE 3
-    | ByteCode.ATHROW -> ATHROW
-    | ByteCode.BALOAD -> BALOAD
-    | ByteCode.BASTORE -> BASTORE
-    | ByteCode.BIPUSH p1 -> BIPUSH (s1_to_int p1)
-    | ByteCode.CALOAD -> CALOAD
-    | ByteCode.CASTORE -> CASTORE
-    | ByteCode.CHECKCAST p1 -> CHECKCAST (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-    | ByteCode.D2F -> D2F
-    | ByteCode.D2I -> D2I
-    | ByteCode.D2L -> D2L
-    | ByteCode.DADD -> DADD
-    | ByteCode.DALOAD -> DALOAD
-    | ByteCode.DASTORE -> DASTORE
-    | ByteCode.DCMPG -> DCMPG
-    | ByteCode.DCMPL -> DCMPL
-    | ByteCode.DCONST_0 -> DCONST_0
-    | ByteCode.DCONST_1 -> DCONST_1
-    | ByteCode.DDIV -> DDIV
-    | ByteCode.DLOAD p1 -> DLOAD (u1_to_int p1)
-    | ByteCode.DLOAD_0 -> DLOAD 0
-    | ByteCode.DLOAD_1 -> DLOAD 1
-    | ByteCode.DLOAD_2 -> DLOAD 2
-    | ByteCode.DLOAD_3 -> DLOAD 3
-    | ByteCode.DMUL -> DMUL
-    | ByteCode.DNEG -> DNEG
-    | ByteCode.DREM -> DREM
-    | ByteCode.DRETURN -> DRETURN
-    | ByteCode.DSTORE p1 -> DSTORE (u1_to_int p1)
-    | ByteCode.DSTORE_0 -> DSTORE 0
-    | ByteCode.DSTORE_1 -> DSTORE 1
-    | ByteCode.DSTORE_2 -> DSTORE 2
-    | ByteCode.DSTORE_3 -> DSTORE 3
-    | ByteCode.DSUB -> DSUB
-    | ByteCode.DUP -> DUP
-    | ByteCode.DUP2 -> DUP2
-    | ByteCode.DUP2_X1 -> DUP2_X1
-    | ByteCode.DUP2_X2 -> DUP2_X2
-    | ByteCode.DUP_X1 -> DUP_X1
-    | ByteCode.DUP_X2 -> DUP_X2
-    | ByteCode.F2D -> F2D
-    | ByteCode.F2I -> F2I
-    | ByteCode.F2L -> F2L
-    | ByteCode.FADD -> FADD
-    | ByteCode.FALOAD -> FALOAD
-    | ByteCode.FASTORE -> FASTORE
-    | ByteCode.FCMPG -> FCMPG
-    | ByteCode.FCMPL -> FCMPL
-    | ByteCode.FCONST_0 -> FCONST_0
-    | ByteCode.FCONST_1 -> FCONST_1
-    | ByteCode.FCONST_2 -> FCONST_2
-    | ByteCode.FDIV -> FDIV
-    | ByteCode.FLOAD p1 -> FLOAD (u1_to_int p1)
-    | ByteCode.FLOAD_0 -> FLOAD 0
-    | ByteCode.FLOAD_1 -> FLOAD 1
-    | ByteCode.FLOAD_2 -> FLOAD 2
-    | ByteCode.FLOAD_3 -> FLOAD 3
-    | ByteCode.FMUL -> FMUL
-    | ByteCode.FNEG -> FNEG
-    | ByteCode.FREM -> FREM
-    | ByteCode.FRETURN -> FRETURN
-    | ByteCode.FSTORE p1 -> FSTORE (u1_to_int p1)
-    | ByteCode.FSTORE_0 -> FSTORE 0
-    | ByteCode.FSTORE_1 -> FSTORE 1
-    | ByteCode.FSTORE_2 -> FSTORE 2
-    | ByteCode.FSTORE_3 -> FSTORE 3
-    | ByteCode.FSUB -> FSUB
-    | ByteCode.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.GOTO p1 -> GOTO (abs_s_ofs_to_lbl p1)
-    | ByteCode.GOTO_W p1 -> GOTO (abs_l_ofs_to_lbl p1)
-    | ByteCode.I2B -> I2B
-    | ByteCode.I2C -> I2C
-    | ByteCode.I2D -> I2D
-    | ByteCode.I2F -> I2F
-    | ByteCode.I2L -> I2L
-    | ByteCode.I2S -> I2S
-    | ByteCode.IADD -> IADD
-    | ByteCode.IALOAD -> IALOAD
-    | ByteCode.IAND -> IAND
-    | ByteCode.IASTORE -> IASTORE
-    | ByteCode.ICONST_0 -> ICONST_0
-    | ByteCode.ICONST_1 -> ICONST_1
-    | ByteCode.ICONST_2 -> ICONST_2
-    | ByteCode.ICONST_3 -> ICONST_3
-    | ByteCode.ICONST_4 -> ICONST_4
-    | ByteCode.ICONST_5 -> ICONST_5
-    | ByteCode.ICONST_M1 -> ICONST_M1
-    | ByteCode.IDIV -> IDIV
-    | ByteCode.IF_ACMPEQ p1 -> IF_ACMPEQ (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ACMPNE p1 -> IF_ACMPNE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ICMPEQ p1 -> IF_ICMPEQ (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ICMPGE p1 -> IF_ICMPGE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ICMPGT p1 -> IF_ICMPGT (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ICMPLE p1 -> IF_ICMPLE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ICMPLT p1 -> IF_ICMPLT (abs_s_ofs_to_lbl p1)
-    | ByteCode.IF_ICMPNE p1 -> IF_ICMPNE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFEQ p1 -> IFEQ (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFGE p1 -> IFGE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFGT p1 -> IFGT (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFLE p1 -> IFLE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFLT p1 -> IFLT (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFNE p1 -> IFNE (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFNONNULL p1 -> IFNONNULL (abs_s_ofs_to_lbl p1)
-    | ByteCode.IFNULL p1 -> IFNULL (abs_s_ofs_to_lbl p1)
-    | ByteCode.IINC (p1, p2) -> IINC { ii_var = u1_to_int p1; ii_inc = s1_to_int p2 }
-    | ByteCode.ILOAD p1 -> ILOAD (u1_to_int p1)
-    | ByteCode.ILOAD_0 -> ILOAD 0
-    | ByteCode.ILOAD_1 -> ILOAD 1
-    | ByteCode.ILOAD_2 -> ILOAD 2
-    | ByteCode.ILOAD_3 -> ILOAD 3
-    | ByteCode.IMUL -> IMUL
-    | ByteCode.INEG -> INEG
-    | ByteCode.INSTANCEOF p1 -> INSTANCEOF (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-    | ByteCode.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
-    | ByteCode.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
-    | ByteCode.INVOKESPECIAL p1 -> INVOKESPECIAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.INVOKESTATIC p1 -> INVOKESTATIC (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.IOR -> IOR
-    | ByteCode.IREM -> IREM
-    | ByteCode.IRETURN -> IRETURN
-    | ByteCode.ISHL -> ISHL
-    | ByteCode.ISHR -> ISHR
-    | ByteCode.ISTORE p1 -> ISTORE (u1_to_int p1)
-    | ByteCode.ISTORE_0 -> ISTORE 0
-    | ByteCode.ISTORE_1 -> ISTORE 1
-    | ByteCode.ISTORE_2 -> ISTORE 2
-    | ByteCode.ISTORE_3 -> ISTORE 3
-    | ByteCode.ISUB -> ISUB
-    | ByteCode.IUSHR -> IUSHR
-    | ByteCode.IXOR -> IXOR
-    | ByteCode.JSR p1 -> JSR (abs_s_ofs_to_lbl p1)
-    | ByteCode.JSR_W p1 -> JSR (abs_l_ofs_to_lbl p1)
-    | ByteCode.L2D -> L2D
-    | ByteCode.L2F -> L2F
-    | ByteCode.L2I -> L2I
-    | ByteCode.LADD -> LADD
-    | ByteCode.LALOAD -> LALOAD
-    | ByteCode.LAND -> LAND
-    | ByteCode.LASTORE -> LASTORE
-    | ByteCode.LCMP -> LCMP
-    | ByteCode.LCONST_0 -> LCONST_0
-    | ByteCode.LCONST_1 -> LCONST_1
-    | ByteCode.LDC p1 -> LDC (match entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-    | ByteCode.LDC2_W p1 -> LDC2_W (match entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
-    | ByteCode.LDC_W p1 -> LDC (match entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-    | ByteCode.LDIV -> LDIV
-    | ByteCode.LLOAD p1 -> LLOAD (u1_to_int p1)
-    | ByteCode.LLOAD_0 -> LLOAD 0
-    | ByteCode.LLOAD_1 -> LLOAD 1
-    | ByteCode.LLOAD_2 -> LLOAD 2
-    | ByteCode.LLOAD_3 -> LLOAD 3
-    | ByteCode.LMUL -> LMUL
-    | ByteCode.LNEG -> LNEG
-    | ByteCode.LOOKUPSWITCH (p1, p2, p3) ->
+    | BC.AALOAD -> AALOAD
+    | BC.AASTORE -> AASTORE
+    | BC.ACONST_NULL -> ACONST_NULL
+    | BC.ALOAD p1 -> ALOAD (u1_to_int p1)
+    | BC.ALOAD_0 -> ALOAD 0
+    | BC.ALOAD_1 -> ALOAD 1
+    | BC.ALOAD_2 -> ALOAD 2
+    | BC.ALOAD_3 -> ALOAD 3
+    | BC.ANEWARRAY p1 -> ANEWARRAY (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+    | BC.ARETURN -> ARETURN
+    | BC.ARRAYLENGTH -> ARRAYLENGTH
+    | BC.ASTORE p1 -> ASTORE (u1_to_int p1)
+    | BC.ASTORE_0 -> ASTORE 0
+    | BC.ASTORE_1 -> ASTORE 1
+    | BC.ASTORE_2 -> ASTORE 2
+    | BC.ASTORE_3 -> ASTORE 3
+    | BC.ATHROW -> ATHROW
+    | BC.BALOAD -> BALOAD
+    | BC.BASTORE -> BASTORE
+    | BC.BIPUSH p1 -> BIPUSH (s1_to_int p1)
+    | BC.CALOAD -> CALOAD
+    | BC.CASTORE -> CASTORE
+    | BC.CHECKCAST p1 -> CHECKCAST (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+    | BC.D2F -> D2F
+    | BC.D2I -> D2I
+    | BC.D2L -> D2L
+    | BC.DADD -> DADD
+    | BC.DALOAD -> DALOAD
+    | BC.DASTORE -> DASTORE
+    | BC.DCMPG -> DCMPG
+    | BC.DCMPL -> DCMPL
+    | BC.DCONST_0 -> DCONST_0
+    | BC.DCONST_1 -> DCONST_1
+    | BC.DDIV -> DDIV
+    | BC.DLOAD p1 -> DLOAD (u1_to_int p1)
+    | BC.DLOAD_0 -> DLOAD 0
+    | BC.DLOAD_1 -> DLOAD 1
+    | BC.DLOAD_2 -> DLOAD 2
+    | BC.DLOAD_3 -> DLOAD 3
+    | BC.DMUL -> DMUL
+    | BC.DNEG -> DNEG
+    | BC.DREM -> DREM
+    | BC.DRETURN -> DRETURN
+    | BC.DSTORE p1 -> DSTORE (u1_to_int p1)
+    | BC.DSTORE_0 -> DSTORE 0
+    | BC.DSTORE_1 -> DSTORE 1
+    | BC.DSTORE_2 -> DSTORE 2
+    | BC.DSTORE_3 -> DSTORE 3
+    | BC.DSUB -> DSUB
+    | BC.DUP -> DUP
+    | BC.DUP2 -> DUP2
+    | BC.DUP2_X1 -> DUP2_X1
+    | BC.DUP2_X2 -> DUP2_X2
+    | BC.DUP_X1 -> DUP_X1
+    | BC.DUP_X2 -> DUP_X2
+    | BC.F2D -> F2D
+    | BC.F2I -> F2I
+    | BC.F2L -> F2L
+    | BC.FADD -> FADD
+    | BC.FALOAD -> FALOAD
+    | BC.FASTORE -> FASTORE
+    | BC.FCMPG -> FCMPG
+    | BC.FCMPL -> FCMPL
+    | BC.FCONST_0 -> FCONST_0
+    | BC.FCONST_1 -> FCONST_1
+    | BC.FCONST_2 -> FCONST_2
+    | BC.FDIV -> FDIV
+    | BC.FLOAD p1 -> FLOAD (u1_to_int p1)
+    | BC.FLOAD_0 -> FLOAD 0
+    | BC.FLOAD_1 -> FLOAD 1
+    | BC.FLOAD_2 -> FLOAD 2
+    | BC.FLOAD_3 -> FLOAD 3
+    | BC.FMUL -> FMUL
+    | BC.FNEG -> FNEG
+    | BC.FREM -> FREM
+    | BC.FRETURN -> FRETURN
+    | BC.FSTORE p1 -> FSTORE (u1_to_int p1)
+    | BC.FSTORE_0 -> FSTORE 0
+    | BC.FSTORE_1 -> FSTORE 1
+    | BC.FSTORE_2 -> FSTORE 2
+    | BC.FSTORE_3 -> FSTORE 3
+    | BC.FSUB -> FSUB
+    | BC.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.GOTO p1 -> GOTO (abs_s_ofs_to_lbl p1)
+    | BC.GOTO_W p1 -> GOTO (abs_l_ofs_to_lbl p1)
+    | BC.I2B -> I2B
+    | BC.I2C -> I2C
+    | BC.I2D -> I2D
+    | BC.I2F -> I2F
+    | BC.I2L -> I2L
+    | BC.I2S -> I2S
+    | BC.IADD -> IADD
+    | BC.IALOAD -> IALOAD
+    | BC.IAND -> IAND
+    | BC.IASTORE -> IASTORE
+    | BC.ICONST_0 -> ICONST_0
+    | BC.ICONST_1 -> ICONST_1
+    | BC.ICONST_2 -> ICONST_2
+    | BC.ICONST_3 -> ICONST_3
+    | BC.ICONST_4 -> ICONST_4
+    | BC.ICONST_5 -> ICONST_5
+    | BC.ICONST_M1 -> ICONST_M1
+    | BC.IDIV -> IDIV
+    | BC.IF_ACMPEQ p1 -> IF_ACMPEQ (abs_s_ofs_to_lbl p1)
+    | BC.IF_ACMPNE p1 -> IF_ACMPNE (abs_s_ofs_to_lbl p1)
+    | BC.IF_ICMPEQ p1 -> IF_ICMPEQ (abs_s_ofs_to_lbl p1)
+    | BC.IF_ICMPGE p1 -> IF_ICMPGE (abs_s_ofs_to_lbl p1)
+    | BC.IF_ICMPGT p1 -> IF_ICMPGT (abs_s_ofs_to_lbl p1)
+    | BC.IF_ICMPLE p1 -> IF_ICMPLE (abs_s_ofs_to_lbl p1)
+    | BC.IF_ICMPLT p1 -> IF_ICMPLT (abs_s_ofs_to_lbl p1)
+    | BC.IF_ICMPNE p1 -> IF_ICMPNE (abs_s_ofs_to_lbl p1)
+    | BC.IFEQ p1 -> IFEQ (abs_s_ofs_to_lbl p1)
+    | BC.IFGE p1 -> IFGE (abs_s_ofs_to_lbl p1)
+    | BC.IFGT p1 -> IFGT (abs_s_ofs_to_lbl p1)
+    | BC.IFLE p1 -> IFLE (abs_s_ofs_to_lbl p1)
+    | BC.IFLT p1 -> IFLT (abs_s_ofs_to_lbl p1)
+    | BC.IFNE p1 -> IFNE (abs_s_ofs_to_lbl p1)
+    | BC.IFNONNULL p1 -> IFNONNULL (abs_s_ofs_to_lbl p1)
+    | BC.IFNULL p1 -> IFNULL (abs_s_ofs_to_lbl p1)
+    | BC.IINC (p1, p2) -> IINC { ii_var = u1_to_int p1; ii_inc = s1_to_int p2 }
+    | BC.ILOAD p1 -> ILOAD (u1_to_int p1)
+    | BC.ILOAD_0 -> ILOAD 0
+    | BC.ILOAD_1 -> ILOAD 1
+    | BC.ILOAD_2 -> ILOAD 2
+    | BC.ILOAD_3 -> ILOAD 3
+    | BC.IMUL -> IMUL
+    | BC.INEG -> INEG
+    | BC.INSTANCEOF p1 -> INSTANCEOF (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+    | BC.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
+    | BC.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
+    | BC.INVOKESPECIAL p1 -> INVOKESPECIAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.INVOKESTATIC p1 -> INVOKESTATIC (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.IOR -> IOR
+    | BC.IREM -> IREM
+    | BC.IRETURN -> IRETURN
+    | BC.ISHL -> ISHL
+    | BC.ISHR -> ISHR
+    | BC.ISTORE p1 -> ISTORE (u1_to_int p1)
+    | BC.ISTORE_0 -> ISTORE 0
+    | BC.ISTORE_1 -> ISTORE 1
+    | BC.ISTORE_2 -> ISTORE 2
+    | BC.ISTORE_3 -> ISTORE 3
+    | BC.ISUB -> ISUB
+    | BC.IUSHR -> IUSHR
+    | BC.IXOR -> IXOR
+    | BC.JSR p1 -> JSR (abs_s_ofs_to_lbl p1)
+    | BC.JSR_W p1 -> JSR (abs_l_ofs_to_lbl p1)
+    | BC.L2D -> L2D
+    | BC.L2F -> L2F
+    | BC.L2I -> L2I
+    | BC.LADD -> LADD
+    | BC.LALOAD -> LALOAD
+    | BC.LAND -> LAND
+    | BC.LASTORE -> LASTORE
+    | BC.LCMP -> LCMP
+    | BC.LCONST_0 -> LCONST_0
+    | BC.LCONST_1 -> LCONST_1
+    | BC.LDC p1 -> LDC (match entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+    | BC.LDC2_W p1 -> LDC (match entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
+    | BC.LDC_W p1 -> LDC (match entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+    | BC.LDIV -> LDIV
+    | BC.LLOAD p1 -> LLOAD (u1_to_int p1)
+    | BC.LLOAD_0 -> LLOAD 0
+    | BC.LLOAD_1 -> LLOAD 1
+    | BC.LLOAD_2 -> LLOAD 2
+    | BC.LLOAD_3 -> LLOAD 3
+    | BC.LMUL -> LMUL
+    | BC.LNEG -> LNEG
+    | BC.LOOKUPSWITCH (p1, p2, p3) ->
       let keys, offsets = List.split p3 in
       let labels = List.map rel_l_ofs_to_lbl offsets in
       let items = List.map s4_to_int keys in
@@ -498,58 +501,348 @@ module HighInstruction = struct (* {{{ *)
       assert (s4_to_int p2 = List.length p3);
       LOOKUPSWITCH { ls_def = rel_l_ofs_to_lbl p1
 		   ; ls_branches = List.combine items labels }
-    | ByteCode.LOR -> LOR
-    | ByteCode.LREM -> LREM
-    | ByteCode.LRETURN -> LRETURN
-    | ByteCode.LSHL -> LSHL
-    | ByteCode.LSHR -> LSHR
-    | ByteCode.LSTORE p1 -> LSTORE (u1_to_int p1)
-    | ByteCode.LSTORE_0 -> LSTORE 0
-    | ByteCode.LSTORE_1 -> LSTORE 1
-    | ByteCode.LSTORE_2 -> LSTORE 2
-    | ByteCode.LSTORE_3 -> LSTORE 3
-    | ByteCode.LSUB -> LSUB
-    | ByteCode.LUSHR -> LUSHR
-    | ByteCode.LXOR -> LXOR
-    | ByteCode.MONITORENTER -> MONITORENTER
-    | ByteCode.MONITOREXIT -> MONITOREXIT
-    | ByteCode.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
-    | ByteCode.NEW p1 -> NEW (match entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (utf8 idx)) | _ -> fail Invalid_pool_element)
-    | ByteCode.NEWARRAY p1 -> NEWARRAY (primitive_array_type_of_int (p1 :> int))
-    | ByteCode.NOP -> NOP
-    | ByteCode.POP -> POP
-    | ByteCode.POP2 -> POP2
-    | ByteCode.PUTFIELD p1 -> PUTFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.PUTSTATIC p1 -> PUTSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | ByteCode.RET p1 -> RET (u1_to_int p1)
-    | ByteCode.RETURN -> RETURN
-    | ByteCode.SALOAD -> SALOAD
-    | ByteCode.SASTORE -> SASTORE
-    | ByteCode.SIPUSH p1 -> SIPUSH (s2_to_int p1)
-    | ByteCode.SWAP -> SWAP
-    | ByteCode.TABLESWITCH (p1, p2, p3, p4) ->
+    | BC.LOR -> LOR
+    | BC.LREM -> LREM
+    | BC.LRETURN -> LRETURN
+    | BC.LSHL -> LSHL
+    | BC.LSHR -> LSHR
+    | BC.LSTORE p1 -> LSTORE (u1_to_int p1)
+    | BC.LSTORE_0 -> LSTORE 0
+    | BC.LSTORE_1 -> LSTORE 1
+    | BC.LSTORE_2 -> LSTORE 2
+    | BC.LSTORE_3 -> LSTORE 3
+    | BC.LSUB -> LSUB
+    | BC.LUSHR -> LUSHR
+    | BC.LXOR -> LXOR
+    | BC.MONITORENTER -> MONITORENTER
+    | BC.MONITOREXIT -> MONITOREXIT
+    | BC.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
+    | BC.NEW p1 -> NEW (match entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (utf8 idx)) | _ -> fail Invalid_pool_element)
+    | BC.NEWARRAY p1 -> NEWARRAY (primitive_array_type_of_int (p1 :> int))
+    | BC.NOP -> NOP
+    | BC.POP -> POP
+    | BC.POP2 -> POP2
+    | BC.PUTFIELD p1 -> PUTFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.PUTSTATIC p1 -> PUTSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+    | BC.RET p1 -> RET (u1_to_int p1)
+    | BC.RETURN -> RETURN
+    | BC.SALOAD -> SALOAD
+    | BC.SASTORE -> SASTORE
+    | BC.SIPUSH p1 -> SIPUSH (s2_to_int p1)
+    | BC.SWAP -> SWAP
+    | BC.TABLESWITCH (p1, p2, p3, p4) ->
       TABLESWITCH {
 	ts_lbl = abs_l_ofs_to_lbl p1;
 	ts_low = s4_to_int p2;
 	ts_high = s4_to_int p3;
 	ts_ofss = List.map abs_l_ofs_to_lbl p4 }
-    | ByteCode.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
-    | ByteCode.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
-    | ByteCode.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
-    | ByteCode.WIDE_DSTORE p1 -> DSTORE (u2_to_int p1)
-    | ByteCode.WIDE_FLOAD p1 -> FLOAD (u2_to_int p1)
-    | ByteCode.WIDE_FSTORE p1 -> FSTORE (u2_to_int p1)
-    | ByteCode.WIDE_IINC (p1, p2) -> IINC { ii_var = u2_to_int p1
+    | BC.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
+    | BC.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
+    | BC.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
+    | BC.WIDE_DSTORE p1 -> DSTORE (u2_to_int p1)
+    | BC.WIDE_FLOAD p1 -> FLOAD (u2_to_int p1)
+    | BC.WIDE_FSTORE p1 -> FSTORE (u2_to_int p1)
+    | BC.WIDE_IINC (p1, p2) -> IINC { ii_var = u2_to_int p1
 					  ; ii_inc = s2_to_int p2 }
-    | ByteCode.WIDE_ILOAD p1 -> ILOAD (u2_to_int p1)
-    | ByteCode.WIDE_ISTORE p1 -> ISTORE (u2_to_int p1)
-    | ByteCode.WIDE_LLOAD p1 -> LLOAD (u2_to_int p1)
-    | ByteCode.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
-    | ByteCode.WIDE_RET p1 -> RET (u2_to_int p1)
-      
-  let encode _ = failwith "todo"
-    
-  let render_size o i = ByteCode.size_of o (encode i)
+    | BC.WIDE_ILOAD p1 -> ILOAD (u2_to_int p1)
+    | BC.WIDE_ISTORE p1 -> ISTORE (u2_to_int p1)
+    | BC.WIDE_LLOAD p1 -> LLOAD (u2_to_int p1)
+    | BC.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
+    | BC.WIDE_RET p1 -> RET (u2_to_int p1)
+
+  let encode (ool : label -> int) pool offset instruction =
+    let sro_of_label d =
+      U.s2 (ool d - offset) in
+    let fits_u k x =
+      let bits = 8 * k in
+      assert (0 <= bits && bits < 32);
+      0 <= x && x < (1 lsl bits) in
+    let fits_s k x =
+      let bits = 8 * (k - 1) in
+      assert (0 <= bits && bits < 32);
+      let m = 1 lsl bits in -m <= x && x < m in
+    let int_of_primitive_array_type = function
+      | `Boolean -> 4
+      | `Char -> 5
+      | `Float -> 6
+      | `Double -> 7
+      | `Byte -> 8
+      | `Short -> 9
+      | `Int -> 10
+      | `Long -> 11
+      | _ -> fail Invalid_primitive_array_type in
+    let reference = function
+      | `getField x -> CP.Reference_getField x
+      | `getStatic x -> CP.Reference_getStatic x
+      | `putField x -> CP.Reference_putField x
+      | `putStatic x -> CP.Reference_putStatic x
+      | `invokeVirtual x -> CP.Reference_invokeVirtual x
+      | `invokeStatic x -> CP.Reference_invokeStatic x
+      | `invokeSpecial x -> CP.Reference_invokeSpecial x
+      | `newInvokeSpecial x -> CP.Reference_newInvokeSpecial x
+      | `invokeInterface x -> CP.Reference_invokeInterface x in
+    let index_of_constant c = ((match c with
+      | `Int v -> CP.add_integer pool v
+      | `Float v -> CP.add_float pool v
+      | `String v -> CP.add_string pool v
+      | `Class_or_interface u -> CP.add_class pool u
+      | `Array_type t -> CP.add_array_class pool t
+      | `Method_type v -> CP.add_method_type pool v
+      | `Method_handle v -> CP.add_method_handle pool (reference v)
+      | `Long v -> CP.add_long pool v
+      | `Double v -> CP.add_double pool v) :> int) in
+    let u2_of_constant c =
+      U.u2 (index_of_constant c) in
+    let size_of_constant = function
+      | `Int _
+      | `Float _
+      | `String _
+      | `Class_or_interface _
+      | `Array_type _
+      | `Method_type _
+      | `Method_handle _
+          -> 1
+      | `Long _
+      | `Double _
+          -> 2 in
+    let bc_LDC c =
+      let j = index_of_constant c in
+      if size_of_constant c = 2 then
+        BC.LDC2_W (U.u2 j)
+      else
+        (if fits_u 1 j then BC.LDC (U.u1 j) else BC.LDC_W (U.u2 j)) in
+    let bc_ALOAD = function
+      | 0 -> BC.ALOAD_0
+      | 1 -> BC.ALOAD_1
+      | 2 -> BC.ALOAD_2
+      | 3 -> BC.ALOAD_3
+      | c -> BC.ALOAD (U.u1 c) in
+    let bc_ASTORE = function
+      | 0 -> BC.ASTORE_0
+      | 1 -> BC.ASTORE_1
+      | 2 -> BC.ASTORE_2
+      | 3 -> BC.ASTORE_3
+      | c -> BC.ASTORE (U.u1 c) in
+    let bc_DLOAD = function
+      | 0 -> BC.DLOAD_0
+      | 1 -> BC.DLOAD_1
+      | 2 -> BC.DLOAD_2
+      | 3 -> BC.DLOAD_3
+      | c -> BC.DLOAD (U.u1 c) in
+    let bc_DSTORE = function
+      | 0 -> BC.DSTORE_0
+      | 1 -> BC.DSTORE_1
+      | 2 -> BC.DSTORE_2
+      | 3 -> BC.DSTORE_3
+      | c -> BC.DSTORE (U.u1 c) in
+    let bc_ILOAD = function
+      | 0 -> BC.ILOAD_0
+      | 1 -> BC.ILOAD_1
+      | 2 -> BC.ILOAD_2
+      | 3 -> BC.ILOAD_3
+      | c -> BC.ILOAD (U.u1 c) in
+    let bc_ISTORE = function
+      | 0 -> BC.ISTORE_0
+      | 1 -> BC.ISTORE_1
+      | 2 -> BC.ISTORE_2
+      | 3 -> BC.ISTORE_3
+      | c -> BC.ISTORE (U.u1 c) in
+    let bc_FLOAD = function
+      | 0 -> BC.FLOAD_0
+      | 1 -> BC.FLOAD_1
+      | 2 -> BC.FLOAD_2
+      | 3 -> BC.FLOAD_3
+      | c -> BC.FLOAD (U.u1 c) in
+    let bc_FSTORE = function
+      | 0 -> BC.FSTORE_0
+      | 1 -> BC.FSTORE_1
+      | 2 -> BC.FSTORE_2
+      | 3 -> BC.FSTORE_3
+      | c -> BC.FSTORE (U.u1 c) in
+    let bc_LLOAD = function
+      | 0 -> BC.LLOAD_0
+      | 1 -> BC.LLOAD_1
+      | 2 -> BC.LLOAD_2
+      | 3 -> BC.LLOAD_3
+      | c -> BC.LLOAD (U.u1 c) in
+    let bc_LSTORE = function
+      | 0 -> BC.LSTORE_0
+      | 1 -> BC.LSTORE_1
+      | 2 -> BC.LSTORE_2
+      | 3 -> BC.LSTORE_3
+      | c -> BC.LSTORE (U.u1 c) in
+    let bc_GOTO l =
+      let x = offset - ool l in
+      if fits_s 2 x then
+        BC.GOTO (U.s2 x)
+      else
+        BC.GOTO_W (U.s4 (Int32.of_int x)) in
+    let bc_JSR l =
+      let x = ool l in
+      if fits_s 2 x then
+        BC.JSR (U.s2 x)
+      else
+        BC.JSR_W (U.s4 (Int32.of_int x)) in
+    let bc_INVOKEVIRTUAL p = BC.INVOKEVIRTUAL (match p with
+      | `Class_or_interface c, n, t -> CP.add_method pool c n t
+      | `Array_type a, n, t -> CP.add_array_method pool a n t) in
+    match instruction with
+    | AALOAD -> BC.AALOAD
+    | AASTORE -> BC.AASTORE
+    | ACONST_NULL -> BC.ACONST_NULL
+    | ALOAD p1 -> bc_ALOAD p1
+    | ANEWARRAY p1 -> BC.ANEWARRAY (u2_of_constant p1)
+    | ARETURN -> BC.ARETURN
+    | ARRAYLENGTH -> BC.ARRAYLENGTH
+    | ASTORE p1 -> bc_ASTORE p1
+    | ATHROW -> BC.ATHROW
+    | BALOAD -> BC.BALOAD
+    | BASTORE -> BC.BASTORE
+    | BIPUSH p1 -> BC.BIPUSH (U.s1 p1)
+    | CALOAD -> BC.CALOAD
+    | CASTORE -> BC.CASTORE
+    | CHECKCAST p1 -> BC.CHECKCAST (u2_of_constant p1)
+    | D2F -> BC.D2F
+    | D2I -> BC.D2I
+    | D2L -> BC.D2L
+    | DADD -> BC.DADD
+    | DALOAD -> BC.DALOAD
+    | DASTORE -> BC.DASTORE
+    | DCMPG -> BC.DCMPG
+    | DCMPL -> BC.DCMPL
+    | DCONST_0 -> BC.DCONST_0
+    | DCONST_1 -> BC.DCONST_1
+    | DDIV -> BC.DDIV
+    | DLOAD p1 -> bc_DLOAD p1
+    | DMUL -> BC.DMUL
+    | DNEG -> BC.DNEG
+    | DREM -> BC.DREM
+    | DRETURN -> BC.DRETURN
+    | DSTORE p1 -> bc_DSTORE p1
+    | DSUB -> BC.DSUB
+    | DUP -> BC.DUP
+    | DUP2 -> BC.DUP2
+    | DUP2_X1 -> BC.DUP2_X1
+    | DUP2_X2 -> BC.DUP2_X2
+    | DUP_X1 -> BC.DUP_X1
+    | DUP_X2 -> BC.DUP_X2
+    | F2D -> BC.F2D
+    | F2I -> BC.F2I
+    | F2L -> BC.F2L
+    | FADD -> BC.FADD
+    | FALOAD -> BC.FALOAD
+    | FASTORE -> BC.FASTORE
+    | FCMPG -> BC.FCMPG
+    | FCMPL -> BC.FCMPL
+    | FCONST_0 -> BC.FCONST_0
+    | FCONST_1 -> BC.FCONST_1
+    | FCONST_2 -> BC.FCONST_2
+    | FDIV -> BC.FDIV
+    | FLOAD p1 -> bc_FLOAD p1
+    | FMUL -> BC.FMUL
+    | FNEG -> BC.FNEG
+    | FREM -> BC.FREM
+    | FRETURN -> BC.FRETURN
+    | FSTORE p1 -> bc_FSTORE p1
+    | FSUB -> BC.FSUB
+    | GETFIELD (c, n, t) -> BC.GETFIELD (CP.add_field pool c n t)
+    | GETSTATIC (c, n, t) -> BC.GETSTATIC (CP.add_field pool c n t)
+    | GOTO p1 -> bc_GOTO p1
+    | I2B -> BC.I2B
+    | I2C -> BC.I2C
+    | I2D -> BC.I2D
+    | I2F -> BC.I2F
+    | I2L -> BC.I2L
+    | I2S -> BC.I2S
+    | IADD -> BC.IADD
+    | IALOAD -> BC.IALOAD
+    | IAND -> BC.IAND
+    | IASTORE -> BC.IASTORE
+    | ICONST_0 -> BC.ICONST_0
+    | ICONST_1 -> BC.ICONST_1
+    | ICONST_2 -> BC.ICONST_2
+    | ICONST_3 -> BC.ICONST_3
+    | ICONST_4 -> BC.ICONST_4
+    | ICONST_5 -> BC.ICONST_5
+    | ICONST_M1 -> BC.ICONST_M1
+    | IDIV -> BC.IDIV
+    | IF_ACMPEQ p1 -> BC.IF_ACMPEQ (sro_of_label p1)
+    | IF_ACMPNE p1 -> BC.IF_ACMPNE (sro_of_label p1)
+    | IF_ICMPEQ p1 -> BC.IF_ICMPEQ (sro_of_label p1)
+    | IF_ICMPGE p1 -> BC.IF_ICMPGE (sro_of_label p1)
+    | IF_ICMPGT p1 -> BC.IF_ICMPGT (sro_of_label p1)
+    | IF_ICMPLE p1 -> BC.IF_ICMPLE (sro_of_label p1)
+    | IF_ICMPLT p1 -> BC.IF_ICMPLT (sro_of_label p1)
+    | IF_ICMPNE p1 -> BC.IF_ICMPNE (sro_of_label p1)
+    | IFEQ p1 -> BC.IFEQ (sro_of_label p1)
+    | IFGE p1 -> BC.IFGE (sro_of_label p1)
+    | IFGT p1 -> BC.IFGT (sro_of_label p1)
+    | IFLE p1 -> BC.IFLE (sro_of_label p1)
+    | IFLT p1 -> BC.IFLT (sro_of_label p1)
+    | IFNE p1 -> BC.IFNE (sro_of_label p1)
+    | IFNONNULL p1 -> BC.IFNONNULL (sro_of_label p1)
+    | IFNULL p1 -> BC.IFNULL (sro_of_label p1)
+    | IINC { ii_var; ii_inc } -> BC.IINC (U.u1 ii_var, U.s1 ii_inc)
+    | ILOAD p1 -> bc_ILOAD p1
+    | IMUL -> BC.IMUL
+    | INEG -> BC.INEG
+    | INSTANCEOF p1 -> BC.INSTANCEOF (u2_of_constant p1)
+    | INVOKEINTERFACE ((c, n, t), p2) -> BC.INVOKEINTERFACE (CP.add_interface_method pool c n t, p2)
+    | INVOKESPECIAL (c, n, t) -> BC.INVOKESPECIAL (CP.add_method pool c n t)
+    | INVOKESTATIC (c, n, t) -> BC.INVOKESTATIC (CP.add_method pool c n t)
+    | INVOKEVIRTUAL p1 -> bc_INVOKEVIRTUAL p1
+    | IOR -> BC.IOR
+    | IREM -> BC.IREM
+    | IRETURN -> BC.IRETURN
+    | ISHL -> BC.ISHL
+    | ISHR -> BC.ISHR
+    | ISTORE p1 -> bc_ISTORE p1
+    | ISUB -> BC.ISUB
+    | IUSHR -> BC.IUSHR
+    | IXOR -> BC.IXOR
+    | JSR p1 -> bc_JSR p1
+    | L2D -> BC.L2D
+    | L2F -> BC.L2F
+    | L2I -> BC.L2I
+    | LADD -> BC.LADD
+    | LALOAD -> BC.LALOAD
+    | LAND -> BC.LAND
+    | LASTORE -> BC.LASTORE
+    | LCMP -> BC.LCMP
+    | LCONST_0 -> BC.LCONST_0
+    | LCONST_1 -> BC.LCONST_1
+    | LDC p1 -> bc_LDC p1
+    | LDIV -> BC.LDIV
+    | LLOAD p1 -> bc_LLOAD p1
+    | LMUL -> BC.LMUL
+    | LNEG -> BC.LNEG
+    | LOOKUPSWITCH _ -> failwith "todo"
+    | LOR -> BC.LOR
+    | LREM -> BC.LREM
+    | LRETURN -> BC.LRETURN
+    | LSHL -> BC.LSHL
+    | LSHR -> BC.LSHR
+    | LSTORE p1 -> bc_LSTORE p1
+    | LSUB -> BC.LSUB
+    | LUSHR -> BC.LUSHR
+    | LXOR -> BC.LXOR
+    | MONITORENTER -> BC.MONITORENTER
+    | MONITOREXIT -> BC.MONITOREXIT
+    | MULTIANEWARRAY (c, d) -> BC.MULTIANEWARRAY (u2_of_constant c, U.u1 d)
+    | NEW c -> BC.NEW (CP.add_class pool c)
+    | NEWARRAY p1 -> BC.NEWARRAY (U.u1 (int_of_primitive_array_type p1))
+    | NOP -> BC.NOP
+    | POP -> BC.POP
+    | POP2 -> BC.POP2
+    | PUTFIELD (c, n, t) -> BC.PUTFIELD (CP.add_field pool c n t)
+    | PUTSTATIC (c, n, t) -> BC.PUTSTATIC (CP.add_field pool c n t)
+    | RET p1 -> BC.RET (U.u1 p1)
+    | RETURN -> BC.RETURN
+    | SALOAD -> BC.SALOAD
+    | SASTORE -> BC.SASTORE
+    | SIPUSH p1 -> BC.SIPUSH (U.s2 p1)
+    | SWAP -> BC.SWAP
+    | TABLESWITCH _ -> failwith "todo"
 
   let version_bounds (_, inst) = match inst with
     | AALOAD -> Version.make_bounds "'AALOAD' instruction" Version.Java_1_0 None
@@ -677,7 +970,6 @@ module HighInstruction = struct (* {{{ *)
     | LCONST_0 -> Version.make_bounds "'LCONST_0' instruction" Version.Java_1_0 None
     | LCONST_1 -> Version.make_bounds "'LCONST_1' instruction" Version.Java_1_0 None
     | LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_1_5 | `Method_type _ -> Version.Java_1_7 | `Method_handle _ -> Version.Java_1_7 | _ -> Version.Java_1_0) None
-    | LDC2_W _ -> Version.make_bounds "'LDC2_W' instruction" Version.Java_1_0 None
     | LDIV -> Version.make_bounds "'LDIV' instruction" Version.Java_1_0 None
     | LLOAD _ -> Version.make_bounds "'LLOAD' instruction" Version.Java_1_0 None
     | LMUL -> Version.make_bounds "'LMUL' instruction" Version.Java_1_0 None
@@ -830,7 +1122,7 @@ module SymbExe = struct  (* {{{ *)
   let top = function
     | hd :: _ -> hd
     | [] -> fail SE_empty_stack
-      
+
   let pop = function
     | _ :: tl -> tl
     | [] -> fail SE_empty_stack
@@ -855,11 +1147,11 @@ module SymbExe = struct  (* {{{ *)
     | Uninitialized_variable_info _ -> true
     | Long_variable_info
     | Double_variable_info -> false
-      
+
   let pop_if_category1 = function
     | hd :: tl -> if is_category1 hd then hd, tl else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
-      
+
   let pop_if_cat2 = function
     | hd :: tl -> if not (is_category1 hd) then hd, tl else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
@@ -1656,9 +1948,6 @@ module SymbExe = struct  (* {{{ *)
       | HI.LDC parameter ->
 	let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
 	{ locals = locals; stack = stack; }
-      | HI.LDC2_W parameter ->
-	let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
-	{ locals = locals; stack = stack; }
       | HI.LDIV ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
@@ -2135,9 +2424,9 @@ module HighAttribute = struct (* {{{ *)
         fail Invalid_code_length in
     let code_content = InputStream.read_bytes st code_len in
     let code_stream = InputStream.make_of_string code_content in
-    let instr_codes = ByteCode.read code_stream 0 in
+    let instr_codes = BC.read code_stream 0 in
     let fold_size (l, ofs, lbl) inst =
-      let s = ByteCode.size_of ofs inst in
+      let s = BC.size_of ofs inst in
       assert (s > 0);
       (inst, ofs, lbl) :: l, ofs + s, lbl + 1 in
     let instr_codes_annot, _, _ = List.fold_left fold_size ([], 0, 0) instr_codes in
@@ -2399,11 +2688,11 @@ module HighAttribute = struct (* {{{ *)
 
   type encoder = { en_pool : CP.extendable
 		 ; en_buffer : Buffer.t
-		 ; en_st : OutputStream.t }
+		 ; en_st : OS.t }
 
   let make_encoder pool n =
     let buffer = Buffer.create n in
-    let st = OutputStream.make_of_buffer buffer in
+    let st = OS.make_of_buffer buffer in
     { en_pool = pool; en_buffer = buffer; en_st = st }
 
   let enc_return enc n =
@@ -2414,9 +2703,9 @@ module HighAttribute = struct (* {{{ *)
       data = content; }
 
   let write_info st i =
-    OutputStream.write_u2 st i.Attribute.name_index;
-    OutputStream.write_u4 st i.Attribute.length;
-    OutputStream.write_bytes st i.Attribute.data
+    OS.write_u2 st i.Attribute.name_index;
+    OS.write_u4 st i.Attribute.length;
+    OS.write_bytes st i.Attribute.data
 
   let compute_max_stack_locals is =
     let init = SE.make_empty (), 0, 0 in
@@ -2439,88 +2728,73 @@ module HighAttribute = struct (* {{{ *)
   let encode_attr_class_signature _ = failwith "todo"
 
   let rec encode_attr_code enc encode c =
-    (* first compute maps:
-       instruction -> offset
-       label -> offset
-       for this we need instructon -> size
-    *)
-    let fold_size (l, ofs) inst = 
-      let s = HI.render_size ofs inst in
-      (inst, ofs) :: l, ofs + s in
-    let inst_ofs, _ = List.fold_left fold_size ([], 0) c.code in
-    let label_to_ofs lbl =
-      let ((_, _), ofs) = List.find (fun ((l, _), _) -> l = lbl) inst_ofs in
-      U.u2 ofs in
+    (* TODO(rgrig): Figure out how to handle offsets properly. *)
+    let label_to_ofs _ = failwith "todo" in
+    let code_content = failwith "todo" in
+    let code_enc = make_encoder enc.en_pool 16 in
+    BC.write code_enc.en_st 0 code_content;
+    OS.close code_enc.en_st;
 
-      let code_content =
-        List.map
-          (HI.encode enc.en_pool)
-          c.code in
-
-      let code_enc = make_encoder enc.en_pool 16 in
-      ByteCode.write code_enc.en_st 0 code_content;
-      OutputStream.close code_enc.en_st;
-
-      let actual_code = Buffer.contents code_enc.en_buffer in
-      let stackmap, max_stack, max_locals = compute_max_stack_locals c.code in
-      OutputStream.write_u2 enc.en_st (U.u2 max_stack);
-      OutputStream.write_u2 enc.en_st (U.u2 max_locals);
-      let code_length = String.length actual_code in
-      if code_length > U.max_u2 then fail Invalid_code_length;
-      OutputStream.write_u4 enc.en_st (U.u4 (Int64.of_int code_length));
-      OutputStream.write_bytes enc.en_st actual_code;
-      OutputStream.write_elements
-        (checked_length "Exceptions")
-        enc.en_st
-        (fun st elem ->
-          let catch_idx = match elem.caught with
-          | Some exn_name -> ConstantPool.add_class enc.en_pool exn_name
-          | None -> U.u2 0 in
-          OutputStream.write_u2 st (label_to_ofs elem.try_start);
-          OutputStream.write_u2 st (label_to_ofs elem.try_end);
-          OutputStream.write_u2 st (label_to_ofs elem.catch);
-          OutputStream.write_u2 st catch_idx)
-        c.exception_table;
-      let len' = checked_length "Attributes" c.attributes in
-      OutputStream.write_u2 enc.en_st len';
-      let sub_enc = make_encoder enc.en_pool 16 in
-      List.iter
-        (fun a ->
-          let res = encode sub_enc.en_pool (a :> t) in
-          write_info sub_enc.en_st res)
-        c.attributes;
-      OutputStream.close sub_enc.en_st;
-      OutputStream.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
-      enc_return enc attr_code
+    let actual_code = Buffer.contents code_enc.en_buffer in
+    let stackmap, max_stack, max_locals = compute_max_stack_locals c.code in
+    OS.write_u2 enc.en_st (U.u2 max_stack);
+    OS.write_u2 enc.en_st (U.u2 max_locals);
+    let code_length = String.length actual_code in
+    if code_length > U.max_u2 then fail Invalid_code_length;
+    OS.write_u4 enc.en_st (U.u4 (Int64.of_int code_length));
+    OS.write_bytes enc.en_st actual_code;
+    OS.write_elements
+      (checked_length "Exceptions")
+      enc.en_st
+      (fun st elem ->
+        let catch_idx = match elem.caught with
+        | Some exn_name -> CP.add_class enc.en_pool exn_name
+        | None -> U.u2 0 in
+        OS.write_u2 st (label_to_ofs elem.try_start);
+        OS.write_u2 st (label_to_ofs elem.try_end);
+        OS.write_u2 st (label_to_ofs elem.catch);
+        OS.write_u2 st catch_idx)
+      c.exception_table;
+    let len' = checked_length "Attributes" c.attributes in
+    OS.write_u2 enc.en_st len';
+    let sub_enc = make_encoder enc.en_pool 16 in
+    List.iter
+      (fun a ->
+        let res = encode sub_enc.en_pool (a :> t) in
+        write_info sub_enc.en_st res)
+      c.attributes;
+    OS.close sub_enc.en_st;
+    OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
+    enc_return enc attr_code
 
   let encode_attr_constant_value enc = function
       | Boolean_value b ->
           let idx = CP.add_integer enc.en_pool (if b then 1l else 0l) in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
       | Byte_value v | Character_value v | Short_value v ->
           let idx = CP.add_integer enc.en_pool (Int32.of_int v) in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
       | Double_value d ->
           let idx = CP.add_double enc.en_pool d in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
       | Float_value f ->
           let idx = CP.add_float enc.en_pool f in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
       | Integer_value i ->
           let idx = CP.add_integer enc.en_pool i in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
       | Long_value l ->
           let idx = CP.add_long enc.en_pool l in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
       | String_value s ->
           let idx = CP.add_string enc.en_pool s in
-          OutputStream.write_u2 enc.en_st idx;
+          OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
 
   let encode_attr_deprecated _ = failwith "todo"
@@ -2583,7 +2857,7 @@ module HA = HighAttribute
 module F = Field
 module HighField = struct (* {{{ *)
   type t = {
-      flags : AF.for_field list; 
+      flags : AF.for_field list;
       name : Name.for_field;
       descriptor : Descriptor.for_field;
       attributes : HA.for_field list;
@@ -2601,7 +2875,17 @@ module HighField = struct (* {{{ *)
       U.map_array_to_list (HA.decode_field pool) i.F.attributes_array in
     { flags; name; descriptor; attributes }
 
-  let encode _ = failwith "todo"
+  let encode pool f =
+    let access_flags = AF.list_to_u2 (f.flags :> AccessFlag.t list) in
+    let name_index = CP.add_utf8 pool (Name.utf8_for_field f.name) in
+    let desc_utf8 = Descriptor.utf8_of_field f.descriptor in
+    let descriptor_index = CP.add_utf8 pool desc_utf8 in
+    let attributes_count = U.u2 (List.length f.attributes) in
+    let attributes_array =
+      U.map_list_to_array (HA.encode pool) (f.attributes :> HA.t list) in
+    { F.access_flags; name_index; descriptor_index; attributes_count
+    ; attributes_array }
+
 end (* }}} *)
 module HF = HighField
 

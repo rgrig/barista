@@ -148,8 +148,9 @@ module HighInstruction : sig (* {{{ *)
 	     | `Class_or_interface of Name.for_class
 	     | `Array_type of Descriptor.array_type
 	     | `Method_type of Descriptor.for_method
-	     | `Method_handle of Bootstrap.method_handle ]
-    | LDC2_W of [ `Long of int64 | `Double of float ]
+	     | `Method_handle of Bootstrap.method_handle
+             | `Long of int64
+             | `Double of float ]
     | LDIV
     | LLOAD of int
     | LMUL
@@ -300,8 +301,8 @@ module HighAttribute : sig (* {{{ *)
 
 end (* }}} *)
 module HighField : sig (* {{{ *)
-  type t ={
-      flags : AccessFlag.for_field list; 
+  type t = {
+      flags : AccessFlag.for_field list;
       name : Name.for_field;
       descriptor : Descriptor.for_field;
       attributes : HighAttribute.for_field list;

@@ -11,7 +11,8 @@ let check fn =
   let ch = open_in fn in
   let cl_in = IS.make_of_channel ch in
   let cf = CF.read cl_in in
-  let _ = HC.decode ~version:Version.Java_1_5 cf in
+  let version = Version.Java_1_6 in
+  let _ = HC.encode ~version (HC.decode ~version cf) in
   close_in_noerr ch
 
 let () =
