@@ -264,8 +264,11 @@ module HighInstruction = struct (* {{{ *)
   let u2_to_int (u : U.u2) = (u :> int)
 
   let decode pool ofs_to_lbl ofs =
+(*
     let abs_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (s :> int) in
     let abs_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (Int32.to_int (s :> Int32.t)) in
+*)
+    let rel_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (ofs + (s :> int)) in
     let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + Int32.to_int (s :> Int32.t)) in
   let entry = CP.get_entry pool in
   let utf8 = CP.get_utf8_entry pool in
@@ -416,8 +419,8 @@ module HighInstruction = struct (* {{{ *)
     | BC.FSUB -> FSUB
     | BC.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
     | BC.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.GOTO p1 -> GOTO (abs_s_ofs_to_lbl p1)
-    | BC.GOTO_W p1 -> GOTO (abs_l_ofs_to_lbl p1)
+    | BC.GOTO p1 -> GOTO (rel_s_ofs_to_lbl p1)
+    | BC.GOTO_W p1 -> GOTO (rel_l_ofs_to_lbl p1)
     | BC.I2B -> I2B
     | BC.I2C -> I2C
     | BC.I2D -> I2D
@@ -436,22 +439,22 @@ module HighInstruction = struct (* {{{ *)
     | BC.ICONST_5 -> ICONST_5
     | BC.ICONST_M1 -> ICONST_M1
     | BC.IDIV -> IDIV
-    | BC.IF_ACMPEQ p1 -> IF_ACMPEQ (abs_s_ofs_to_lbl p1)
-    | BC.IF_ACMPNE p1 -> IF_ACMPNE (abs_s_ofs_to_lbl p1)
-    | BC.IF_ICMPEQ p1 -> IF_ICMPEQ (abs_s_ofs_to_lbl p1)
-    | BC.IF_ICMPGE p1 -> IF_ICMPGE (abs_s_ofs_to_lbl p1)
-    | BC.IF_ICMPGT p1 -> IF_ICMPGT (abs_s_ofs_to_lbl p1)
-    | BC.IF_ICMPLE p1 -> IF_ICMPLE (abs_s_ofs_to_lbl p1)
-    | BC.IF_ICMPLT p1 -> IF_ICMPLT (abs_s_ofs_to_lbl p1)
-    | BC.IF_ICMPNE p1 -> IF_ICMPNE (abs_s_ofs_to_lbl p1)
-    | BC.IFEQ p1 -> IFEQ (abs_s_ofs_to_lbl p1)
-    | BC.IFGE p1 -> IFGE (abs_s_ofs_to_lbl p1)
-    | BC.IFGT p1 -> IFGT (abs_s_ofs_to_lbl p1)
-    | BC.IFLE p1 -> IFLE (abs_s_ofs_to_lbl p1)
-    | BC.IFLT p1 -> IFLT (abs_s_ofs_to_lbl p1)
-    | BC.IFNE p1 -> IFNE (abs_s_ofs_to_lbl p1)
-    | BC.IFNONNULL p1 -> IFNONNULL (abs_s_ofs_to_lbl p1)
-    | BC.IFNULL p1 -> IFNULL (abs_s_ofs_to_lbl p1)
+    | BC.IF_ACMPEQ p1 -> IF_ACMPEQ (rel_s_ofs_to_lbl p1)
+    | BC.IF_ACMPNE p1 -> IF_ACMPNE (rel_s_ofs_to_lbl p1)
+    | BC.IF_ICMPEQ p1 -> IF_ICMPEQ (rel_s_ofs_to_lbl p1)
+    | BC.IF_ICMPGE p1 -> IF_ICMPGE (rel_s_ofs_to_lbl p1)
+    | BC.IF_ICMPGT p1 -> IF_ICMPGT (rel_s_ofs_to_lbl p1)
+    | BC.IF_ICMPLE p1 -> IF_ICMPLE (rel_s_ofs_to_lbl p1)
+    | BC.IF_ICMPLT p1 -> IF_ICMPLT (rel_s_ofs_to_lbl p1)
+    | BC.IF_ICMPNE p1 -> IF_ICMPNE (rel_s_ofs_to_lbl p1)
+    | BC.IFEQ p1 -> IFEQ (rel_s_ofs_to_lbl p1)
+    | BC.IFGE p1 -> IFGE (rel_s_ofs_to_lbl p1)
+    | BC.IFGT p1 -> IFGT (rel_s_ofs_to_lbl p1)
+    | BC.IFLE p1 -> IFLE (rel_s_ofs_to_lbl p1)
+    | BC.IFLT p1 -> IFLT (rel_s_ofs_to_lbl p1)
+    | BC.IFNE p1 -> IFNE (rel_s_ofs_to_lbl p1)
+    | BC.IFNONNULL p1 -> IFNONNULL (rel_s_ofs_to_lbl p1)
+    | BC.IFNULL p1 -> IFNULL (rel_s_ofs_to_lbl p1)
     | BC.IINC (p1, p2) -> IINC { ii_var = u1_to_int p1; ii_inc = s1_to_int p2 }
     | BC.ILOAD p1 -> ILOAD (u1_to_int p1)
     | BC.ILOAD_0 -> ILOAD 0
@@ -479,8 +482,8 @@ module HighInstruction = struct (* {{{ *)
     | BC.ISUB -> ISUB
     | BC.IUSHR -> IUSHR
     | BC.IXOR -> IXOR
-    | BC.JSR p1 -> JSR (abs_s_ofs_to_lbl p1)
-    | BC.JSR_W p1 -> JSR (abs_l_ofs_to_lbl p1)
+    | BC.JSR p1 -> JSR (rel_s_ofs_to_lbl p1)
+    | BC.JSR_W p1 -> JSR (rel_l_ofs_to_lbl p1)
     | BC.L2D -> L2D
     | BC.L2F -> L2F
     | BC.L2I -> L2I
@@ -541,10 +544,10 @@ module HighInstruction = struct (* {{{ *)
     | BC.SWAP -> SWAP
     | BC.TABLESWITCH (p1, p2, p3, p4) ->
       TABLESWITCH {
-	ts_lbl = abs_l_ofs_to_lbl p1;
+	ts_lbl = rel_l_ofs_to_lbl p1;
 	ts_low = s4_to_int p2;
 	ts_high = s4_to_int p3;
-	ts_ofss = List.map abs_l_ofs_to_lbl p4 }
+	ts_ofss = List.map rel_l_ofs_to_lbl p4 }
     | BC.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
     | BC.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
     | BC.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
@@ -2726,7 +2729,26 @@ module HighAttribute = struct (* {{{ *)
       OS.write_u2 enc.en_st idx;
       enc_return enc attr_signature
 
+  let instr_list_to_labeled_bc m pool l =
+    let fold (bcl, ofs) (lbl, i) =
+      let bc = HI.encode m ofs pool i in
+      ((lbl, bc)::bcl, ofs + (BC.size_of ofs bc)) in
+    List.fold_left fold ([], 0) l
+
+  let compute_ofs_map bcl =
+    let m = HI.LabelHash.create 131 in
+    let fold ofs (lbl, bc) =
+      (* could check for clashes here *)
+      HI.LabelHash.add m lbl ofs;
+      ofs + (BC.size_of ofs bc) in
+    List.fold_left fold 0 bcl
+
+      
+
   let rec encode_attr_code enc encode c =
+    let dummy_map = HI.LabelHash.create 131 in
+    
+
     (* TODO(rgrig): Figure out how to handle offsets properly. *)
     let label_to_ofs _ = failwith "todo" in
     let code_content = failwith "todo" in
@@ -2825,7 +2847,28 @@ module HighAttribute = struct (* {{{ *)
       OS.write_u2 enc.en_st idx;
       enc_return enc attr_signature
 
-  let encode_attr_inner_classes _ = failwith "todo"
+  let encode_attr_inner_classes enc l =
+      OutputStream.write_elements
+        (checked_length "inner classes")
+        enc.en_st
+        (fun st { inner_class; outer_class; inner_name; inner_flags } ->
+          let inner_idx = match inner_class with
+          | None -> U.u2 0
+          | Some c -> CP.add_class enc.en_pool c in
+          let outer_idx = match outer_class with
+          | None -> U.u2 0
+          | Some c -> CP.add_class enc.en_pool c in
+          let name_idx = match inner_name with
+          | None -> U.u2 0
+          | Some c -> CP.add_utf8 enc.en_pool c in
+          let fl = AccessFlag.list_to_u2 (inner_flags :> AccessFlag.t list) in
+          OutputStream.write_u2 enc.en_st inner_idx;
+          OutputStream.write_u2 enc.en_st outer_idx;
+          OutputStream.write_u2 enc.en_st name_idx;
+          OutputStream.write_u2 enc.en_st fl)
+        l;
+      enc_return enc attr_inner_classes
+
   let encode_attr_line_number_table _ = failwith "todo"
   let encode_attr_local_variable_table _ = failwith "todo"
   let encode_attr_local_variable_type_table _ = failwith "todo"
@@ -2886,7 +2929,7 @@ module HighAttribute = struct (* {{{ *)
     | `EnclosingMethod em -> encode_attr_enclosing_method enc em
     | `Exceptions l -> encode_attr_exceptions enc l
     | `FieldSignature s -> encode_attr_field_signature enc s
-    | `InnerClasses _ -> encode_attr_inner_classes ()
+    | `InnerClasses l -> encode_attr_inner_classes enc l
     | `LineNumberTable _ -> encode_attr_line_number_table ()
     | `LocalVariableTable _ -> encode_attr_local_variable_table ()
     | `LocalVariableTypeTable _ -> encode_attr_local_variable_type_table ()
