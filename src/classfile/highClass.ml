@@ -2735,11 +2735,12 @@ module HighAttribute = struct (* {{{ *)
       OS.write_u2 enc.en_st idx;
       enc_return enc attr_signature
 
-  let instr_list_to_labeled_bc m pool l =
+  let i_list_to_labeled_bc_list m pool l =
     let fold (bcl, ofs) (lbl, i) =
-      let bc = HI.encode m ofs pool i in
+      let bc = HI.encode (HI.LabelHash.find m) ofs pool i in
       ((lbl, bc)::bcl, ofs + (BC.size_of ofs bc)) in
-    List.fold_left fold ([], 0) l
+    let bcl, _ = List.fold_left fold ([], 0) l in
+    bcl
 
   let compute_ofs_map bcl =
     let m = HI.LabelHash.create 131 in
@@ -2747,17 +2748,23 @@ module HighAttribute = struct (* {{{ *)
       (* could check for clashes here *)
       HI.LabelHash.add m lbl ofs;
       ofs + (BC.size_of ofs bc) in
-    List.fold_left fold 0 bcl
+    List.fold_left fold 0 bcl;
+    m
 
-      
+  let encode_instr_list pool l =
+    let dummy_map = HI.LabelHash.create 131 in
+    let rec fix_map m bcl =
+      let m' = compute_ofs_map bcl in
+      if m = m' then (m, List.map snd bcl)
+      else
+	let bcl' = i_list_to_labeled_bc_list m' pool l in
+	fix_map m' bcl' in
+    let bcl = i_list_to_labeled_bc_list dummy_map pool l in
+    fix_map dummy_map bcl
 
   let rec encode_attr_code enc encode c =
-    let dummy_map = HI.LabelHash.create 131 in
-    
-
-    (* TODO(rgrig): Figure out how to handle offsets properly. *)
-    let label_to_ofs _ = failwith "todo" in
-    let code_content = failwith "todo" in
+    let m, code_content = encode_instr_list enc.en_pool c.code in
+    let label_to_ofs = HI.LabelHash.find m in
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
@@ -2777,9 +2784,9 @@ module HighAttribute = struct (* {{{ *)
         let catch_idx = match elem.caught with
         | Some exn_name -> CP.add_class enc.en_pool exn_name
         | None -> U.u2 0 in
-        OS.write_u2 st (label_to_ofs elem.try_start);
-        OS.write_u2 st (label_to_ofs elem.try_end);
-        OS.write_u2 st (label_to_ofs elem.catch);
+        OS.write_u2 st (U.u2 (label_to_ofs elem.try_start));
+        OS.write_u2 st (U.u2 (label_to_ofs elem.try_end));
+        OS.write_u2 st (U.u2 (label_to_ofs elem.catch));
         OS.write_u2 st catch_idx)
       c.exception_table;
     let len' = checked_length "Attributes" c.attributes in
