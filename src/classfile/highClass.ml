@@ -559,9 +559,15 @@ module HighInstruction = struct (* {{{ *)
     | BC.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
     | BC.WIDE_RET p1 -> RET (u2_to_int p1)
 
-  let encode (ool : label -> int) pool offset instruction =
-    let sro_of_label d =
-      U.s2 (ool d - offset) in
+  (* NOTE: The current implementation generates suboptimal bytecode, but it
+  ensures that the chosen opcodes do not depend on [ool] or on [here]. We do
+  intend to generate better bytecode, but that requires calling this encode
+  (from [encode_attr_code] in a sort-of fixed-point computation. *)
+  let encode (ool : label -> int) here pool instruction =
+    let offset l = ool l - here in
+    let s2_offset l = U.s2 (offset l) in
+    let s4_offset l = U.s4 (Int32.of_int (offset l)) in
+    (* TODO(rgrig): Move fits_* in Utils. *)
     let fits_u k x =
       let bits = 8 * k in
       assert (0 <= bits && bits < 32);
@@ -614,87 +620,32 @@ module HighInstruction = struct (* {{{ *)
       | `Long _
       | `Double _
           -> 2 in
+    let bc_INVOKEVIRTUAL p = BC.INVOKEVIRTUAL (match p with
+      | `Class_or_interface c, n, t -> CP.add_method pool c n t
+      | `Array_type a, n, t -> CP.add_array_method pool a n t) in
+
+    (* Helpers that pick between wide and narrow versions of instructions. *)
     let bc_LDC c =
       let j = index_of_constant c in
       if size_of_constant c = 2 then
         BC.LDC2_W (U.u2 j)
       else
-        (if fits_u 1 j then BC.LDC (U.u1 j) else BC.LDC_W (U.u2 j)) in
-    let bc_ALOAD = function
-      | 0 -> BC.ALOAD_0
-      | 1 -> BC.ALOAD_1
-      | 2 -> BC.ALOAD_2
-      | 3 -> BC.ALOAD_3
-      | c -> BC.ALOAD (U.u1 c) in
-    let bc_ASTORE = function
-      | 0 -> BC.ASTORE_0
-      | 1 -> BC.ASTORE_1
-      | 2 -> BC.ASTORE_2
-      | 3 -> BC.ASTORE_3
-      | c -> BC.ASTORE (U.u1 c) in
-    let bc_DLOAD = function
-      | 0 -> BC.DLOAD_0
-      | 1 -> BC.DLOAD_1
-      | 2 -> BC.DLOAD_2
-      | 3 -> BC.DLOAD_3
-      | c -> BC.DLOAD (U.u1 c) in
-    let bc_DSTORE = function
-      | 0 -> BC.DSTORE_0
-      | 1 -> BC.DSTORE_1
-      | 2 -> BC.DSTORE_2
-      | 3 -> BC.DSTORE_3
-      | c -> BC.DSTORE (U.u1 c) in
-    let bc_ILOAD = function
-      | 0 -> BC.ILOAD_0
-      | 1 -> BC.ILOAD_1
-      | 2 -> BC.ILOAD_2
-      | 3 -> BC.ILOAD_3
-      | c -> BC.ILOAD (U.u1 c) in
-    let bc_ISTORE = function
-      | 0 -> BC.ISTORE_0
-      | 1 -> BC.ISTORE_1
-      | 2 -> BC.ISTORE_2
-      | 3 -> BC.ISTORE_3
-      | c -> BC.ISTORE (U.u1 c) in
-    let bc_FLOAD = function
-      | 0 -> BC.FLOAD_0
-      | 1 -> BC.FLOAD_1
-      | 2 -> BC.FLOAD_2
-      | 3 -> BC.FLOAD_3
-      | c -> BC.FLOAD (U.u1 c) in
-    let bc_FSTORE = function
-      | 0 -> BC.FSTORE_0
-      | 1 -> BC.FSTORE_1
-      | 2 -> BC.FSTORE_2
-      | 3 -> BC.FSTORE_3
-      | c -> BC.FSTORE (U.u1 c) in
-    let bc_LLOAD = function
-      | 0 -> BC.LLOAD_0
-      | 1 -> BC.LLOAD_1
-      | 2 -> BC.LLOAD_2
-      | 3 -> BC.LLOAD_3
-      | c -> BC.LLOAD (U.u1 c) in
-    let bc_LSTORE = function
-      | 0 -> BC.LSTORE_0
-      | 1 -> BC.LSTORE_1
-      | 2 -> BC.LSTORE_2
-      | 3 -> BC.LSTORE_3
-      | c -> BC.LSTORE (U.u1 c) in
-    let bc_GOTO l =
-      let x = offset - ool l in
-      if fits_s 2 x then
-        BC.GOTO (U.s2 x)
-      else
-        BC.GOTO_W (U.s4 (Int32.of_int x)) in
-    let bc_JSR l =
-      let x = ool l in
-      if fits_s 2 x then
-        BC.JSR (U.s2 x)
-      else
-        BC.JSR_W (U.s4 (Int32.of_int x)) in
-    let bc_INVOKEVIRTUAL p = BC.INVOKEVIRTUAL (match p with
-      | `Class_or_interface c, n, t -> CP.add_method pool c n t
-      | `Array_type a, n, t -> CP.add_array_method pool a n t) in
+        BC.LDC_W (U.u2 j) in
+    let bc_ALOAD x = BC.WIDE_ALOAD (U.u2 x) in
+    let bc_ASTORE x = BC.WIDE_ASTORE (U.u2 x) in
+    let bc_DLOAD x = BC.WIDE_DLOAD (U.u2 x) in
+    let bc_DSTORE x = BC.WIDE_DSTORE (U.u2 x) in
+    let bc_FLOAD x = BC.WIDE_FLOAD (U.u2 x) in
+    let bc_FSTORE x = BC.WIDE_FSTORE (U.u2 x) in
+    let bc_ILOAD x = BC.WIDE_ILOAD (U.u2 x) in
+    let bc_ISTORE x = BC.WIDE_ISTORE (U.u2 x) in
+    let bc_LLOAD x = BC.WIDE_LLOAD (U.u2 x) in
+    let bc_LSTORE x = BC.WIDE_LSTORE (U.u2 x) in
+    let bc_RET x = BC.WIDE_RET (U.u2 x) in
+    let bc_IINC { ii_var; ii_inc } = BC.WIDE_IINC (U.u2 ii_var, U.s2 ii_inc) in
+    let bc_GOTO l = BC.GOTO_W (s4_offset l) in
+    let bc_JSR l = BC.JSR_W (s4_offset l) in
+
     match instruction with
     | AALOAD -> BC.AALOAD
     | AASTORE -> BC.AASTORE
@@ -775,23 +726,23 @@ module HighInstruction = struct (* {{{ *)
     | ICONST_5 -> BC.ICONST_5
     | ICONST_M1 -> BC.ICONST_M1
     | IDIV -> BC.IDIV
-    | IF_ACMPEQ p1 -> BC.IF_ACMPEQ (sro_of_label p1)
-    | IF_ACMPNE p1 -> BC.IF_ACMPNE (sro_of_label p1)
-    | IF_ICMPEQ p1 -> BC.IF_ICMPEQ (sro_of_label p1)
-    | IF_ICMPGE p1 -> BC.IF_ICMPGE (sro_of_label p1)
-    | IF_ICMPGT p1 -> BC.IF_ICMPGT (sro_of_label p1)
-    | IF_ICMPLE p1 -> BC.IF_ICMPLE (sro_of_label p1)
-    | IF_ICMPLT p1 -> BC.IF_ICMPLT (sro_of_label p1)
-    | IF_ICMPNE p1 -> BC.IF_ICMPNE (sro_of_label p1)
-    | IFEQ p1 -> BC.IFEQ (sro_of_label p1)
-    | IFGE p1 -> BC.IFGE (sro_of_label p1)
-    | IFGT p1 -> BC.IFGT (sro_of_label p1)
-    | IFLE p1 -> BC.IFLE (sro_of_label p1)
-    | IFLT p1 -> BC.IFLT (sro_of_label p1)
-    | IFNE p1 -> BC.IFNE (sro_of_label p1)
-    | IFNONNULL p1 -> BC.IFNONNULL (sro_of_label p1)
-    | IFNULL p1 -> BC.IFNULL (sro_of_label p1)
-    | IINC { ii_var; ii_inc } -> BC.IINC (U.u1 ii_var, U.s1 ii_inc)
+    | IF_ACMPEQ p1 -> BC.IF_ACMPEQ (s2_offset p1)
+    | IF_ACMPNE p1 -> BC.IF_ACMPNE (s2_offset p1)
+    | IF_ICMPEQ p1 -> BC.IF_ICMPEQ (s2_offset p1)
+    | IF_ICMPGE p1 -> BC.IF_ICMPGE (s2_offset p1)
+    | IF_ICMPGT p1 -> BC.IF_ICMPGT (s2_offset p1)
+    | IF_ICMPLE p1 -> BC.IF_ICMPLE (s2_offset p1)
+    | IF_ICMPLT p1 -> BC.IF_ICMPLT (s2_offset p1)
+    | IF_ICMPNE p1 -> BC.IF_ICMPNE (s2_offset p1)
+    | IFEQ p1 -> BC.IFEQ (s2_offset p1)
+    | IFGE p1 -> BC.IFGE (s2_offset p1)
+    | IFGT p1 -> BC.IFGT (s2_offset p1)
+    | IFLE p1 -> BC.IFLE (s2_offset p1)
+    | IFLT p1 -> BC.IFLT (s2_offset p1)
+    | IFNE p1 -> BC.IFNE (s2_offset p1)
+    | IFNONNULL p1 -> BC.IFNONNULL (s2_offset p1)
+    | IFNULL p1 -> BC.IFNULL (s2_offset p1)
+    | IINC x -> bc_IINC x
     | ILOAD p1 -> bc_ILOAD p1
     | IMUL -> BC.IMUL
     | INEG -> BC.INEG
@@ -845,7 +796,7 @@ module HighInstruction = struct (* {{{ *)
     | POP2 -> BC.POP2
     | PUTFIELD (c, n, t) -> BC.PUTFIELD (CP.add_field pool c n t)
     | PUTSTATIC (c, n, t) -> BC.PUTSTATIC (CP.add_field pool c n t)
-    | RET p1 -> BC.RET (U.u1 p1)
+    | RET p1 -> bc_RET p1
     | RETURN -> BC.RETURN
     | SALOAD -> BC.SALOAD
     | SASTORE -> BC.SASTORE
@@ -1305,7 +1256,7 @@ module SymbExe = struct  (* {{{ *)
 	  else [acc]
     and g_set acc = List.flatten (List.map g acc) in
     g_set [init, 0]
-	
+
   (* was StackState.update *)
   let step st (lbl, i) =
     let locals = Array.copy st.locals in
@@ -2121,14 +2072,14 @@ let make_array_unifier (f : Name.for_class unifier) (x : Descriptor.array_type) 
       | `Array x -> `Array_type (`Array x)
       | _ -> java_lang_Object)
   with Not_found -> java_lang_Object
-    
+
 let make_unifier f x y =
   let array_unifier = make_array_unifier f in
   match x, y with
     | (`Array_type at1), (`Array_type at2) -> array_unifier at1 at2
     | (`Class_or_interface cn1), (`Class_or_interface cn2) -> `Class_or_interface (f cn1 cn2)
     | _ -> java_lang_Object
-      
+
 let unify_to_java_lang_Object =
   let utjlo x y =
     if Name.equal_for_class x y then
@@ -2136,7 +2087,7 @@ let unify_to_java_lang_Object =
     else
       java_lang_Object_name in
   make_unifier utjlo
-    
+
 let unify_to_closest_common_parent cl l =
   let rec parents cn =
     let hd, prn =
