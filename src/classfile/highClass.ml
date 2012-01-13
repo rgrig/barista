@@ -13,6 +13,7 @@ module U = Utils
 (* }}} *)
 (* errors *) (* {{{ *)
 type error =
+  | Invalid_TABLESWITCH
   | Invalid_attribute
   | Invalid_code_length
   | Invalid_constant_value
@@ -24,35 +25,36 @@ type error =
   | Invalid_pool_entry
   | Invalid_primitive_array_type
   | Misplaced_attribute of (string * string)
-  | Too_many of string
-  | Unsupported_instruction of string
-  | SE_empty_stack
-  | SE_invalid_stack_top of (string * string)
-  | SE_reference_expected of string
   | SE_array_expected of string
-  | SE_invalid_local_index of (int * int)
-  | SE_invalid_local_contents of (int * string * string)
   | SE_category1_expected of string
   | SE_category2_expected of string
   | SE_different_stack_sizes of (int * int)
+  | SE_empty_stack
+  | SE_invalid_local_contents of (int * string * string)
+  | SE_invalid_local_index of (int * int)
+  | SE_invalid_stack_top of (string * string)
+  | SE_reference_expected of string
+  | Too_many of string
+  | Unsupported_instruction of string
 
 exception Exception of error
 
 let fail e = raise (Exception e)
 
 let string_of_error = function
-  | Unsupported_instruction s -> "unsupported instruction: " ^ s
+  | Invalid_TABLESWITCH -> "TABLESWITCH with empty range [low..high]"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
-  | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
-  | SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
-  | SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
-  | SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
   | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
-  | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
-  | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
   | SE_category1_expected s -> "SE: found " ^ s ^ " where a value of category 1 was expected"
   | SE_category2_expected s -> "SE: found " ^ s ^ " where a value of category 2 was expected"
   | SE_different_stack_sizes (s, s') -> "SE: saw a stack with size " ^ (string_of_int s) ^ " but expected one with size " ^ (string_of_int s')
+  | SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
+  | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
+  | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
+  | SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
+  | SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
+  | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
+  | Unsupported_instruction s -> "unsupported instruction: " ^ s
   | _ -> "undescribed error (todo)"
 
 let checked_length s l =
@@ -78,7 +80,7 @@ module HighInstruction = struct (* {{{ *)
 
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
-  type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }
+  type tableswitch = { ts_def: label; ts_low: int; ts_high: int; ts_ofss: label list }
 
   type instruction =
     | AALOAD
@@ -544,7 +546,7 @@ module HighInstruction = struct (* {{{ *)
     | BC.SWAP -> SWAP
     | BC.TABLESWITCH (p1, p2, p3, p4) ->
       TABLESWITCH {
-	ts_lbl = rel_l_ofs_to_lbl p1;
+	ts_def = rel_l_ofs_to_lbl p1;
 	ts_low = s4_to_int p2;
 	ts_high = s4_to_int p3;
 	ts_ofss = List.map rel_l_ofs_to_lbl p4 }
@@ -567,9 +569,10 @@ module HighInstruction = struct (* {{{ *)
   intend to generate better bytecode, but that requires calling this encode
   (from [encode_attr_code] in a sort-of fixed-point computation. *)
   let encode (ool : label -> int) here pool instruction =
+    let s4 x = U.s4 (Int32.of_int x) in
     let offset l = ool l - here in
     let s2_offset l = U.s2 (offset l) in
-    let s4_offset l = U.s4 (Int32.of_int (offset l)) in
+    let s4_offset l = s4 (offset l) in
     (* TODO(rgrig): Move fits_* in Utils. *)
     let fits_u k x =
       let bits = 8 * k in
@@ -626,6 +629,18 @@ module HighInstruction = struct (* {{{ *)
     let bc_INVOKEVIRTUAL p = BC.INVOKEVIRTUAL (match p with
       | `Class_or_interface c, n, t -> CP.add_method pool c n t
       | `Array_type a, n, t -> CP.add_array_method pool a n t) in
+    let bc_LOOKUPSWITCH { ls_def; ls_branches } =
+      let def = s4_offset ls_def in
+      let cnt = s4 (List.length ls_branches) in
+      let eb (v, l) = (s4 v, s4_offset l) in
+      let jmp = List.map eb (List.sort compare ls_branches) in
+      BC.LOOKUPSWITCH (def, cnt, jmp) in
+    let bc_TABLESWITCH { ts_def; ts_low; ts_high; ts_ofss } =
+      if ts_low > ts_high then fail Invalid_TABLESWITCH;
+      let def = s4_offset ts_def in
+      let low, high = s4 ts_low, s4 ts_high in
+      let ofss = List.map s4_offset ts_ofss in
+      BC.TABLESWITCH (def, low, high, ofss) in
 
     (* Helpers that pick between wide and narrow versions of instructions. *)
     let bc_LDC c =
@@ -779,7 +794,7 @@ module HighInstruction = struct (* {{{ *)
     | LLOAD p1 -> bc_LLOAD p1
     | LMUL -> BC.LMUL
     | LNEG -> BC.LNEG
-    | LOOKUPSWITCH _ -> failwith "todo"
+    | LOOKUPSWITCH x -> bc_LOOKUPSWITCH x
     | LOR -> BC.LOR
     | LREM -> BC.LREM
     | LRETURN -> BC.LRETURN
@@ -805,7 +820,7 @@ module HighInstruction = struct (* {{{ *)
     | SASTORE -> BC.SASTORE
     | SIPUSH p1 -> BC.SIPUSH (U.s2 p1)
     | SWAP -> BC.SWAP
-    | TABLESWITCH _ -> failwith "todo"
+    | TABLESWITCH x -> bc_TABLESWITCH x
 
   let version_bounds (_, inst) = match inst with
     | AALOAD -> Version.make_bounds "'AALOAD' instruction" Version.Java_1_0 None
@@ -1246,7 +1261,7 @@ module SymbExe = struct  (* {{{ *)
 	  else [acc]
 	| HI.TABLESWITCH ts ->
 	  if (record n acc) then
-	  let targets = ts.HI.ts_lbl :: ts.HI.ts_ofss in
+	  let targets = ts.HI.ts_def :: ts.HI.ts_ofss in
 	  g_set (List.map (fun t -> f acc (l, i), t) targets)
 	  else [acc]
 	(* unsupported *)

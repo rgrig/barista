@@ -15,7 +15,7 @@ module HighInstruction : sig (* {{{ *)
   val fresh_label : unit -> label
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
-  type tableswitch = { ts_lbl: label; ts_low: int; ts_high: int; ts_ofss: label list }
+  type tableswitch = { ts_def: label; ts_low: int; ts_high: int; ts_ofss: label list }
   type instruction =
     | AALOAD
     | AASTORE
@@ -350,6 +350,7 @@ type t = {
   }
 
 type error =
+  | Invalid_TABLESWITCH
   | Invalid_attribute
   | Invalid_code_length
   | Invalid_constant_value
@@ -361,17 +362,17 @@ type error =
   | Invalid_pool_entry
   | Invalid_primitive_array_type
   | Misplaced_attribute of (string * string)
-  | Too_many of string
-  | Unsupported_instruction of string
-  | SE_empty_stack
-  | SE_invalid_stack_top of (string * string)
-  | SE_reference_expected of string
   | SE_array_expected of string
-  | SE_invalid_local_index of (int * int)
-  | SE_invalid_local_contents of (int * string * string)
   | SE_category1_expected of string
   | SE_category2_expected of string
   | SE_different_stack_sizes of (int * int)
+  | SE_empty_stack
+  | SE_invalid_local_contents of (int * string * string)
+  | SE_invalid_local_index of (int * int)
+  | SE_invalid_stack_top of (string * string)
+  | SE_reference_expected of string
+  | Too_many of string
+  | Unsupported_instruction of string
 
 exception Exception of error
 
