@@ -25,4 +25,5 @@ let () =
       | Version.Exception e -> printf "  %s@." (Version.string_of_error e)
       | Name.Exception e -> printf "  %s@." (Name.string_of_error e)
       | AccessFlag.Exception e -> printf "  %s@." (AccessFlag.string_of_error e)
+      | HC.Exception e -> printf "  %s@." (HC.string_of_error e)
   done

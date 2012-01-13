@@ -1,5 +1,6 @@
 (* open modules *) (* {{{ *)
 open Consts
+open Format
 (* }}} *)
 (* module shorthands *) (* {{{ *)
 module AF = AccessFlag
@@ -272,297 +273,297 @@ module HighInstruction = struct (* {{{ *)
 *)
     let rel_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (ofs + (s :> int)) in
     let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + Int32.to_int (s :> Int32.t)) in
-  let entry = CP.get_entry pool in
-  let utf8 = CP.get_utf8_entry pool in
-  let get_class_or_array i =
-    let s = utf8 i in
-    if U.UChar.equal opening_square_bracket (U.UTF8.get s 0) then
-      let t = Descriptor.java_type_of_internal_utf8 s in
-      `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type t)
-    else
-      `Class_or_interface (Name.make_for_class_from_internal s) in
-  let get_field_ref cls nat = match entry cls, entry nat with
-    | CP.Class i1, CP.NameAndType (i2, i3) ->
-        (Name.make_for_class_from_internal (utf8 i1),
-         Name.make_for_field (utf8 i2),
-         Descriptor.field_of_utf8 (utf8 i3))
-    | _ -> fail Invalid_pool_entry in
-  let get_method_ref cls nat = match entry cls, entry nat with
-    | CP.Class i1, CP.NameAndType (i2, i3) ->
-        (Name.make_for_class_from_internal (utf8 i1),
-          Name.make_for_method (utf8 i2),
-          Descriptor.method_of_utf8 (utf8 i3))
-    | _ -> fail Invalid_pool_entry in
-  let get_special_ref cls nat = match entry cls, entry nat with
-    | CP.Class i1, CP.NameAndType (i2, i3)
-      when U.UTF8.equal (utf8 i2) class_constructor ->
-        (Name.make_for_class_from_internal (utf8 i1),
-          fst (Descriptor.method_of_utf8 (utf8 i3)))
-    | _ -> fail Invalid_pool_entry in
-  let get_array_method_ref cls nat = match entry cls, entry nat with
-    | CP.Class i1, CP.NameAndType (i2, i3) ->
-        (get_class_or_array i1,
-          Name.make_for_method (utf8 i2),
-          Descriptor.method_of_utf8 (utf8 i3))
-    | _ -> fail Invalid_pool_entry in
-  let primitive_array_type_of_int = function
-    | 4 -> `Boolean
-    | 5 -> `Char
-    | 6 -> `Float
-    | 7 -> `Double
-    | 8 -> `Byte
-    | 9 -> `Short
-    | 10 -> `Int
-    | 11 -> `Long
-    | _ -> fail Invalid_primitive_array_type in
-  let get_method_handle kind idx =
-    match kind, entry idx with
-    | CP.REF_getField, CP.Fieldref (fc, nt) ->
-      `getField (get_field_ref fc nt)
-    | CP.REF_getStatic, CP.Fieldref (fc, nt) ->
-      `getStatic (get_field_ref fc nt)
-    | CP.REF_putField, CP.Fieldref (fc, nt) ->
-      `putField (get_field_ref fc nt)
-    | CP.REF_putStatic, CP.Fieldref (fc, nt) ->
-      `putStatic (get_field_ref fc nt)
-    | CP.REF_invokeVirtual, CP.Methodref (mc, mt) ->
-      `invokeVirtual (get_method_ref mc mt)
-    | CP.REF_invokeStatic, CP.Methodref (mc, mt) ->
-      `invokeStatic (get_method_ref mc mt)
-    | CP.REF_invokeSpecial, CP.Methodref (mc, mt) ->
-      `invokeSpecial (get_method_ref mc mt)
-    | CP.REF_newInvokeSpecial, CP.Methodref (mc, mt) ->
-      `newInvokeSpecial (get_special_ref mc mt)
-    | CP.REF_invokeInterface, CP.Methodref (mc, mt) ->
-      `invokeInterface (get_method_ref mc mt)
-    | _ -> fail Invalid_method_handle in
-  function
-    | BC.AALOAD -> AALOAD
-    | BC.AASTORE -> AASTORE
-    | BC.ACONST_NULL -> ACONST_NULL
-    | BC.ALOAD p1 -> ALOAD (u1_to_int p1)
-    | BC.ALOAD_0 -> ALOAD 0
-    | BC.ALOAD_1 -> ALOAD 1
-    | BC.ALOAD_2 -> ALOAD 2
-    | BC.ALOAD_3 -> ALOAD 3
-    | BC.ANEWARRAY p1 -> ANEWARRAY (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-    | BC.ARETURN -> ARETURN
-    | BC.ARRAYLENGTH -> ARRAYLENGTH
-    | BC.ASTORE p1 -> ASTORE (u1_to_int p1)
-    | BC.ASTORE_0 -> ASTORE 0
-    | BC.ASTORE_1 -> ASTORE 1
-    | BC.ASTORE_2 -> ASTORE 2
-    | BC.ASTORE_3 -> ASTORE 3
-    | BC.ATHROW -> ATHROW
-    | BC.BALOAD -> BALOAD
-    | BC.BASTORE -> BASTORE
-    | BC.BIPUSH p1 -> BIPUSH (s1_to_int p1)
-    | BC.CALOAD -> CALOAD
-    | BC.CASTORE -> CASTORE
-    | BC.CHECKCAST p1 -> CHECKCAST (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-    | BC.D2F -> D2F
-    | BC.D2I -> D2I
-    | BC.D2L -> D2L
-    | BC.DADD -> DADD
-    | BC.DALOAD -> DALOAD
-    | BC.DASTORE -> DASTORE
-    | BC.DCMPG -> DCMPG
-    | BC.DCMPL -> DCMPL
-    | BC.DCONST_0 -> DCONST_0
-    | BC.DCONST_1 -> DCONST_1
-    | BC.DDIV -> DDIV
-    | BC.DLOAD p1 -> DLOAD (u1_to_int p1)
-    | BC.DLOAD_0 -> DLOAD 0
-    | BC.DLOAD_1 -> DLOAD 1
-    | BC.DLOAD_2 -> DLOAD 2
-    | BC.DLOAD_3 -> DLOAD 3
-    | BC.DMUL -> DMUL
-    | BC.DNEG -> DNEG
-    | BC.DREM -> DREM
-    | BC.DRETURN -> DRETURN
-    | BC.DSTORE p1 -> DSTORE (u1_to_int p1)
-    | BC.DSTORE_0 -> DSTORE 0
-    | BC.DSTORE_1 -> DSTORE 1
-    | BC.DSTORE_2 -> DSTORE 2
-    | BC.DSTORE_3 -> DSTORE 3
-    | BC.DSUB -> DSUB
-    | BC.DUP -> DUP
-    | BC.DUP2 -> DUP2
-    | BC.DUP2_X1 -> DUP2_X1
-    | BC.DUP2_X2 -> DUP2_X2
-    | BC.DUP_X1 -> DUP_X1
-    | BC.DUP_X2 -> DUP_X2
-    | BC.F2D -> F2D
-    | BC.F2I -> F2I
-    | BC.F2L -> F2L
-    | BC.FADD -> FADD
-    | BC.FALOAD -> FALOAD
-    | BC.FASTORE -> FASTORE
-    | BC.FCMPG -> FCMPG
-    | BC.FCMPL -> FCMPL
-    | BC.FCONST_0 -> FCONST_0
-    | BC.FCONST_1 -> FCONST_1
-    | BC.FCONST_2 -> FCONST_2
-    | BC.FDIV -> FDIV
-    | BC.FLOAD p1 -> FLOAD (u1_to_int p1)
-    | BC.FLOAD_0 -> FLOAD 0
-    | BC.FLOAD_1 -> FLOAD 1
-    | BC.FLOAD_2 -> FLOAD 2
-    | BC.FLOAD_3 -> FLOAD 3
-    | BC.FMUL -> FMUL
-    | BC.FNEG -> FNEG
-    | BC.FREM -> FREM
-    | BC.FRETURN -> FRETURN
-    | BC.FSTORE p1 -> FSTORE (u1_to_int p1)
-    | BC.FSTORE_0 -> FSTORE 0
-    | BC.FSTORE_1 -> FSTORE 1
-    | BC.FSTORE_2 -> FSTORE 2
-    | BC.FSTORE_3 -> FSTORE 3
-    | BC.FSUB -> FSUB
-    | BC.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.GOTO p1 -> GOTO (rel_s_ofs_to_lbl p1)
-    | BC.GOTO_W p1 -> GOTO (rel_l_ofs_to_lbl p1)
-    | BC.I2B -> I2B
-    | BC.I2C -> I2C
-    | BC.I2D -> I2D
-    | BC.I2F -> I2F
-    | BC.I2L -> I2L
-    | BC.I2S -> I2S
-    | BC.IADD -> IADD
-    | BC.IALOAD -> IALOAD
-    | BC.IAND -> IAND
-    | BC.IASTORE -> IASTORE
-    | BC.ICONST_0 -> ICONST_0
-    | BC.ICONST_1 -> ICONST_1
-    | BC.ICONST_2 -> ICONST_2
-    | BC.ICONST_3 -> ICONST_3
-    | BC.ICONST_4 -> ICONST_4
-    | BC.ICONST_5 -> ICONST_5
-    | BC.ICONST_M1 -> ICONST_M1
-    | BC.IDIV -> IDIV
-    | BC.IF_ACMPEQ p1 -> IF_ACMPEQ (rel_s_ofs_to_lbl p1)
-    | BC.IF_ACMPNE p1 -> IF_ACMPNE (rel_s_ofs_to_lbl p1)
-    | BC.IF_ICMPEQ p1 -> IF_ICMPEQ (rel_s_ofs_to_lbl p1)
-    | BC.IF_ICMPGE p1 -> IF_ICMPGE (rel_s_ofs_to_lbl p1)
-    | BC.IF_ICMPGT p1 -> IF_ICMPGT (rel_s_ofs_to_lbl p1)
-    | BC.IF_ICMPLE p1 -> IF_ICMPLE (rel_s_ofs_to_lbl p1)
-    | BC.IF_ICMPLT p1 -> IF_ICMPLT (rel_s_ofs_to_lbl p1)
-    | BC.IF_ICMPNE p1 -> IF_ICMPNE (rel_s_ofs_to_lbl p1)
-    | BC.IFEQ p1 -> IFEQ (rel_s_ofs_to_lbl p1)
-    | BC.IFGE p1 -> IFGE (rel_s_ofs_to_lbl p1)
-    | BC.IFGT p1 -> IFGT (rel_s_ofs_to_lbl p1)
-    | BC.IFLE p1 -> IFLE (rel_s_ofs_to_lbl p1)
-    | BC.IFLT p1 -> IFLT (rel_s_ofs_to_lbl p1)
-    | BC.IFNE p1 -> IFNE (rel_s_ofs_to_lbl p1)
-    | BC.IFNONNULL p1 -> IFNONNULL (rel_s_ofs_to_lbl p1)
-    | BC.IFNULL p1 -> IFNULL (rel_s_ofs_to_lbl p1)
-    | BC.IINC (p1, p2) -> IINC { ii_var = u1_to_int p1; ii_inc = s1_to_int p2 }
-    | BC.ILOAD p1 -> ILOAD (u1_to_int p1)
-    | BC.ILOAD_0 -> ILOAD 0
-    | BC.ILOAD_1 -> ILOAD 1
-    | BC.ILOAD_2 -> ILOAD 2
-    | BC.ILOAD_3 -> ILOAD 3
-    | BC.IMUL -> IMUL
-    | BC.INEG -> INEG
-    | BC.INSTANCEOF p1 -> INSTANCEOF (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-    | BC.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
-    | BC.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
-    | BC.INVOKESPECIAL p1 -> INVOKESPECIAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.INVOKESTATIC p1 -> INVOKESTATIC (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.IOR -> IOR
-    | BC.IREM -> IREM
-    | BC.IRETURN -> IRETURN
-    | BC.ISHL -> ISHL
-    | BC.ISHR -> ISHR
-    | BC.ISTORE p1 -> ISTORE (u1_to_int p1)
-    | BC.ISTORE_0 -> ISTORE 0
-    | BC.ISTORE_1 -> ISTORE 1
-    | BC.ISTORE_2 -> ISTORE 2
-    | BC.ISTORE_3 -> ISTORE 3
-    | BC.ISUB -> ISUB
-    | BC.IUSHR -> IUSHR
-    | BC.IXOR -> IXOR
-    | BC.JSR p1 -> JSR (rel_s_ofs_to_lbl p1)
-    | BC.JSR_W p1 -> JSR (rel_l_ofs_to_lbl p1)
-    | BC.L2D -> L2D
-    | BC.L2F -> L2F
-    | BC.L2I -> L2I
-    | BC.LADD -> LADD
-    | BC.LALOAD -> LALOAD
-    | BC.LAND -> LAND
-    | BC.LASTORE -> LASTORE
-    | BC.LCMP -> LCMP
-    | BC.LCONST_0 -> LCONST_0
-    | BC.LCONST_1 -> LCONST_1
-    | BC.LDC p1 -> LDC (match entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-    | BC.LDC2_W p1 -> LDC (match entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
-    | BC.LDC_W p1 -> LDC (match entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-    | BC.LDIV -> LDIV
-    | BC.LLOAD p1 -> LLOAD (u1_to_int p1)
-    | BC.LLOAD_0 -> LLOAD 0
-    | BC.LLOAD_1 -> LLOAD 1
-    | BC.LLOAD_2 -> LLOAD 2
-    | BC.LLOAD_3 -> LLOAD 3
-    | BC.LMUL -> LMUL
-    | BC.LNEG -> LNEG
-    | BC.LOOKUPSWITCH (p1, p2, p3) ->
-      let keys, offsets = List.split p3 in
-      let labels = List.map rel_l_ofs_to_lbl offsets in
-      let items = List.map s4_to_int keys in
-    (* bytecode parser should ensure this *)
-      assert (s4_to_int p2 = List.length p3);
-      LOOKUPSWITCH { ls_def = rel_l_ofs_to_lbl p1
-		   ; ls_branches = List.combine items labels }
-    | BC.LOR -> LOR
-    | BC.LREM -> LREM
-    | BC.LRETURN -> LRETURN
-    | BC.LSHL -> LSHL
-    | BC.LSHR -> LSHR
-    | BC.LSTORE p1 -> LSTORE (u1_to_int p1)
-    | BC.LSTORE_0 -> LSTORE 0
-    | BC.LSTORE_1 -> LSTORE 1
-    | BC.LSTORE_2 -> LSTORE 2
-    | BC.LSTORE_3 -> LSTORE 3
-    | BC.LSUB -> LSUB
-    | BC.LUSHR -> LUSHR
-    | BC.LXOR -> LXOR
-    | BC.MONITORENTER -> MONITORENTER
-    | BC.MONITOREXIT -> MONITOREXIT
-    | BC.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
-    | BC.NEW p1 -> NEW (match entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (utf8 idx)) | _ -> fail Invalid_pool_element)
-    | BC.NEWARRAY p1 -> NEWARRAY (primitive_array_type_of_int (p1 :> int))
-    | BC.NOP -> NOP
-    | BC.POP -> POP
-    | BC.POP2 -> POP2
-    | BC.PUTFIELD p1 -> PUTFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.PUTSTATIC p1 -> PUTSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-    | BC.RET p1 -> RET (u1_to_int p1)
-    | BC.RETURN -> RETURN
-    | BC.SALOAD -> SALOAD
-    | BC.SASTORE -> SASTORE
-    | BC.SIPUSH p1 -> SIPUSH (s2_to_int p1)
-    | BC.SWAP -> SWAP
-    | BC.TABLESWITCH (p1, p2, p3, p4) ->
-      TABLESWITCH {
-	ts_def = rel_l_ofs_to_lbl p1;
-	ts_low = s4_to_int p2;
-	ts_high = s4_to_int p3;
-	ts_ofss = List.map rel_l_ofs_to_lbl p4 }
-    | BC.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
-    | BC.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
-    | BC.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
-    | BC.WIDE_DSTORE p1 -> DSTORE (u2_to_int p1)
-    | BC.WIDE_FLOAD p1 -> FLOAD (u2_to_int p1)
-    | BC.WIDE_FSTORE p1 -> FSTORE (u2_to_int p1)
-    | BC.WIDE_IINC (p1, p2) -> IINC { ii_var = u2_to_int p1
-					  ; ii_inc = s2_to_int p2 }
-    | BC.WIDE_ILOAD p1 -> ILOAD (u2_to_int p1)
-    | BC.WIDE_ISTORE p1 -> ISTORE (u2_to_int p1)
-    | BC.WIDE_LLOAD p1 -> LLOAD (u2_to_int p1)
-    | BC.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
-    | BC.WIDE_RET p1 -> RET (u2_to_int p1)
+    let entry = CP.get_entry pool in
+    let utf8 = CP.get_utf8_entry pool in
+    let get_class_or_array i =
+      let s = utf8 i in
+      if U.UChar.equal opening_square_bracket (U.UTF8.get s 0) then
+        let t = Descriptor.java_type_of_internal_utf8 s in
+        `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type t)
+      else
+        `Class_or_interface (Name.make_for_class_from_internal s) in
+    let get_field_ref cls nat = match entry cls, entry nat with
+      | CP.Class i1, CP.NameAndType (i2, i3) ->
+          (Name.make_for_class_from_internal (utf8 i1),
+           Name.make_for_field (utf8 i2),
+           Descriptor.field_of_utf8 (utf8 i3))
+      | _ -> fail Invalid_pool_entry in
+    let get_method_ref cls nat = match entry cls, entry nat with
+      | CP.Class i1, CP.NameAndType (i2, i3) ->
+          (Name.make_for_class_from_internal (utf8 i1),
+            Name.make_for_method (utf8 i2),
+            Descriptor.method_of_utf8 (utf8 i3))
+      | _ -> fail Invalid_pool_entry in
+    let get_special_ref cls nat = match entry cls, entry nat with
+      | CP.Class i1, CP.NameAndType (i2, i3)
+        when U.UTF8.equal (utf8 i2) class_constructor ->
+          (Name.make_for_class_from_internal (utf8 i1),
+            fst (Descriptor.method_of_utf8 (utf8 i3)))
+      | _ -> fail Invalid_pool_entry in
+    let get_array_method_ref cls nat = match entry cls, entry nat with
+      | CP.Class i1, CP.NameAndType (i2, i3) ->
+          (get_class_or_array i1,
+            Name.make_for_method (utf8 i2),
+            Descriptor.method_of_utf8 (utf8 i3))
+      | _ -> fail Invalid_pool_entry in
+    let primitive_array_type_of_int = function
+      | 4 -> `Boolean
+      | 5 -> `Char
+      | 6 -> `Float
+      | 7 -> `Double
+      | 8 -> `Byte
+      | 9 -> `Short
+      | 10 -> `Int
+      | 11 -> `Long
+      | _ -> fail Invalid_primitive_array_type in
+    let get_method_handle kind idx =
+      match kind, entry idx with
+      | CP.REF_getField, CP.Fieldref (fc, nt) ->
+        `getField (get_field_ref fc nt)
+      | CP.REF_getStatic, CP.Fieldref (fc, nt) ->
+        `getStatic (get_field_ref fc nt)
+      | CP.REF_putField, CP.Fieldref (fc, nt) ->
+        `putField (get_field_ref fc nt)
+      | CP.REF_putStatic, CP.Fieldref (fc, nt) ->
+        `putStatic (get_field_ref fc nt)
+      | CP.REF_invokeVirtual, CP.Methodref (mc, mt) ->
+        `invokeVirtual (get_method_ref mc mt)
+      | CP.REF_invokeStatic, CP.Methodref (mc, mt) ->
+        `invokeStatic (get_method_ref mc mt)
+      | CP.REF_invokeSpecial, CP.Methodref (mc, mt) ->
+        `invokeSpecial (get_method_ref mc mt)
+      | CP.REF_newInvokeSpecial, CP.Methodref (mc, mt) ->
+        `newInvokeSpecial (get_special_ref mc mt)
+      | CP.REF_invokeInterface, CP.Methodref (mc, mt) ->
+        `invokeInterface (get_method_ref mc mt)
+      | _ -> fail Invalid_method_handle in
+    function
+      | BC.AALOAD -> AALOAD
+      | BC.AASTORE -> AASTORE
+      | BC.ACONST_NULL -> ACONST_NULL
+      | BC.ALOAD p1 -> ALOAD (u1_to_int p1)
+      | BC.ALOAD_0 -> ALOAD 0
+      | BC.ALOAD_1 -> ALOAD 1
+      | BC.ALOAD_2 -> ALOAD 2
+      | BC.ALOAD_3 -> ALOAD 3
+      | BC.ANEWARRAY p1 -> ANEWARRAY (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+      | BC.ARETURN -> ARETURN
+      | BC.ARRAYLENGTH -> ARRAYLENGTH
+      | BC.ASTORE p1 -> ASTORE (u1_to_int p1)
+      | BC.ASTORE_0 -> ASTORE 0
+      | BC.ASTORE_1 -> ASTORE 1
+      | BC.ASTORE_2 -> ASTORE 2
+      | BC.ASTORE_3 -> ASTORE 3
+      | BC.ATHROW -> ATHROW
+      | BC.BALOAD -> BALOAD
+      | BC.BASTORE -> BASTORE
+      | BC.BIPUSH p1 -> BIPUSH (s1_to_int p1)
+      | BC.CALOAD -> CALOAD
+      | BC.CASTORE -> CASTORE
+      | BC.CHECKCAST p1 -> CHECKCAST (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+      | BC.D2F -> D2F
+      | BC.D2I -> D2I
+      | BC.D2L -> D2L
+      | BC.DADD -> DADD
+      | BC.DALOAD -> DALOAD
+      | BC.DASTORE -> DASTORE
+      | BC.DCMPG -> DCMPG
+      | BC.DCMPL -> DCMPL
+      | BC.DCONST_0 -> DCONST_0
+      | BC.DCONST_1 -> DCONST_1
+      | BC.DDIV -> DDIV
+      | BC.DLOAD p1 -> DLOAD (u1_to_int p1)
+      | BC.DLOAD_0 -> DLOAD 0
+      | BC.DLOAD_1 -> DLOAD 1
+      | BC.DLOAD_2 -> DLOAD 2
+      | BC.DLOAD_3 -> DLOAD 3
+      | BC.DMUL -> DMUL
+      | BC.DNEG -> DNEG
+      | BC.DREM -> DREM
+      | BC.DRETURN -> DRETURN
+      | BC.DSTORE p1 -> DSTORE (u1_to_int p1)
+      | BC.DSTORE_0 -> DSTORE 0
+      | BC.DSTORE_1 -> DSTORE 1
+      | BC.DSTORE_2 -> DSTORE 2
+      | BC.DSTORE_3 -> DSTORE 3
+      | BC.DSUB -> DSUB
+      | BC.DUP -> DUP
+      | BC.DUP2 -> DUP2
+      | BC.DUP2_X1 -> DUP2_X1
+      | BC.DUP2_X2 -> DUP2_X2
+      | BC.DUP_X1 -> DUP_X1
+      | BC.DUP_X2 -> DUP_X2
+      | BC.F2D -> F2D
+      | BC.F2I -> F2I
+      | BC.F2L -> F2L
+      | BC.FADD -> FADD
+      | BC.FALOAD -> FALOAD
+      | BC.FASTORE -> FASTORE
+      | BC.FCMPG -> FCMPG
+      | BC.FCMPL -> FCMPL
+      | BC.FCONST_0 -> FCONST_0
+      | BC.FCONST_1 -> FCONST_1
+      | BC.FCONST_2 -> FCONST_2
+      | BC.FDIV -> FDIV
+      | BC.FLOAD p1 -> FLOAD (u1_to_int p1)
+      | BC.FLOAD_0 -> FLOAD 0
+      | BC.FLOAD_1 -> FLOAD 1
+      | BC.FLOAD_2 -> FLOAD 2
+      | BC.FLOAD_3 -> FLOAD 3
+      | BC.FMUL -> FMUL
+      | BC.FNEG -> FNEG
+      | BC.FREM -> FREM
+      | BC.FRETURN -> FRETURN
+      | BC.FSTORE p1 -> FSTORE (u1_to_int p1)
+      | BC.FSTORE_0 -> FSTORE 0
+      | BC.FSTORE_1 -> FSTORE 1
+      | BC.FSTORE_2 -> FSTORE 2
+      | BC.FSTORE_3 -> FSTORE 3
+      | BC.FSUB -> FSUB
+      | BC.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.GOTO p1 -> GOTO (rel_s_ofs_to_lbl p1)
+      | BC.GOTO_W p1 -> GOTO (rel_l_ofs_to_lbl p1)
+      | BC.I2B -> I2B
+      | BC.I2C -> I2C
+      | BC.I2D -> I2D
+      | BC.I2F -> I2F
+      | BC.I2L -> I2L
+      | BC.I2S -> I2S
+      | BC.IADD -> IADD
+      | BC.IALOAD -> IALOAD
+      | BC.IAND -> IAND
+      | BC.IASTORE -> IASTORE
+      | BC.ICONST_0 -> ICONST_0
+      | BC.ICONST_1 -> ICONST_1
+      | BC.ICONST_2 -> ICONST_2
+      | BC.ICONST_3 -> ICONST_3
+      | BC.ICONST_4 -> ICONST_4
+      | BC.ICONST_5 -> ICONST_5
+      | BC.ICONST_M1 -> ICONST_M1
+      | BC.IDIV -> IDIV
+      | BC.IF_ACMPEQ p1 -> IF_ACMPEQ (rel_s_ofs_to_lbl p1)
+      | BC.IF_ACMPNE p1 -> IF_ACMPNE (rel_s_ofs_to_lbl p1)
+      | BC.IF_ICMPEQ p1 -> IF_ICMPEQ (rel_s_ofs_to_lbl p1)
+      | BC.IF_ICMPGE p1 -> IF_ICMPGE (rel_s_ofs_to_lbl p1)
+      | BC.IF_ICMPGT p1 -> IF_ICMPGT (rel_s_ofs_to_lbl p1)
+      | BC.IF_ICMPLE p1 -> IF_ICMPLE (rel_s_ofs_to_lbl p1)
+      | BC.IF_ICMPLT p1 -> IF_ICMPLT (rel_s_ofs_to_lbl p1)
+      | BC.IF_ICMPNE p1 -> IF_ICMPNE (rel_s_ofs_to_lbl p1)
+      | BC.IFEQ p1 -> IFEQ (rel_s_ofs_to_lbl p1)
+      | BC.IFGE p1 -> IFGE (rel_s_ofs_to_lbl p1)
+      | BC.IFGT p1 -> IFGT (rel_s_ofs_to_lbl p1)
+      | BC.IFLE p1 -> IFLE (rel_s_ofs_to_lbl p1)
+      | BC.IFLT p1 -> IFLT (rel_s_ofs_to_lbl p1)
+      | BC.IFNE p1 -> IFNE (rel_s_ofs_to_lbl p1)
+      | BC.IFNONNULL p1 -> IFNONNULL (rel_s_ofs_to_lbl p1)
+      | BC.IFNULL p1 -> IFNULL (rel_s_ofs_to_lbl p1)
+      | BC.IINC (p1, p2) -> IINC { ii_var = u1_to_int p1; ii_inc = s1_to_int p2 }
+      | BC.ILOAD p1 -> ILOAD (u1_to_int p1)
+      | BC.ILOAD_0 -> ILOAD 0
+      | BC.ILOAD_1 -> ILOAD 1
+      | BC.ILOAD_2 -> ILOAD 2
+      | BC.ILOAD_3 -> ILOAD 3
+      | BC.IMUL -> IMUL
+      | BC.INEG -> INEG
+      | BC.INSTANCEOF p1 -> INSTANCEOF (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+      | BC.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
+      | BC.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
+      | BC.INVOKESPECIAL p1 -> INVOKESPECIAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.INVOKESTATIC p1 -> INVOKESTATIC (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.IOR -> IOR
+      | BC.IREM -> IREM
+      | BC.IRETURN -> IRETURN
+      | BC.ISHL -> ISHL
+      | BC.ISHR -> ISHR
+      | BC.ISTORE p1 -> ISTORE (u1_to_int p1)
+      | BC.ISTORE_0 -> ISTORE 0
+      | BC.ISTORE_1 -> ISTORE 1
+      | BC.ISTORE_2 -> ISTORE 2
+      | BC.ISTORE_3 -> ISTORE 3
+      | BC.ISUB -> ISUB
+      | BC.IUSHR -> IUSHR
+      | BC.IXOR -> IXOR
+      | BC.JSR p1 -> JSR (rel_s_ofs_to_lbl p1)
+      | BC.JSR_W p1 -> JSR (rel_l_ofs_to_lbl p1)
+      | BC.L2D -> L2D
+      | BC.L2F -> L2F
+      | BC.L2I -> L2I
+      | BC.LADD -> LADD
+      | BC.LALOAD -> LALOAD
+      | BC.LAND -> LAND
+      | BC.LASTORE -> LASTORE
+      | BC.LCMP -> LCMP
+      | BC.LCONST_0 -> LCONST_0
+      | BC.LCONST_1 -> LCONST_1
+      | BC.LDC p1 -> LDC (match entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+      | BC.LDC2_W p1 -> LDC (match entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
+      | BC.LDC_W p1 -> LDC (match entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+      | BC.LDIV -> LDIV
+      | BC.LLOAD p1 -> LLOAD (u1_to_int p1)
+      | BC.LLOAD_0 -> LLOAD 0
+      | BC.LLOAD_1 -> LLOAD 1
+      | BC.LLOAD_2 -> LLOAD 2
+      | BC.LLOAD_3 -> LLOAD 3
+      | BC.LMUL -> LMUL
+      | BC.LNEG -> LNEG
+      | BC.LOOKUPSWITCH (p1, p2, p3) ->
+        let keys, offsets = List.split p3 in
+        let labels = List.map rel_l_ofs_to_lbl offsets in
+        let items = List.map s4_to_int keys in
+      (* bytecode parser should ensure this *)
+        assert (s4_to_int p2 = List.length p3);
+        LOOKUPSWITCH { ls_def = rel_l_ofs_to_lbl p1
+                     ; ls_branches = List.combine items labels }
+      | BC.LOR -> LOR
+      | BC.LREM -> LREM
+      | BC.LRETURN -> LRETURN
+      | BC.LSHL -> LSHL
+      | BC.LSHR -> LSHR
+      | BC.LSTORE p1 -> LSTORE (u1_to_int p1)
+      | BC.LSTORE_0 -> LSTORE 0
+      | BC.LSTORE_1 -> LSTORE 1
+      | BC.LSTORE_2 -> LSTORE 2
+      | BC.LSTORE_3 -> LSTORE 3
+      | BC.LSUB -> LSUB
+      | BC.LUSHR -> LUSHR
+      | BC.LXOR -> LXOR
+      | BC.MONITORENTER -> MONITORENTER
+      | BC.MONITOREXIT -> MONITOREXIT
+      | BC.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
+      | BC.NEW p1 -> NEW (match entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (utf8 idx)) | _ -> fail Invalid_pool_element)
+      | BC.NEWARRAY p1 -> NEWARRAY (primitive_array_type_of_int (p1 :> int))
+      | BC.NOP -> NOP
+      | BC.POP -> POP
+      | BC.POP2 -> POP2
+      | BC.PUTFIELD p1 -> PUTFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.PUTSTATIC p1 -> PUTSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.RET p1 -> RET (u1_to_int p1)
+      | BC.RETURN -> RETURN
+      | BC.SALOAD -> SALOAD
+      | BC.SASTORE -> SASTORE
+      | BC.SIPUSH p1 -> SIPUSH (s2_to_int p1)
+      | BC.SWAP -> SWAP
+      | BC.TABLESWITCH (p1, p2, p3, p4) ->
+        TABLESWITCH {
+          ts_def = rel_l_ofs_to_lbl p1;
+          ts_low = s4_to_int p2;
+          ts_high = s4_to_int p3;
+          ts_ofss = List.map rel_l_ofs_to_lbl p4 }
+      | BC.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
+      | BC.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
+      | BC.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
+      | BC.WIDE_DSTORE p1 -> DSTORE (u2_to_int p1)
+      | BC.WIDE_FLOAD p1 -> FLOAD (u2_to_int p1)
+      | BC.WIDE_FSTORE p1 -> FSTORE (u2_to_int p1)
+      | BC.WIDE_IINC (p1, p2) -> IINC { ii_var = u2_to_int p1
+                                            ; ii_inc = s2_to_int p2 }
+      | BC.WIDE_ILOAD p1 -> ILOAD (u2_to_int p1)
+      | BC.WIDE_ISTORE p1 -> ISTORE (u2_to_int p1)
+      | BC.WIDE_LLOAD p1 -> LLOAD (u2_to_int p1)
+      | BC.WIDE_LSTORE p1 -> LSTORE (u2_to_int p1)
+      | BC.WIDE_RET p1 -> RET (u2_to_int p1)
 
   (* NOTE: The current implementation generates suboptimal bytecode, but it
   ensures that the chosen opcodes do not depend on [ool] or on [here]. We do
@@ -1034,6 +1035,7 @@ module SymbExe = struct  (* {{{ *)
   let verification_type_info_of_constant_descriptor = function
     | `Int _ -> Integer_variable_info
     | `Float _ -> Float_variable_info
+(* TODO(rgrig): Does `Class_or_interface need distinct parameters here? *)
     | `String _ -> Object_variable_info (`Class_or_interface java_lang_String)
     | `Class_or_interface _ -> Object_variable_info (`Class_or_interface java_lang_Class)
     | `Array_type _ -> Object_variable_info (`Class_or_interface java_lang_Class)
@@ -1081,6 +1083,7 @@ module SymbExe = struct  (* {{{ *)
   let empty () = []
 
   let push v s =
+printf "@[push %s@." (string_of_verification_type_info v);
     v :: s
 
   let push_return_value x s = match x with
@@ -1092,7 +1095,9 @@ module SymbExe = struct  (* {{{ *)
     | hd :: _ -> hd
     | [] -> fail SE_empty_stack
 
-  let pop = function
+  let pop =
+printf "@[pop@.";
+  function
     | _ :: tl -> tl
     | [] -> fail SE_empty_stack
 
@@ -1121,7 +1126,7 @@ module SymbExe = struct  (* {{{ *)
     | hd :: tl -> if is_category1 hd then hd, tl else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
 
-  let pop_if_cat2 = function
+  let pop_if_category2 = function
     | hd :: tl -> if not (is_category1 hd) then hd, tl else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
   (* }}} *)
@@ -1145,16 +1150,18 @@ module SymbExe = struct  (* {{{ *)
 	| Long_variable_info
 	| Double_variable_info -> 1
 	| _ -> 0) in
-    let l' =
-      Array.init
-	(max sz len)
-	(fun i -> if i < len then l.(i) else Top_variable_info) in
-    l'.(i) <- v;
+    let l =
+      if sz > len then
+        Array.init
+          sz
+          (fun i -> if i < len then l.(i) else Top_variable_info)
+      else l in
+    l.(i) <- v;
     (match v with
       | Long_variable_info
-      | Double_variable_info -> l'.(succ i) <- Top_variable_info
+      | Double_variable_info -> l.(succ i) <- Top_variable_info
       | _ -> ());
-    l'
+    l
   (* }}} *)
   (* checks {{{ *)
   let check_reference x =
@@ -1281,7 +1288,7 @@ module SymbExe = struct  (* {{{ *)
             | Null_variable_info -> push Null_variable_info stack
             | Object_variable_info (`Array_type (`Array t)) -> push (verification_type_info_of_parameter_descriptor t) stack
             | _ -> fail (report_array_expected topv)) in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.AASTORE ->
 	let topv = top stack in
 	check_reference topv;
@@ -1290,150 +1297,150 @@ module SymbExe = struct  (* {{{ *)
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ACONST_NULL ->
 	let stack = push Null_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ALOAD parameter ->
 	let loc = load parameter locals in
 	check_reference loc;
 	let stack = push loc stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ANEWARRAY parameter ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push (verification_type_info_of_array_element parameter) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ARETURN ->
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ARRAYLENGTH ->
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ASTORE parameter ->
 	let loc = top stack in
 	let stack = pop stack in
 	check_reference loc;
 	let locals = store parameter loc locals in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ATHROW ->
 	let exc = top stack in
 	check_reference exc;
 	let stack = empty () in
 	let stack = push exc stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.BALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.BASTORE ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.BIPUSH _ ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.CALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.CASTORE ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.CHECKCAST parameter ->
 	let stack = pop stack in
 	let stack = push (verification_type_info_of_parameter_descriptor (match parameter with `Array_type at -> (at :> Descriptor.for_parameter) | `Class_or_interface cn -> `Class cn)) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.D2F ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.D2I ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.D2L ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DADD ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DASTORE ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DCMPG ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DCMPL ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DCONST_0 ->
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DCONST_1 ->
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DDIV ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DLOAD parameter ->
 	check_load parameter locals Double_variable_info;
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DMUL ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DNEG ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DREM ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DRETURN ->
 	let stack = pop_if Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DSTORE parameter ->
 	let stack = pop_if Double_variable_info stack in
 	let locals = store parameter Double_variable_info locals in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DSUB ->
 	let stack = pop_if Double_variable_info stack in
 	let stack = pop_if Double_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DUP ->
 	let v, stack = pop_if_category1 stack in
 	let stack = push v stack in
 	let stack = push v stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DUP2 ->
 	let v1 = top stack in
 	let stack = pop stack in
@@ -1446,7 +1453,7 @@ module SymbExe = struct  (* {{{ *)
             push v1 stack
           else
             push v1 (push v1 stack) in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DUP2_X1 ->
 	let v1 = top stack in
 	let stack =
@@ -1465,7 +1472,7 @@ module SymbExe = struct  (* {{{ *)
             let stack = push v1 stack in
             let stack = push v2 stack in
             push v1 stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DUP2_X2 ->
 	let v1 = top stack in
 	let stack =
@@ -1508,14 +1515,14 @@ module SymbExe = struct  (* {{{ *)
               push v1 stack
             end
           end in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DUP_X1 ->
 	let v1, stack = pop_if_category1 stack in
 	let v2, stack = pop_if_category1 stack in
 	let stack = push v1 stack in
 	let stack = push v2 stack in
 	let stack = push v1 stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.DUP_X2 ->
 	let v1, stack = pop_if_category1 stack in
 	let v2 = top stack in
@@ -1528,250 +1535,250 @@ module SymbExe = struct  (* {{{ *)
             let stack = push v2 stack in
             push v1 stack
           else
-            let v2, stack = pop_if_cat2 stack in
+            let v2, stack = pop_if_category2 stack in
             let stack = push v1 stack in
             let stack = push v2 stack in
             push v1 stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.F2D ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.F2I ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.F2L ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FADD ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FASTORE ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FCMPG ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FCMPL ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FCONST_0 ->
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FCONST_1 ->
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FCONST_2 ->
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FDIV ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FLOAD parameter ->
 	check_load parameter locals Float_variable_info;
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FMUL ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FNEG ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FREM ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FRETURN ->
 	let stack = pop_if Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FSTORE parameter ->
 	let stack = pop_if Float_variable_info stack in
 	let locals = store parameter Float_variable_info locals in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.FSUB ->
 	let stack = pop_if Float_variable_info stack in
 	let stack = pop_if Float_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.GETFIELD (_, _, desc) ->
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
 	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.GETSTATIC (_, _, desc) ->
 	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.GOTO _ ->
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.I2B ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.I2C ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.I2D ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.I2F ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.I2L ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.I2S ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IADD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IAND ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IASTORE ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_0 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_1 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_2 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_3 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_4 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_5 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ICONST_M1 ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IDIV ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ACMPEQ _ ->
 	let stack = pop stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ACMPNE _ ->
 	let stack = pop stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ICMPEQ _ ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ICMPGE _ ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ICMPGT _ ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ICMPLE _ ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ICMPLT _ ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IF_ICMPNE _ ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFEQ _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFGE _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFGT _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFLE _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFLT _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFNE _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFNONNULL _ ->
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IFNULL _ ->
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IINC ii ->
 	check_load ii.HI.ii_var locals Integer_variable_info;
 	let locals = store ii.HI.ii_var Integer_variable_info locals in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ILOAD parameter ->
 	check_load parameter locals Integer_variable_info;
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IMUL ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.INEG ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.INSTANCEOF _ ->
 	let stack = pop stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
   (*
     | HI.INVOKEDYNAMIC (_, _, (params, ret)) ->
     let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
@@ -1780,7 +1787,7 @@ module SymbExe = struct  (* {{{ *)
     check_reference topv;
     let stack = pop stack in
     let stack = push_return_value ret stack in
-    { locals = locals; stack = stack; }
+    { locals; stack }
   *)
       | HI.INVOKEINTERFACE ((_, _, (params, ret)), _) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
@@ -1789,7 +1796,7 @@ module SymbExe = struct  (* {{{ *)
 	check_reference topv;
 	let stack = pop stack in
 	let stack = push_return_value ret stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.INVOKESPECIAL (cn, mn, (params, ret)) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
@@ -1813,12 +1820,12 @@ module SymbExe = struct  (* {{{ *)
               | _ -> locals, stack
           else
             locals, stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.INVOKESTATIC (_, _, (params, ret)) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let stack = push_return_value ret stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.INVOKEVIRTUAL (_, _, (params, ret)) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
@@ -1826,190 +1833,190 @@ module SymbExe = struct  (* {{{ *)
 	check_reference topv;
 	let stack = pop stack in
 	let stack = push_return_value ret stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IOR ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IREM ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IRETURN ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ISHL ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ISHR ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ISTORE parameter ->
 	let stack = pop_if Integer_variable_info stack in
 	let locals = store parameter Integer_variable_info locals in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.ISUB ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IUSHR ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.IXOR ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.JSR _ ->
 	fail (Unsupported_instruction "JSR")
       | HI.L2D ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Double_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.L2F ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Float_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.L2I ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LADD ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LAND ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LASTORE ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LCMP ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LCONST_0 ->
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LCONST_1 ->
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LDC parameter ->
 	let stack = push (verification_type_info_of_constant_descriptor parameter) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LDIV ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LLOAD parameter ->
 	check_load parameter locals Long_variable_info;
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LMUL ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LNEG ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LOOKUPSWITCH _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LOR ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LREM ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LRETURN ->
 	let stack = pop_if Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LSHL ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LSHR ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LSTORE parameter ->
 	let stack = pop_if Long_variable_info stack in
 	let locals = store parameter Long_variable_info locals in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LSUB ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LUSHR ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.LXOR ->
 	let stack = pop_if Long_variable_info stack in
 	let stack = pop_if Long_variable_info stack in
 	let stack = push Long_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.MONITORENTER ->
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.MONITOREXIT ->
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.MULTIANEWARRAY (at, dims) ->
 	let s = ref stack in
 	for i = 1 to (dims :> int) do
           s := pop_if Integer_variable_info !s;
 	done;
 	let stack = push (Object_variable_info at) !s in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.NEW _ ->
       (* TODO(rlp) understand why the argument to NEW is thrown away *)
 	let stack = push (Uninitialized_variable_info lbl) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.NEWARRAY parameter ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = push (verification_type_info_of_array_primitive parameter) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.NOP ->
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.POP ->
 	let _, stack = pop_if_category1 stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.POP2 ->
 	let v1 = top stack in
 	let stack =
@@ -2017,158 +2024,195 @@ module SymbExe = struct  (* {{{ *)
             snd (pop_if_category1 (snd (pop_if_category1 stack)))
           else
             pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.PUTFIELD (_, _, desc) ->
 	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.PUTSTATIC (_, _, desc) ->
 	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.RET _ ->
 	fail (Unsupported_instruction "RET")
       | HI.RETURN ->
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.SALOAD ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.SASTORE ->
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop_if Integer_variable_info stack in
 	let stack = pop stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.SIPUSH _ ->
 	let stack = push Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.SWAP ->
 	let v1, stack = pop_if_category1 stack in
 	let v2, stack = pop_if_category1 stack in
 	let stack = push v1 stack in
 	let stack = push v2 stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
       | HI.TABLESWITCH _ ->
 	let stack = pop_if Integer_variable_info stack in
-	{ locals = locals; stack = stack; }
+	{ locals; stack }
   (* }}} *)
   (* unification {{{ *)
-type 'a unifier = 'a -> 'a -> 'a
+  type 'a unifier = 'a -> 'a -> 'a
 
-let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
+  let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
 
-let java_lang_Object = `Class_or_interface java_lang_Object_name
+  let java_lang_Object = `Class_or_interface java_lang_Object_name
 
-let make_array_unifier (f : Name.for_class unifier) (x : Descriptor.array_type) (y : Descriptor.array_type) =
-  let rec ua (x : Descriptor.java_type) (y : Descriptor.java_type) = match x, y with
-    | (`Array x'), (`Array y') -> `Array (ua (x' :> Descriptor.java_type) (y' :> Descriptor.java_type))
-    | (`Array _), _ -> `Class java_lang_Object_name
-    | _, (`Array _) -> `Class java_lang_Object_name
-    | (`Class x'), (`Class y') -> `Class (f x' y')
-    | `Boolean, `Boolean -> `Boolean
-    | `Byte, `Byte -> `Byte
-    | `Char, `Char -> `Char
-    | `Double, `Double -> `Double
-    | `Float, `Float -> `Float
-    | `Int, `Int -> `Int
-    | `Long, `Long -> `Long
-    | `Short, `Short -> `Short
-    | _ -> raise Not_found in
-  try
-    (match ua (x :> Descriptor.java_type) (y :> Descriptor.java_type) with
-      | `Array x -> `Array_type (`Array x)
-      | _ -> java_lang_Object)
-  with Not_found -> java_lang_Object
+  let make_array_unifier (f : Name.for_class unifier) (x : Descriptor.array_type) (y : Descriptor.array_type) =
+    let rec ua (x : Descriptor.java_type) (y : Descriptor.java_type) = match x, y with
+      | (`Array x'), (`Array y') -> `Array (ua (x' :> Descriptor.java_type) (y' :> Descriptor.java_type))
+      | (`Array _), _ -> `Class java_lang_Object_name
+      | _, (`Array _) -> `Class java_lang_Object_name
+      | (`Class x'), (`Class y') -> `Class (f x' y')
+      | `Boolean, `Boolean -> `Boolean
+      | `Byte, `Byte -> `Byte
+      | `Char, `Char -> `Char
+      | `Double, `Double -> `Double
+      | `Float, `Float -> `Float
+      | `Int, `Int -> `Int
+      | `Long, `Long -> `Long
+      | `Short, `Short -> `Short
+      | _ -> raise Not_found in
+    try
+      (match ua (x :> Descriptor.java_type) (y :> Descriptor.java_type) with
+        | `Array x -> `Array_type (`Array x)
+        | _ -> java_lang_Object)
+    with Not_found -> java_lang_Object
 
-let make_unifier f x y =
-  let array_unifier = make_array_unifier f in
-  match x, y with
-    | (`Array_type at1), (`Array_type at2) -> array_unifier at1 at2
-    | (`Class_or_interface cn1), (`Class_or_interface cn2) -> `Class_or_interface (f cn1 cn2)
-    | _ -> java_lang_Object
+  let make_unifier f x y =
+    let array_unifier = make_array_unifier f in
+    match x, y with
+      | (`Array_type at1), (`Array_type at2) -> array_unifier at1 at2
+      | (`Class_or_interface cn1), (`Class_or_interface cn2) -> `Class_or_interface (f cn1 cn2)
+      | _ -> java_lang_Object
 
-let unify_to_java_lang_Object =
-  let utjlo x y =
-    if Name.equal_for_class x y then
-      x
-    else
-      java_lang_Object_name in
-  make_unifier utjlo
+  let unify_to_java_lang_Object =
+    let utjlo x y =
+      if Name.equal_for_class x y then
+        x
+      else
+        java_lang_Object_name in
+    make_unifier utjlo
 
-let unify_to_closest_common_parent cl l =
-  let rec parents cn =
-    let hd, prn =
-      try
-        let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
-        (Name.internal_utf8_for_class c), p
-      with Not_found ->
-        let cd = ClassLoader.find_class cl (Name.external_utf8_for_class cn) in
-        (Name.internal_utf8_for_class cd.ClassDefinition.name),
-        cd.ClassDefinition.extends in
-    let tl = match prn with
-    | Some x -> parents x
-    | None -> [] in
-    hd :: tl in
-  let rec common_parent l = function
-  | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
-  | [] -> U.UTF8.of_string "java/lang/Object" in
-  let utccp x y =
-    let parents_x = parents x in
-    let parents_y = parents y in
-    Name.make_for_class_from_internal (common_parent parents_x parents_y) in
-    make_unifier utccp
+  let unify_to_closest_common_parent cl l =
+    let rec parents cn =
+      let hd, prn =
+        try
+          let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
+          (Name.internal_utf8_for_class c), p
+        with Not_found ->
+          let cd = ClassLoader.find_class cl (Name.external_utf8_for_class cn) in
+          (Name.internal_utf8_for_class cd.ClassDefinition.name),
+          cd.ClassDefinition.extends in
+      let tl = match prn with
+      | Some x -> parents x
+      | None -> [] in
+      hd :: tl in
+    let rec common_parent l = function
+    | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
+    | [] -> U.UTF8.of_string "java/lang/Object" in
+    let utccp x y =
+      let parents_x = parents x in
+      let parents_y = parents y in
+      Name.make_for_class_from_internal (common_parent parents_x parents_y) in
+      make_unifier utccp
 
-let unify_to_parent_list l =
-  let rec parents cn =
-    let hd, prn =
-      try
-        let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
-        (Name.internal_utf8_for_class c), p
-      with Not_found ->
-        (Name.internal_utf8_for_class cn), None in
-    let tl = match prn with
-    | Some x -> parents x
-    | None -> [] in
-    hd :: tl in
-  let rec common_parent l = function
-  | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
-  | [] -> U.UTF8.of_string "java/lang/Object" in
-  let utccp x y =
-    let parents_x = parents x in
-    let parents_y = parents y in
-    Name.make_for_class_from_internal (common_parent parents_x parents_y) in
-    make_unifier utccp
+  let unify_to_parent_list l =
+    let rec parents cn =
+      let hd, prn =
+        try
+          let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
+          (Name.internal_utf8_for_class c), p
+        with Not_found ->
+          (Name.internal_utf8_for_class cn), None in
+      let tl = match prn with
+      | Some x -> parents x
+      | None -> [] in
+      hd :: tl in
+    let rec common_parent l = function
+    | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
+    | [] -> U.UTF8.of_string "java/lang/Object" in
+    let utccp x y =
+      let parents_x = parents x in
+      let parents_y = parents y in
+      Name.make_for_class_from_internal (common_parent parents_x parents_y) in
+      make_unifier utccp
 
-let unify f st1 st2 =
-  let unify_elements vti1 vti2 =
-    match (vti1, vti2) with
-    | Top_variable_info, _
-    | _, Top_variable_info -> Top_variable_info
-    | (Object_variable_info o1), (Object_variable_info o2) -> Object_variable_info (f o1 o2)
-    | Null_variable_info, (Object_variable_info _) -> vti2
-    | (Object_variable_info _), Null_variable_info -> vti1
-    | _ -> if vti1 = vti2 then vti1 else Top_variable_info in
-  let sz1 = List.length st1.stack in
-  let sz2 = List.length st2.stack in
-  if sz1 = sz2 then begin
-    let len1 = Array.length st1.locals in
-    let len2 = Array.length st2.locals in
-    let len = max len1 len2 in
-    let locals =
-      Array.init
-        len
-        (fun i ->
-          if (i < len1) && (i < len2) then
-            unify_elements st1.locals.(i) st2.locals.(i)
-          else
-            Top_variable_info) in
-    let stack = List.map2 unify_elements st1.stack st2.stack in
-    { locals = locals; stack = stack; }
-  end else
-    fail (SE_different_stack_sizes (sz1, sz2))
+  let unify f st1 st2 =
+    let unify_elements vti1 vti2 =
+      match (vti1, vti2) with
+      | Top_variable_info, _
+      | _, Top_variable_info -> Top_variable_info
+      | (Object_variable_info o1), (Object_variable_info o2) -> Object_variable_info (f o1 o2)
+      | Null_variable_info, (Object_variable_info _) -> vti2
+      | (Object_variable_info _), Null_variable_info -> vti1
+      | _ -> if vti1 = vti2 then vti1 else Top_variable_info in
+    let sz1 = List.length st1.stack in
+    let sz2 = List.length st2.stack in
+    if sz1 = sz2 then begin
+      let len1 = Array.length st1.locals in
+      let len2 = Array.length st2.locals in
+      let len = max len1 len2 in
+      let locals =
+        Array.init
+          len
+          (fun i ->
+            if (i < len1) && (i < len2) then
+              unify_elements st1.locals.(i) st2.locals.(i)
+            else
+              Top_variable_info) in
+      let stack = List.map2 unify_elements st1.stack st2.stack in
+      { locals; stack }
+    end else
+      fail (SE_different_stack_sizes (sz1, sz2))
   (* }}} *)
+  (* public *) (* {{{ *)
+  let make_of_method = failwith "todo"
+    (*
+    function
+    | HM.Regular { HM.flags; descriptor; _ } ->
+        let l = fst descriptor in
+        let l = List.map verification_type_info_of_parameter_descriptor l in
+        let l =
+          if List.mem `Static flags then
+            l
+          else
+            (Object_variable_info (`Class_or_interface java_lang_Class)) :: l in
+        { locals = of_list l; stack = [] }
+    | HM.Constructor { HM.cstr_descriptor = l ; _ } ->
+        let l = List.map verification_type_info_of_parameter_descriptor l in
+        let l = Uninitialized_this_variable_info :: l in
+        { locals = of_list l; stack = [] }
+    | HM.Initializer _ ->
+        make_empty ()
+*)
+
+  let compute_max_stack_locals m is =
+    let init = make_of_method m, 0, 0 in
+    let stackmap = HI.LabelHash.create 131 in
+    let matches (s, _, _) (s', _, _) = (stack_size s) = (stack_size s') in
+    (* TODO(rlp) is this the correct unification? *)
+    let unify_states = unify unify_to_java_lang_Object in
+    let unify (s, ms, ml) (s', ms', ml') = (unify_states s s', max ms ms', max ml ml') in
+    let f (s, ms, ml) (l, i) =
+      let s' = step s (l, i) in
+      HI.LabelHash.replace stackmap l s;
+      (s', max ms (stack_size s), max ml (locals_size s)) in
+    let maxes = fold_instructions f init matches unify is in
+    let g (ms, ml) (_, s, l) = (max ms s, max ml l) in
+    let max_stack, max_locals = List.fold_left g (0, 0) maxes in
+    stackmap, max_stack, max_locals
+    (* }}} *)
 end (* }}} *)
 module SE = SymbExe
 
@@ -2399,6 +2443,7 @@ module HighAttribute = struct (* {{{ *)
       assert (s > 0);
       (inst, ofs, lbl) :: l, ofs + s, lbl + 1 in
     let instr_codes_annot, _, _ = List.fold_left fold_size ([], 0, 0) instr_codes in
+    let instr_codes_annot = List.rev instr_codes_annot in
     (* TODO: faster structure for this? *)
     let ofs_to_label ofs =
       let (_, _, lbl) = List.find (fun (_, o, _) -> o = ofs) instr_codes_annot in
@@ -2708,28 +2753,12 @@ module HighAttribute = struct (* {{{ *)
         Annotation.write_extended_info st a')
       l
 
-  let compute_max_stack_locals is =
-    let init = SE.make_empty (), 0, 0 in
-    let stackmap = HI.LabelHash.create 131 in
-    let matches (s, _, _) (s', _, _) = (SE.stack_size s) = (SE.stack_size s') in
-    (* TODO(rlp) is this the correct unification? *)
-    let unify_states = SE.unify SE.unify_to_java_lang_Object in
-    let unify (s, ms, ml) (s', ms', ml') = (unify_states s s', max ms ms', max ml ml') in
-    let f (s, ms, ml) (l, i) =
-      let s' = SE.step s (l, i) in
-      HI.LabelHash.replace stackmap l s;
-      (s', max ms (SE.stack_size s), max ml (SE.locals_size s)) in
-    let maxes = SE.fold_instructions f init matches unify is in
-    let g (ms, ml) (_, s, l) = (max ms s, max ml l) in
-    let max_stack, max_locals = List.fold_left g (0, 0) maxes in
-    stackmap, max_stack, max_locals
-
   let encode_attr_annotation_default enc ev =
       let eiv = Annotation.encode_element_value enc.en_pool ev in
       Annotation.write_info_element_value enc.en_st eiv;
       enc_return enc attr_annotation_default
 
-  let encode_attr_bootstrap_methods _ = failwith "todo" (* not decoded yet *)
+  let encode_attr_bootstrap_methods _ = failwith "todo   let encode_attr_bootstrap_methods _ = " (* not decoded yet *)
   let encode_attr_class_signature enc s =
       let idx = CP.add_utf8 enc.en_pool (Signature.utf8_of_class_signature s) in
       OS.write_u2 enc.en_st idx;
@@ -2737,7 +2766,7 @@ module HighAttribute = struct (* {{{ *)
 
   let i_list_to_labeled_bc_list m pool l =
     let fold (bcl, ofs) (lbl, i) =
-      let bc = HI.encode (HI.LabelHash.find m) ofs pool i in
+      let bc = HI.encode m ofs pool i in
       ((lbl, bc)::bcl, ofs + (BC.size_of ofs bc)) in
     let bcl, _ = List.fold_left fold ([], 0) l in
     bcl
@@ -2752,25 +2781,31 @@ module HighAttribute = struct (* {{{ *)
     m
 
   let encode_instr_list pool l =
-    let dummy_map = HI.LabelHash.create 131 in
+    let dummy_map _ = 0 in
     let rec fix_map m bcl =
       let m' = compute_ofs_map bcl in
-      if m = m' then (m, List.map snd bcl)
+      let same =
+        let f k v same = same && m k = v in
+        HI.LabelHash.fold f m' true in
+      if same then (m, List.map snd bcl)
       else
+        let m' = HI.LabelHash.find m' in
 	let bcl' = i_list_to_labeled_bc_list m' pool l in
 	fix_map m' bcl' in
     let bcl = i_list_to_labeled_bc_list dummy_map pool l in
     fix_map dummy_map bcl
 
-  let rec encode_attr_code enc encode c =
-    let m, code_content = encode_instr_list enc.en_pool c.code in
-    let label_to_ofs = HI.LabelHash.find m in
+  let rec encode_attr_code m enc encode c =
+    let m = match m with
+      | Some m -> m
+      | None -> failwith "INTERNAL: encode_attr_code" in
+    let label_to_ofs, code_content = encode_instr_list enc.en_pool c.code in
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
 
     let actual_code = Buffer.contents code_enc.en_buffer in
-    let stackmap, max_stack, max_locals = compute_max_stack_locals c.code in
+    let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c.code in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
     let code_length = String.length actual_code in
@@ -2794,7 +2829,7 @@ module HighAttribute = struct (* {{{ *)
     let sub_enc = make_encoder enc.en_pool 16 in
     List.iter
       (fun a ->
-        let res = encode sub_enc.en_pool (a :> t) in
+        let res = encode (Some m) sub_enc.en_pool (a :> t) in
         write_info sub_enc res)
       c.attributes;
     OS.close sub_enc.en_st;
@@ -2882,15 +2917,30 @@ module HighAttribute = struct (* {{{ *)
         l;
       enc_return enc attr_inner_classes
 
-  let encode_attr_line_number_table _ = failwith "todo"
-  let encode_attr_local_variable_table _ = failwith "todo"
-  let encode_attr_local_variable_type_table _ = failwith "todo"
+  let write_empty_list msg attr enc =
+    OS.write_elements
+      (checked_length msg)
+      enc.en_st
+      (fun _ _ -> ())
+      [];
+    enc_return enc attr
+
+  (* TODO(rgrig): Implement. *)
+  let encode_attr_line_number_table enc _ =
+    write_empty_list "line numbers" attr_line_number_table enc
+
+  let encode_attr_local_variable_table =
+    write_empty_list "local variables" attr_local_variable_table
+
+  let encode_attr_local_variable_type_table =
+    write_empty_list "local variable types" attr_local_variable_type_table
+
   let encode_attr_method_signature enc s =
       let idx = CP.add_utf8 enc.en_pool (Signature.utf8_of_method_signature s) in
       OS.write_u2 enc.en_st idx;
       enc_return enc attr_signature
 
-  let encode_attr_module _ = failwith "todo" (* not decoded yet *)
+  let encode_attr_module _ = failwith "todo   let encode_attr_module _ = " (* not decoded yet *)
   let encode_attr_runtime_invisible_annotations enc l =
       write_annotations enc l;
       enc_return enc attr_runtime_invisible_annotations
@@ -2930,22 +2980,22 @@ module HighAttribute = struct (* {{{ *)
       Buffer.add_string enc.en_buffer v;
       enc_return enc n
 
-  let rec encode pool : t -> A.info =
+  let rec encode m pool : t -> A.info =
     let enc = make_encoder pool 64 in
   function
     | `AnnotationDefault ev -> encode_attr_annotation_default enc ev
     | `BootstrapMethods _ -> encode_attr_bootstrap_methods ()
     | `ClassSignature s -> encode_attr_class_signature enc s
-    | `Code c -> encode_attr_code enc encode c
+    | `Code c -> encode_attr_code m enc encode c
     | `ConstantValue v -> encode_attr_constant_value enc v
     | `Deprecated -> encode_attr_deprecated enc
     | `EnclosingMethod em -> encode_attr_enclosing_method enc em
     | `Exceptions l -> encode_attr_exceptions enc l
     | `FieldSignature s -> encode_attr_field_signature enc s
     | `InnerClasses l -> encode_attr_inner_classes enc l
-    | `LineNumberTable _ -> encode_attr_line_number_table ()
-    | `LocalVariableTable _ -> encode_attr_local_variable_table ()
-    | `LocalVariableTypeTable _ -> encode_attr_local_variable_type_table ()
+    | `LineNumberTable h -> encode_attr_line_number_table enc h
+    | `LocalVariableTable _ -> encode_attr_local_variable_table enc
+    | `LocalVariableTypeTable _ -> encode_attr_local_variable_type_table enc
     | `MethodSignature s -> encode_attr_method_signature enc s
     | `Module _ -> encode_attr_module ()
     | `RuntimeInvisibleAnnotations l -> encode_attr_runtime_invisible_annotations enc l
@@ -2959,9 +3009,9 @@ module HighAttribute = struct (* {{{ *)
     | `Synthetic -> encode_attr_synthetic enc
     | `Unknown u -> encode_attr_unknown enc u
 
-  let encode_class pool a = encode pool (a : for_class :> t)
-  let encode_field pool a = encode pool (a : for_field :> t)
-  let encode_method pool a = encode pool (a : for_method :> t)
+  let encode_class pool a = encode None pool (a : for_class :> t)
+  let encode_field pool a = encode None pool (a : for_field :> t)
+  let encode_method m pool a = encode (Some m) pool (a : for_method :> t)
 end
 (* }}} *)
 module HA = HighAttribute
@@ -2994,7 +3044,7 @@ module HighField = struct (* {{{ *)
     let descriptor_index = CP.add_utf8 pool desc_utf8 in
     let attributes_count = U.u2 (List.length f.attributes) in
     let attributes_array =
-      U.map_list_to_array (HA.encode pool) (f.attributes :> HA.t list) in
+      U.map_list_to_array (HA.encode None pool) (f.attributes :> HA.t list) in
     { F.access_flags; name_index; descriptor_index; attributes_count
     ; attributes_array }
 
@@ -3078,7 +3128,7 @@ module HighMethod = struct (* {{{ *)
       name_index = name_idx;
       descriptor_index = desc_idx;
       attributes_count = U.u2 (List.length attrs);
-      attributes_array = U.map_list_to_array (HA.encode_method pool) (attrs :> HA.for_method list); }
+      attributes_array = U.map_list_to_array (HA.encode_method m pool) (attrs :> HA.for_method list); }
 end
 (* }}} *)
 module HM = HighMethod
@@ -3150,8 +3200,8 @@ let encode ?(version = Version.default) cd =
   let pool = CP.make_extendable () in
   let this_index = CP.add_class pool cd.name in
   let super_index = match cd.extends with
-  | Some n -> CP.add_class pool n
-  | None -> no_super_class in
+    | Some n -> CP.add_class pool n
+    | None -> no_super_class in
   let itfs = U.map_list_to_array (fun s -> CP.add_class pool s) cd.implements in
   let flds = U.map_list_to_array (HF.encode pool) cd.fields in
   let mths = U.map_list_to_array (HM.encode pool) cd.methods in

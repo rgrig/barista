@@ -374,6 +374,8 @@ type error =
   | Too_many of string
   | Unsupported_instruction of string
 
+val string_of_error : error -> string
+
 exception Exception of error
 
 val check_version_high : ?version : Version.t -> t -> t
