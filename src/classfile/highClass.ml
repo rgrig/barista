@@ -573,15 +573,6 @@ module HighInstruction = struct (* {{{ *)
     let offset l = ool l - here in
     let s2_offset l = U.s2 (offset l) in
     let s4_offset l = s4 (offset l) in
-    (* TODO(rgrig): Move fits_* in Utils. *)
-    let fits_u k x =
-      let bits = 8 * k in
-      assert (0 <= bits && bits < 32);
-      0 <= x && x < (1 lsl bits) in
-    let fits_s k x =
-      let bits = 8 * (k - 1) in
-      assert (0 <= bits && bits < 32);
-      let m = 1 lsl bits in -m <= x && x < m in
     let int_of_primitive_array_type = function
       | `Boolean -> 4
       | `Char -> 5

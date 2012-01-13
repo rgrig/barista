@@ -138,6 +138,15 @@ external u2_of_u1 : u1 -> u2 = "%identity"
 
 external s4_of_s2 : s2 -> s4 = "%int32_of_int"
 
+let fits_u k x =
+  let bits = 8 * k in
+  assert (0 <= bits && bits < 32);
+  0 <= x && x < (1 lsl bits)
+
+let fits_s k x =
+  let bits = 8 * (k - 1) in
+  assert (0 <= bits && bits < 32);
+  let m = 1 lsl bits in -m <= x && x < m
 
 (* Unicode support *)
 

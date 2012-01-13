@@ -124,6 +124,11 @@ external u2_of_u1 : u1 -> u2 = "%identity"
 external s4_of_s2 : s2 -> s4 = "%int32_of_int"
 (** Identity function. *)
 
+val fits_s : int -> int -> bool
+(** [fits_s k v] says if [v] fits in an [sk]. *)
+
+val fits_u : int -> int -> bool
+(** [fits_u k v] says if [v] fits in an [uk]. *)
 
 (** {6 UTF8 support} *)
 
