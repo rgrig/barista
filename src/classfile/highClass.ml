@@ -1243,7 +1243,7 @@ module SymbExe = struct  (* {{{ *)
   let empty () = []
 
   let push v s =
-printf "@[push %s@." (string_of_verification_type_info v);
+(* printf "@[push %s@." (string_of_verification_type_info v); *)
     v :: s
 
   let push_return_value x s = match x with
@@ -1257,7 +1257,7 @@ printf "@[push %s@." (string_of_verification_type_info v);
 
   let pop =
   function
-    | _ :: tl -> printf "@[pop@."; tl
+    | _ :: tl -> (* printf "@[pop@."; *) tl
     | [] -> fail SE_empty_stack
 
   let pop_if v s =
@@ -1284,18 +1284,18 @@ printf "@[push %s@." (string_of_verification_type_info v);
   let pop_if_category1 = function
     | hd :: tl ->
       if is_category1 hd then 
-(printf "@[pop C1@.";
+(* (printf "@[pop C1@."; *)
 	hd, tl
-)
+(* ) *)
       else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
 
   let pop_if_category2 = function
     | hd :: tl ->
       if not (is_category1 hd) then
-(printf "@[pop C2@.";
+(* (printf "@[pop C2@."; *)
 	hd, tl
-)
+(* ) *)
       else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
   (* }}} *)
@@ -3069,7 +3069,7 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
   let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
   let encode_method m pool a =
-    printf "@[\nEncoding method %s@." (HM.to_string m);
+    (* printf "@[\nEncoding method %s@." (HM.to_string m); *)
     encode (Some m) pool (a : HA.for_method :> HA.t)
 end
 (* }}} *)

@@ -48,14 +48,14 @@ default:
 	@echo "  veryclean   deletes all produced files (including documentation)"
 	@echo "  install     copies executable and library files"
 	@echo "  generate    generates files needed for build"
-	@echo "  scrap       generates small test file"
+	@echo "  scrap       generates small test files"
 
 all: generate
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME)Library.otarget
 	if [ -x "$(PATH_OCAML_PREFIX)/bin/ocamljava" ]; then \
-	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).byte $(PROJECT_NAME).native $(PROJECT_NAME).jar; \
+	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).native $(PROJECT_NAME).jar; \
 	else \
-	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).byte $(PROJECT_NAME).native; \
+	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).native; \
 	fi
 
 doc:
