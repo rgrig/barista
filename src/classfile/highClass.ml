@@ -1097,7 +1097,6 @@ module HighAttribute = struct (* {{{ *)
     | `SourceFile _ -> attr_source_file
     | `Synthetic -> attr_synthetic
     | `Unknown _ -> attr_unknown)
-
 end
 (* }}} *)
 module HA = HighAttribute
@@ -1127,6 +1126,10 @@ module HighMethod = struct (* {{{ *)
     | Constructor of constructor
     | Initializer of class_initializer
 
+  let to_string = function
+    | Regular r -> U.UTF8.to_string (Name.utf8_for_method r.name)
+    | Constructor _ -> "Constructor"
+    | Initializer _ -> "Initializer"
 end
 (* }}} *)
 module HM = HighMethod
@@ -1253,9 +1256,8 @@ printf "@[push %s@." (string_of_verification_type_info v);
     | [] -> fail SE_empty_stack
 
   let pop =
-printf "@[pop@.";
   function
-    | _ :: tl -> tl
+    | _ :: tl -> printf "@[pop@."; tl
     | [] -> fail SE_empty_stack
 
   let pop_if v s =
@@ -1280,11 +1282,21 @@ printf "@[pop@.";
     | Double_variable_info -> false
 
   let pop_if_category1 = function
-    | hd :: tl -> if is_category1 hd then hd, tl else fail (report_category1_expected hd)
+    | hd :: tl ->
+      if is_category1 hd then 
+(printf "@[pop C1@.";
+	hd, tl
+)
+      else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
 
   let pop_if_category2 = function
-    | hd :: tl -> if not (is_category1 hd) then hd, tl else fail (report_category2_expected hd)
+    | hd :: tl ->
+      if not (is_category1 hd) then
+(printf "@[pop C2@.";
+	hd, tl
+)
+      else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
   (* }}} *)
   (* symbolic pool {{{ *)
@@ -1379,11 +1391,6 @@ printf "@[pop@.";
 	| HI.ATHROW
 	| HI.DRETURN
 	| HI.FRETURN
-(*	| HI.INVOKEDYNAMIC _ *)
-	| HI.INVOKEINTERFACE _
-	| HI.INVOKESPECIAL _
-	| HI.INVOKESTATIC _
-	| HI.INVOKEVIRTUAL _
 	| HI.IRETURN
 	| HI.LRETURN
 	| HI.RETURN -> [f acc (l, i)]
@@ -2827,7 +2834,7 @@ module HighAttributeOps = struct (* {{{ *)
       (* could check for clashes here *)
       HI.LabelHash.add m lbl ofs;
       ofs + (BC.size_of ofs bc) in
-    List.fold_left fold 0 bcl;
+    ignore (List.fold_left fold 0 bcl);
     m
 
   let encode_instr_list pool l =
@@ -3061,7 +3068,9 @@ module HighAttributeOps = struct (* {{{ *)
 
   let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
   let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
-  let encode_method m pool a = encode (Some m) pool (a : HA.for_method :> HA.t)
+  let encode_method m pool a =
+    printf "@[\nEncoding method %s@." (HM.to_string m);
+    encode (Some m) pool (a : HA.for_method :> HA.t)
 end
 (* }}} *)
 module HAO = HighAttributeOps
