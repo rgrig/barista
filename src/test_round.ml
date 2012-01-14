@@ -4,6 +4,7 @@
 open Format
 
 module IS = InputStream
+module OS = OutputStream
 module CF = ClassFile
 module HC = HighClass
 
@@ -12,8 +13,13 @@ let check fn =
   let cl_in = IS.make_of_channel ch in
   let cf = CF.read cl_in in
   let version = Version.Java_1_7 in
-  let _ = HC.encode ~version (HC.decode ~version cf) in
-  close_in_noerr ch
+  let hc = HC.decode ~version cf in
+  close_in_noerr ch;
+  let bc = HC.encode ~version hc in
+  let ch = open_out (fn ^ ".round") in
+  let ch_out = OS.make_of_channel ch in
+  CF.write bc ch_out;
+  close_out ch
 
 let () =
   for i = 1 to Array.length Sys.argv - 1 do

@@ -64,6 +64,7 @@ doc:
 
 scrap:
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) test.native
+	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) test_round.native
 
 tests:
 	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) all && cd ..) || true

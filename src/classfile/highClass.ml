@@ -2826,7 +2826,7 @@ module HighAttributeOps = struct (* {{{ *)
       let bc = HI.encode m ofs pool i in
       ((lbl, bc)::bcl, ofs + (BC.size_of ofs bc)) in
     let bcl, _ = List.fold_left fold ([], 0) l in
-    bcl
+    List.rev bcl
 
   let compute_ofs_map bcl =
     let m = HI.LabelHash.create 131 in
