@@ -387,8 +387,8 @@ val string_of_error : error -> string
 exception Exception of error
 
 val check_version_high : ?version : Version.t -> t -> t
-val decode : ?version : Version.t -> ClassFile.t -> t
-val encode : ?version : Version.t -> t -> ClassFile.t
+val decode : ClassFile.t -> (t * Version.t)
+val encode : (t * Version.t) -> ClassFile.t
 
 (*
 vim:tw=0:

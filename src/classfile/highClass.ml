@@ -3199,15 +3199,11 @@ let check_version_high ?(version = Version.default) c =
   List.iter check_attribute (c.attributes :> HA.t list);
   c
 
-let decode ?(version = Version.default) cf =
+let decode cf =
   let pool = cf.CF.constant_pool in
-  let check_version v =
-    let v' = cf.CF.major_version, cf.CF.minor_version in
-    let v' = Version.version_of_major_minor v' in
-    Version.at_least "class file version" v' v;
-    (* TODO: The following line should be [ClassFile.check ...]. *)
-    CP.check_version v' pool in
-  check_version version;
+  let version = cf.CF.major_version, cf.CF.minor_version in
+  let version = Version.version_of_major_minor version in
+  CP.check_version version pool;
   let flags = AF.check_class_flags (AF.from_u2 false cf.CF.access_flags) in
   let class_name = CP.get_class_name pool in
   let extends =
@@ -3218,18 +3214,19 @@ let decode ?(version = Version.default) cf =
   let field_decode = HF.decode is_interface pool in
   let method_decode = HMO.decode is_interface pool in
   let attribute_decode = HAO.decode_class pool in
-  check_version_high ~version:version { access_flags = flags;
+  let hc = check_version_high ~version { access_flags = flags;
     name = class_name cf.CF.this_class;
     extends = extends;
     implements = List.map class_name (Array.to_list cf.CF.interfaces);
     fields = List.map field_decode (Array.to_list cf.CF.fields);
     methods = List.map method_decode (Array.to_list cf.CF.methods);
     attributes = List.map attribute_decode (Array.to_list cf.CF.attributes); }
+  in (hc, version)
 
 (* TODO should this be in consts? *)
 let no_super_class = U.u2 0
 
-let encode ?(version = Version.default) cd =
+let encode (cd, version) =
   ignore (check_version_high ~version:version cd);
   let major, minor = Version.major_minor_of_version version in
   let pool = CP.make_extendable () in
