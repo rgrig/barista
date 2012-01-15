@@ -13,6 +13,7 @@ the first place. *)
 module HighInstruction : sig (* {{{ *)
   type label
   val fresh_label : unit -> label
+  val invalid_label : label
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
   type tableswitch = { ts_def: label; ts_low: int; ts_high: int; ts_ofss: label list }
@@ -309,12 +310,16 @@ module SymbExe : sig (* {{{ *)
   type t
   val make_empty : unit -> t
   val fold_instructions :
-    ('a -> HighInstruction.t -> 'a) -> (* fold *)
+    ('a -> HighInstruction.t -> HighInstruction.label
+      -> 'a * HighInstruction.label list) -> (* fold *)
     'a ->                              (* init *)
     ('a -> 'a -> bool) ->              (* matches *)
     ('a -> 'a -> 'a) ->                (* unify *)
-    HighInstruction.t list -> 'a list  (* instructions *)
-  val step : t -> HighInstruction.t -> t
+    HighInstruction.t list ->          (* instructions *)
+    'a
+  val step :
+    t -> HighInstruction.t -> HighInstruction.label ->
+    t * HighInstruction.label list
 end (* }}} *)
 
 module HighAttributeOps : sig (* {{{ *)
@@ -378,6 +383,7 @@ type error =
   | SE_invalid_local_contents of (int * string * string)
   | SE_invalid_local_index of (int * int)
   | SE_invalid_stack_top of (string * string)
+  | SE_missing_return
   | SE_reference_expected of string
   | Too_many of string
   | Unsupported_instruction of string
