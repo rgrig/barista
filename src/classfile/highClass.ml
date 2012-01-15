@@ -2860,8 +2860,8 @@ module HighAttributeOps = struct (* {{{ *)
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
-
     let actual_code = Buffer.contents code_enc.en_buffer in
+    (* TODO: write the stackmap at some point *)
     let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c.HA.code in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
