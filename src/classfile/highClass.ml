@@ -1359,6 +1359,10 @@ module SymbExe = struct  (* {{{ *)
     stack : stack;
   }
 
+  let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
+
+  let java_lang_Object = `Class_or_interface java_lang_Object_name
+
   let make_empty () =
     { locals = [||]; stack = []; }
 
@@ -1378,8 +1382,8 @@ module SymbExe = struct  (* {{{ *)
 
   exception Found of int
 
-  let fold_instructions f init matches unify = function
-    | [] -> init
+  let execute_method step init eh_init unify code = match code.HA.code with
+    | [] -> HI.LabelHash.create 2
     | ((first_label, _) :: _) as i_list ->
       let i_array = Array.of_list i_list in
       let r_array = Array.make (Array.length i_array) false in
@@ -1395,28 +1399,31 @@ module SymbExe = struct  (* {{{ *)
         with Invalid_argument _ -> HI.invalid_label in
       let lift d f = function None -> d | Some x -> f x in
       let u_xO x = lift x (unify x) in
-      let u_OO xO yO = lift yO (fun x -> Some (u_xO x yO)) xO in
       let record_state lbl state =
         let n = index_of_label lbl in
         let r = u_xO state s_array.(n) in
-        s_array.(n) <- Some r; r in
+        let p = s_array.(n) <> Some r in
+        s_array.(n) <- Some r; (r, p) in
       let instruction_at l = i_array.(index_of_label l) in
       let record_return l = r_array.(index_of_label l) <- true in
-      let rec exec old_state lbl = (* main part *)
-        let state = record_state lbl old_state in
-        if not (matches old_state state) then begin
-          let state, lbls = f state (instruction_at lbl) (next_label lbl) in
+      let rec exec prev old_state lbl = (* main part *)
+(* printf "@[exec %d -> %d@." prev lbl; *)
+        let state, made_progress = record_state lbl old_state in
+        if made_progress then begin
+(* printf "@[... continue@."; *)
+          let state, lbls = step state (instruction_at lbl) (next_label lbl) in
           if lbls = [] then record_return lbl;
-          List.iter (exec state) lbls
+          List.iter (exec lbl state) lbls
         end in
-      exec init first_label;
-      let r = ref None in
-      let unify_returns i state =
-        if r_array.(i) then r := u_OO !r state in
-      Array.iteri unify_returns s_array;
-      match !r with
-        | None -> init (* should get here only when bytecode always diverges *)
-        | Some state -> state
+      exec (-1) init first_label;
+      List.iter (fun h -> exec (-1) eh_init h.HA.catch) code.HA.exception_table;
+      let r = HI.LabelHash.create 13 in
+      for i = 0 to Array.length i_array - 1 do begin
+        match s_array.(i) with
+          | Some s -> HI.LabelHash.add r (fst i_array.(i)) s
+          | None -> ()
+      end done;
+      r
 
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
@@ -1479,7 +1486,7 @@ module SymbExe = struct  (* {{{ *)
 	check_reference exc;
 	let stack = empty () in
 	let stack = push exc stack in
-	continue locals stack
+	return locals stack
       | HI.BALOAD ->
 	let stack = pop_if VI_integer stack in
 	let stack = pop stack in
@@ -2218,10 +2225,6 @@ module SymbExe = struct  (* {{{ *)
   (* unification {{{ *)
   type 'a unifier = 'a -> 'a -> 'a
 
-  let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
-
-  let java_lang_Object = `Class_or_interface java_lang_Object_name
-
   let make_array_unifier (f : Name.for_class unifier) (x : Descriptor.array_type) (y : Descriptor.array_type) =
     let rec ua (x : Descriptor.java_type) (y : Descriptor.java_type) = match x, y with
       | (`Array x'), (`Array y') -> `Array (ua (x' :> Descriptor.java_type) (y' :> Descriptor.java_type))
@@ -2365,18 +2368,24 @@ module SymbExe = struct  (* {{{ *)
         make_empty ()
 
   (* public *) (* {{{ *)
-  let compute_max_stack_locals m is =
-    let init = make_of_method m, 0, 0 in
-    let stackmap = HI.LabelHash.create 131 in
-    let matches (s, _, _) (s', _, _) = (stack_size s) = (stack_size s') in
+  let compute_max_stack_locals m c =
+    let lift_state ({ stack; locals } as s) =
+      (s, List.length stack, Array.length locals) in
+    let init = lift_state (make_of_method m) in
+    let eh_init =
+      lift_state { locals = [||]; stack = [VI_object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
     let unify (s, ms, ml) (s', ms', ml') = (unify_states s s', max ms ms', max ml ml') in
-    let f (s, ms, ml) (l, i) nl =
+    let step (s, ms, ml) (l, i) nl =
       let s', nl = step s (l, i) nl in
-      HI.LabelHash.replace stackmap l s;
       ((s', max ms (stack_size s), max ml (locals_size s)), nl) in
-    fold_instructions f init matches unify is
+    let map_scc = execute_method step init eh_init unify c in
+    let map_s = HI.LabelHash.create 13 in
+    let f l (s, ms, ml) (ms', ml') =
+      HI.LabelHash.add map_s l s; (max ms ms', max ml ml') in
+    let max_stack, max_regs = HI.LabelHash.fold f map_scc (0, 0) in
+    (map_s, max_stack, max_regs)
     (* }}} *)
 end (* }}} *)
 module SE = SymbExe
@@ -2849,7 +2858,7 @@ module HighAttributeOps = struct (* {{{ *)
     OS.close code_enc.en_st;
     let actual_code = Buffer.contents code_enc.en_buffer in
     (* TODO: write the stackmap at some point *)
-    let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c.HA.code in
+    let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
     let code_length = String.length actual_code in
@@ -3056,7 +3065,7 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
   let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
   let encode_method m pool a =
-    (* printf "@[\nEncoding method %s@." (HM.to_string m); *)
+(*     printf "@[\nEncoding method %s@." (HM.to_string m); *)
     encode (Some m) pool (a : HA.for_method :> HA.t)
 end
 (* }}} *)

@@ -309,14 +309,14 @@ end (* }}} *)
 module SymbExe : sig (* {{{ *)
   type t
   val make_empty : unit -> t
-  val fold_instructions :
+  val execute_method :
     ('a -> HighInstruction.t -> HighInstruction.label
-      -> 'a * HighInstruction.label list) -> (* fold *)
-    'a ->                              (* init *)
-    ('a -> 'a -> bool) ->              (* matches *)
-    ('a -> 'a -> 'a) ->                (* unify *)
-    HighInstruction.t list ->          (* instructions *)
-    'a
+      -> 'a * HighInstruction.label list) -> (* step *)
+    'a ->                          (* init; has locals for args *)
+    'a ->                          (* init state for exception handlers *)
+    ('a -> 'a -> 'a) ->            (* unify *)
+    HighAttribute.code_value ->    (* the method code *)
+    'a HighInstruction.LabelHash.t (* abstract values for each program point *)
   val step :
     t -> HighInstruction.t -> HighInstruction.label ->
     t * HighInstruction.label list

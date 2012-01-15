@@ -189,7 +189,6 @@ let equal st1 st2 =
   (same_locals st1 st2) && (same_stack st1 st2)
 
 let push v s =
-printf "@["
   v :: s
 
 let push_return_value x s =
