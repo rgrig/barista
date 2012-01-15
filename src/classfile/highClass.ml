@@ -2860,8 +2860,8 @@ module HighAttributeOps = struct (* {{{ *)
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
-
     let actual_code = Buffer.contents code_enc.en_buffer in
+    (* TODO: write the stackmap at some point *)
     let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c.HA.code in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
@@ -3204,7 +3204,8 @@ let decode ?(version = Version.default) cf =
   let check_version v =
     let v' = cf.CF.major_version, cf.CF.minor_version in
     let v' = Version.version_of_major_minor v' in
-    Version.at_least "class file version" v' v;
+    (* at_leat f v x means x >= v *)
+    Version.at_least ("class file version " ^ (Version.to_string v')) v' v;
     (* TODO: The following line should be [ClassFile.check ...]. *)
     CP.check_version v' pool in
   check_version version;

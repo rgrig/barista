@@ -116,7 +116,7 @@ let max_supported = u2 51, u2 0
 (* Conversion functions *)
 
 let major_minor_of_version = function
-  | Java_1_0 -> u2 45, u2 3
+  | Java_1_0 -> u2 45, u2 0
   | Java_1_1 -> u2 45, u2 3
   | Java_1_2 -> u2 46, u2 0
   | Java_1_3 -> u2 47, u2 0
