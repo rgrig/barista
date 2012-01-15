@@ -188,17 +188,6 @@ module HighInstruction : sig (* {{{ *)
 
   val version_bounds : t -> Version.bounds
 end (* }}} *)
-module SymbExe : sig (* {{{ *)
-  type t
-  val make_empty : unit -> t
-  val fold_instructions :
-    ('a -> HighInstruction.t -> 'a) -> (* fold *)
-    'a ->                              (* init *)
-    ('a -> 'a -> bool) ->              (* matches *)
-    ('a -> 'a -> 'a) ->                (* unify *)
-    HighInstruction.t list -> 'a list  (* instructions *)
-  val step : t -> HighInstruction.t -> t
-end (* }}} *)
 module HighAttribute : sig (* {{{ *)
   type constant_value =
     | Long_value of int64
@@ -288,28 +277,8 @@ module HighAttribute : sig (* {{{ *)
     | `Unknown of Utils.UTF8.t * string ]
 
   type t = [ for_class | for_method | for_field | code_attribute ]
-
-  val version_bounds : t -> Version.bounds
-
-  val decode_class :  ConstantPool.t -> Attribute.info -> for_class
-  val decode_field : ConstantPool.t -> Attribute.info -> for_field
-  val decode_method : ConstantPool.t -> Attribute.info -> for_method
-
-  val encode_class :  ConstantPool.extendable -> for_class -> Attribute.info
-  val encode_field : ConstantPool.extendable -> for_field -> Attribute.info
-  val encode_method :  ConstantPool.extendable -> for_method -> Attribute.info
-
 end (* }}} *)
-module HighField : sig (* {{{ *)
-  type t = {
-      flags : AccessFlag.for_field list;
-      name : Name.for_field;
-      descriptor : Descriptor.for_field;
-      attributes : HighAttribute.for_field list;
-    }
-  val decode : bool -> ConstantPool.t -> Field.info -> t
-  val encode : ConstantPool.extendable -> t -> Field.info
-end (* }}} *)
+
 module HighMethod : sig (* {{{ *)
   type regular = {
       flags : AccessFlag.for_method list;
@@ -334,9 +303,48 @@ module HighMethod : sig (* {{{ *)
     | Constructor of constructor
     | Initializer of class_initializer
 
-  val decode : bool -> ConstantPool.t -> Method.info -> t
+end (* }}} *)
 
-  val encode : ConstantPool.extendable -> t -> Method.info
+module SymbExe : sig (* {{{ *)
+  type t
+  val make_empty : unit -> t
+  val fold_instructions :
+    ('a -> HighInstruction.t -> 'a) -> (* fold *)
+    'a ->                              (* init *)
+    ('a -> 'a -> bool) ->              (* matches *)
+    ('a -> 'a -> 'a) ->                (* unify *)
+    HighInstruction.t list -> 'a list  (* instructions *)
+  val step : t -> HighInstruction.t -> t
+end (* }}} *)
+
+module HighAttributeOps : sig (* {{{ *)
+  val version_bounds : HighAttribute.t -> Version.bounds
+
+  val decode_class :  ConstantPool.t -> Attribute.info -> HighAttribute.for_class
+  val decode_field : ConstantPool.t -> Attribute.info -> HighAttribute.for_field
+  val decode_method : ConstantPool.t -> Attribute.info -> HighAttribute.for_method
+
+  val encode_class : ConstantPool.extendable -> HighAttribute.for_class -> Attribute.info
+  val encode_field : ConstantPool.extendable -> HighAttribute.for_field -> Attribute.info
+  val encode_method : HighMethod.t -> ConstantPool.extendable -> HighAttribute.for_method -> Attribute.info
+
+end (* }}} *)
+
+module HighMethodOps : sig (* {{{ *)
+  val decode : bool -> ConstantPool.t -> Method.info -> HighMethod.t
+
+  val encode : ConstantPool.extendable -> HighMethod.t -> Method.info
+end (* }}} *)
+
+module HighField : sig (* {{{ *)
+  type t = {
+      flags : AccessFlag.for_field list;
+      name : Name.for_field;
+      descriptor : Descriptor.for_field;
+      attributes : HighAttribute.for_field list;
+    }
+  val decode : bool -> ConstantPool.t -> Field.info -> t
+  val encode : ConstantPool.extendable -> t -> Field.info
 end (* }}} *)
 
 type t = {

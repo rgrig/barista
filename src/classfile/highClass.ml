@@ -266,6 +266,7 @@ module HighInstruction = struct (* {{{ *)
   let u1_to_int (u : U.u1) = (u :> int)
   let u2_to_int (u : U.u2) = (u :> int)
 
+  (* TODO(rgrig): handle overflow *)
   let decode pool ofs_to_lbl ofs =
 (*
     let abs_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (s :> int) in
@@ -974,6 +975,165 @@ module HighInstruction = struct (* {{{ *)
 end (* }}} *)
 module HI = HighInstruction
 
+
+module A = Attribute
+module HighAttribute = struct (* {{{ *)
+  open Consts
+
+  (* high-level *)
+
+  type constant_value =
+    | Long_value of int64
+    | Float_value of float
+    | Double_value of float
+    | Boolean_value of bool
+    | Byte_value of int
+    | Character_value of int
+    | Short_value of int
+    | Integer_value of int32
+    | String_value of Utils.UTF8.t
+
+  type inner_class_element = {
+      inner_class : Name.for_class option;
+      outer_class : Name.for_class option;
+      inner_name : Utils.UTF8.t option;
+      inner_flags : AccessFlag.for_inner_class list;
+    }
+
+  type enclosing_method_value = {
+      innermost_class : Name.for_class;
+      enclosing_method : (Name.for_method * Descriptor.for_method) option;
+    }
+
+  type code_attribute = [
+    | `LineNumberTable of int HI.LabelHash.t
+    | `Unknown of Utils.UTF8.t * string
+
+    (* TODO: Treating these properly requires some symbolic execution. *)
+    | `LocalVariableTable of unit (** types for local variables *)
+    | `LocalVariableTypeTable of unit (** signatures for local variables *)
+  ]
+
+  type exception_table_element = {
+      try_start : HI.label;
+      try_end : HI.label;
+      catch : HI.label;
+      caught : Name.for_class option;
+    }
+
+  type code_value = {
+      code : HI.t list;
+      exception_table : exception_table_element list;
+      attributes : code_attribute list;
+    }
+
+  type for_class =
+    [ `InnerClasses of inner_class_element list
+    | `EnclosingMethod of enclosing_method_value
+    | `Synthetic (** auto-generated element *)
+    | `ClassSignature of Signature.class_signature
+    | `SourceFile of Utils.UTF8.t
+    | `SourceDebugExtension of Utils.UTF8.t (** implementation specific *)
+    | `Deprecated
+    | `RuntimeVisibleAnnotations of Annotation.t list
+    | `RuntimeInvisibleAnnotations of Annotation.t list
+    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
+    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
+    | `BootstrapMethods of Bootstrap.method_specifier list (** bootstrap for dynamic methods *)
+    | `Module of Utils.UTF8.t * Utils.UTF8.t (** module name and version *)
+    | `Unknown of Utils.UTF8.t * string ]
+
+  type for_method =
+    [ `Code of code_value
+    | `Exceptions of Name.for_class list
+    | `Synthetic (** auto-generated element *)
+    | `MethodSignature of Signature.method_signature
+    | `Deprecated
+    | `RuntimeVisibleAnnotations of Annotation.t list
+    | `RuntimeInvisibleAnnotations of Annotation.t list
+    | `RuntimeVisibleParameterAnnotations of Annotation.t list list
+    | `RuntimeInvisibleParameterAnnotations of Annotation.t list list
+    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
+    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
+    | `AnnotationDefault of Annotation.element_value
+    | `Unknown of Utils.UTF8.t * string ]
+
+  type for_field =
+    [ `ConstantValue of constant_value
+    | `Synthetic
+    | `FieldSignature of Signature.field_type_signature
+    | `Deprecated
+    | `RuntimeVisibleAnnotations of Annotation.t list
+    | `RuntimeInvisibleAnnotations of Annotation.t list
+    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
+    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
+    | `Unknown of Utils.UTF8.t * string ]
+
+  type t = [ for_class | for_method | for_field | code_attribute ]
+
+  let name_of_attribute (a : t) = U.UTF8.to_string (match a with
+    | `AnnotationDefault _ -> attr_annotation_default
+    | `BootstrapMethods _ -> attr_bootstrap_methods
+    | `ClassSignature _ -> attr_signature
+    | `Code _ -> attr_code
+    | `ConstantValue _ -> attr_constant_value
+    | `Deprecated -> attr_deprecated
+    | `EnclosingMethod _ -> attr_enclosing_method
+    | `Exceptions _ -> attr_exceptions
+    | `FieldSignature _ -> attr_signature
+    | `InnerClasses _ -> attr_inner_classes
+    | `LineNumberTable _ -> attr_line_number_table
+    | `LocalVariableTable _ -> attr_local_variable_table
+    | `LocalVariableTypeTable _ -> attr_local_variable_type_table
+    | `MethodSignature _ -> attr_signature
+    | `Module _ -> attr_module
+    | `RuntimeInvisibleAnnotations _ -> attr_runtime_invisible_annotations
+    | `RuntimeInvisibleParameterAnnotations _ -> attr_runtime_invisible_parameter_annotations
+    | `RuntimeInvisibleTypeAnnotations _ -> attr_runtime_invisible_type_annotations
+    | `RuntimeVisibleAnnotations _ -> attr_runtime_visible_annotations
+    | `RuntimeVisibleParameterAnnotations _ -> attr_runtime_visible_parameter_annotations
+    | `RuntimeVisibleTypeAnnotations _ -> attr_runtime_visible_type_annotations
+    | `SourceDebugExtension _ -> attr_source_debug_extension
+    | `SourceFile _ -> attr_source_file
+    | `Synthetic -> attr_synthetic
+    | `Unknown _ -> attr_unknown)
+end
+(* }}} *)
+module HA = HighAttribute
+
+module M = Method
+module HighMethod = struct (* {{{ *)
+  type regular = {
+      flags : AccessFlag.for_method list;
+      name : Name.for_method;
+      descriptor : Descriptor.for_method;
+      attributes : HighAttribute.for_method list;
+    }
+
+  type constructor = {
+      cstr_flags : AccessFlag.for_constructor list;
+      cstr_descriptor : Descriptor.for_parameter list;
+      cstr_attributes : HighAttribute.for_method list;
+    }
+
+  type class_initializer = {
+      init_flags : AccessFlag.for_initializer list;
+      init_attributes : HighAttribute.for_method list;
+    }
+
+  type t =
+    | Regular of regular
+    | Constructor of constructor
+    | Initializer of class_initializer
+
+  let to_string = function
+    | Regular r -> U.UTF8.to_string (Name.utf8_for_method r.name)
+    | Constructor _ -> "Constructor"
+    | Initializer _ -> "Initializer"
+end
+(* }}} *)
+module HM = HighMethod
+
 module SymbExe = struct  (* {{{ *)
   (* symbolic types {{{ *)
   type verification_type_info =
@@ -1083,7 +1243,7 @@ module SymbExe = struct  (* {{{ *)
   let empty () = []
 
   let push v s =
-printf "@[push %s@." (string_of_verification_type_info v);
+(* printf "@[push %s@." (string_of_verification_type_info v); *)
     v :: s
 
   let push_return_value x s = match x with
@@ -1096,9 +1256,8 @@ printf "@[push %s@." (string_of_verification_type_info v);
     | [] -> fail SE_empty_stack
 
   let pop =
-printf "@[pop@.";
   function
-    | _ :: tl -> tl
+    | _ :: tl -> (* printf "@[pop@."; *) tl
     | [] -> fail SE_empty_stack
 
   let pop_if v s =
@@ -1123,11 +1282,21 @@ printf "@[pop@.";
     | Double_variable_info -> false
 
   let pop_if_category1 = function
-    | hd :: tl -> if is_category1 hd then hd, tl else fail (report_category1_expected hd)
+    | hd :: tl ->
+      if is_category1 hd then 
+(* (printf "@[pop C1@."; *)
+	hd, tl
+(* ) *)
+      else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
 
   let pop_if_category2 = function
-    | hd :: tl -> if not (is_category1 hd) then hd, tl else fail (report_category2_expected hd)
+    | hd :: tl ->
+      if not (is_category1 hd) then
+(* (printf "@[pop C2@."; *)
+	hd, tl
+(* ) *)
+      else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
   (* }}} *)
   (* symbolic pool {{{ *)
@@ -1222,11 +1391,6 @@ printf "@[pop@.";
 	| HI.ATHROW
 	| HI.DRETURN
 	| HI.FRETURN
-(*	| HI.INVOKEDYNAMIC _ *)
-	| HI.INVOKEINTERFACE _
-	| HI.INVOKESPECIAL _
-	| HI.INVOKESTATIC _
-	| HI.INVOKEVIRTUAL _
 	| HI.IRETURN
 	| HI.LRETURN
 	| HI.RETURN -> [f acc (l, i)]
@@ -2176,9 +2340,23 @@ printf "@[pop@.";
     end else
       fail (SE_different_stack_sizes (sz1, sz2))
   (* }}} *)
-  (* public *) (* {{{ *)
-  let make_of_method = failwith "todo"
-    (*
+
+  (* TODO(rlp): it appears he pads the stack for big values *)
+  (* our symbolic execution should be size agnostic and not need that *)
+  let of_list l =
+    let l =
+      List.map
+	(function
+          | Long_variable_info ->
+            [Long_variable_info; Top_variable_info]
+          | Double_variable_info ->
+            [Double_variable_info; Top_variable_info]
+          | x -> [x])
+	l in
+    let l = List.concat l in
+    Array.of_list l
+      
+  let make_of_method =
     function
     | HM.Regular { HM.flags; descriptor; _ } ->
         let l = fst descriptor in
@@ -2195,8 +2373,8 @@ printf "@[pop@.";
         { locals = of_list l; stack = [] }
     | HM.Initializer _ ->
         make_empty ()
-*)
 
+  (* public *) (* {{{ *)
   let compute_max_stack_locals m is =
     let init = make_of_method m, 0, 0 in
     let stackmap = HI.LabelHash.create 131 in
@@ -2216,128 +2394,7 @@ printf "@[pop@.";
 end (* }}} *)
 module SE = SymbExe
 
-module A = Attribute
-module HighAttribute = struct (* {{{ *)
-  open Consts
-
-  (* high-level *)
-
-  type constant_value =
-    | Long_value of int64
-    | Float_value of float
-    | Double_value of float
-    | Boolean_value of bool
-    | Byte_value of int
-    | Character_value of int
-    | Short_value of int
-    | Integer_value of int32
-    | String_value of Utils.UTF8.t
-
-  type inner_class_element = {
-      inner_class : Name.for_class option;
-      outer_class : Name.for_class option;
-      inner_name : Utils.UTF8.t option;
-      inner_flags : AccessFlag.for_inner_class list;
-    }
-
-  type enclosing_method_value = {
-      innermost_class : Name.for_class;
-      enclosing_method : (Name.for_method * Descriptor.for_method) option;
-    }
-
-  type code_attribute = [
-    | `LineNumberTable of int HI.LabelHash.t
-    | `Unknown of Utils.UTF8.t * string
-
-    (* TODO: Treating these properly requires some symbolic execution. *)
-    | `LocalVariableTable of unit (** types for local variables *)
-    | `LocalVariableTypeTable of unit (** signatures for local variables *)
-  ]
-
-  type exception_table_element = {
-      try_start : HI.label;
-      try_end : HI.label;
-      catch : HI.label;
-      caught : Name.for_class option;
-    }
-
-  type code_value = {
-      code : HI.t list;
-      exception_table : exception_table_element list;
-      attributes : code_attribute list;
-    }
-
-  type for_class =
-    [ `InnerClasses of inner_class_element list
-    | `EnclosingMethod of enclosing_method_value
-    | `Synthetic (** auto-generated element *)
-    | `ClassSignature of Signature.class_signature
-    | `SourceFile of Utils.UTF8.t
-    | `SourceDebugExtension of Utils.UTF8.t (** implementation specific *)
-    | `Deprecated
-    | `RuntimeVisibleAnnotations of Annotation.t list
-    | `RuntimeInvisibleAnnotations of Annotation.t list
-    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
-    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
-    | `BootstrapMethods of Bootstrap.method_specifier list (** bootstrap for dynamic methods *)
-    | `Module of Utils.UTF8.t * Utils.UTF8.t (** module name and version *)
-    | `Unknown of Utils.UTF8.t * string ]
-
-  type for_method =
-    [ `Code of code_value
-    | `Exceptions of Name.for_class list
-    | `Synthetic (** auto-generated element *)
-    | `MethodSignature of Signature.method_signature
-    | `Deprecated
-    | `RuntimeVisibleAnnotations of Annotation.t list
-    | `RuntimeInvisibleAnnotations of Annotation.t list
-    | `RuntimeVisibleParameterAnnotations of Annotation.t list list
-    | `RuntimeInvisibleParameterAnnotations of Annotation.t list list
-    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
-    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
-    | `AnnotationDefault of Annotation.element_value
-    | `Unknown of Utils.UTF8.t * string ]
-
-  type for_field =
-    [ `ConstantValue of constant_value
-    | `Synthetic
-    | `FieldSignature of Signature.field_type_signature
-    | `Deprecated
-    | `RuntimeVisibleAnnotations of Annotation.t list
-    | `RuntimeInvisibleAnnotations of Annotation.t list
-    | `RuntimeVisibleTypeAnnotations of Annotation.extended list
-    | `RuntimeInvisibleTypeAnnotations of Annotation.extended list
-    | `Unknown of Utils.UTF8.t * string ]
-
-  type t = [ for_class | for_method | for_field | code_attribute ]
-
-  let name_of_attribute (a : t) = U.UTF8.to_string (match a with
-    | `AnnotationDefault _ -> attr_annotation_default
-    | `BootstrapMethods _ -> attr_bootstrap_methods
-    | `ClassSignature _ -> attr_signature
-    | `Code _ -> attr_code
-    | `ConstantValue _ -> attr_constant_value
-    | `Deprecated -> attr_deprecated
-    | `EnclosingMethod _ -> attr_enclosing_method
-    | `Exceptions _ -> attr_exceptions
-    | `FieldSignature _ -> attr_signature
-    | `InnerClasses _ -> attr_inner_classes
-    | `LineNumberTable _ -> attr_line_number_table
-    | `LocalVariableTable _ -> attr_local_variable_table
-    | `LocalVariableTypeTable _ -> attr_local_variable_type_table
-    | `MethodSignature _ -> attr_signature
-    | `Module _ -> attr_module
-    | `RuntimeInvisibleAnnotations _ -> attr_runtime_invisible_annotations
-    | `RuntimeInvisibleParameterAnnotations _ -> attr_runtime_invisible_parameter_annotations
-    | `RuntimeInvisibleTypeAnnotations _ -> attr_runtime_invisible_type_annotations
-    | `RuntimeVisibleAnnotations _ -> attr_runtime_visible_annotations
-    | `RuntimeVisibleParameterAnnotations _ -> attr_runtime_visible_parameter_annotations
-    | `RuntimeVisibleTypeAnnotations _ -> attr_runtime_visible_type_annotations
-    | `SourceDebugExtension _ -> attr_source_debug_extension
-    | `SourceFile _ -> attr_source_file
-    | `Synthetic -> attr_synthetic
-    | `Unknown _ -> attr_unknown)
-
+module HighAttributeOps = struct (* {{{ *)
   (* helper functions *)
 
   let hash_of_list create add xs =
@@ -2395,8 +2452,8 @@ module HighAttribute = struct (* {{{ *)
 	data = dat; }
 
   let check_code_attribute = function
-    | #code_attribute as g -> g
-    | b -> fail (Misplaced_attribute (name_of_attribute b, "code"))
+    | #HA.code_attribute as g -> g
+    | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "code"))
 
   let option_of_u2 f (i : U.u2) =
     if (i :> int) = 0 then None else Some (f i)
@@ -2413,16 +2470,16 @@ module HighAttribute = struct (* {{{ *)
         match CP.get_entry r.da_pool const_index with
         | CP.Long (hi, lo) ->
             let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
-            `ConstantValue (Long_value v)
+            `ConstantValue (HA.Long_value v)
         | CP.Float v ->
-            `ConstantValue (Float_value (Int32.float_of_bits v))
+            `ConstantValue (HA.Float_value (Int32.float_of_bits v))
         | CP.Double (hi, lo) ->
             let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
-            `ConstantValue (Double_value (Int64.float_of_bits v))
+            `ConstantValue (HA.Double_value (Int64.float_of_bits v))
         | CP.Integer v ->
-            `ConstantValue (Integer_value v)
+            `ConstantValue (HA.Integer_value v)
         | CP.String idx ->
-            `ConstantValue (String_value (CP.get_utf8_entry r.da_pool idx))
+            `ConstantValue (HA.String_value (CP.get_utf8_entry r.da_pool idx))
         | _ -> fail Invalid_constant_value
 
   let decode_attr_code decode r st =
@@ -2464,10 +2521,10 @@ module HighAttribute = struct (* {{{ *)
             else
               None in
 	  let u2_ofs_to_label ofs = ofs_to_label (ofs : Utils.u2 :> int) in
-          { try_start = u2_ofs_to_label start_pc;
-            try_end = u2_ofs_to_label end_pc;
-            catch = u2_ofs_to_label handler_pc;
-            caught = catch_type; }) in
+          { HA.try_start = u2_ofs_to_label start_pc;
+            HA.try_end = u2_ofs_to_label end_pc;
+            HA.catch = u2_ofs_to_label handler_pc;
+            HA.caught = catch_type; }) in
     let attrs = IS.read_elements
         st
         (fun st -> decode { r with da_i = read_info st }) in
@@ -2483,15 +2540,15 @@ module HighAttribute = struct (* {{{ *)
       | x -> x in
     let attrs = List.map check_code_attribute attrs in
     let attrs = List.map update_lnt attrs in
-    `Code { code = instrs;
-            exception_table = exceptions;
-            attributes = attrs }
+    `Code { HA.code = instrs;
+            HA.exception_table = exceptions;
+            HA.attributes = attrs }
 
-  let decode_attr_exceptions _ r st : t =
+  let decode_attr_exceptions _ r st : HA.t =
     let f st = CP.get_class_name r.da_pool (IS.read_u2 st) in
     `Exceptions (IS.read_elements st f)
 
-  let decode_attr_inner_classes _ r st : t =
+  let decode_attr_inner_classes _ r st : HA.t =
     let one st =
       let inner_class = IS.read_u2 st in
       let outer_class = IS.read_u2 st in
@@ -2504,10 +2561,10 @@ module HighAttribute = struct (* {{{ *)
       let inner_name = option_of_u2 utf8 inner_name in
       let inner_flags = AF.from_u2 false inner_flags in
       let inner_flags = AF.check_inner_class_flags inner_flags in
-      { inner_class; outer_class; inner_name; inner_flags } in
+      { HA.inner_class; HA.outer_class; HA.inner_name; HA.inner_flags } in
     `InnerClasses (IS.read_elements st one)
 
-  let decode_attr_enclosing_method _ r st : t =
+  let decode_attr_enclosing_method _ r st : HA.t =
     let f i = match CP.get_entry r.da_pool i with
       | CP.NameAndType (name, desc) ->
           let utf8 = CP.get_utf8_entry r.da_pool in
@@ -2518,12 +2575,12 @@ module HighAttribute = struct (* {{{ *)
     let enclosing_method = IS.read_u2 st in
     let innermost_class = CP.get_class_name r.da_pool innermost_class in
     let enclosing_method = option_of_u2 f enclosing_method in
-    `EnclosingMethod { innermost_class; enclosing_method }
+    `EnclosingMethod { HA.innermost_class; HA.enclosing_method }
 
-  let decode_attr_synthetic _ _ _ : t =
+  let decode_attr_synthetic _ _ _ : HA.t =
     `Synthetic
 
-  let decode_attr_signature _ r st : t =
+  let decode_attr_signature _ r st : HA.t =
     let signature_index = InputStream.read_u2 st in
     let s = CP.get_utf8_entry r.da_pool signature_index in
     match r.da_element with
@@ -2559,21 +2616,21 @@ module HighAttribute = struct (* {{{ *)
     (* See TODO note on type code_attribute. *)
     `LocalVariableTypeTable ()
 
-  let decode_attr_deprecated _ _ _ : t = `Deprecated
+  let decode_attr_deprecated _ _ _ : HA.t = `Deprecated
 
-  let decode_attr_runtime_visible_annotations _ r st : t =
+  let decode_attr_runtime_visible_annotations _ r st : HA.t =
     `RuntimeVisibleAnnotations (read_annotations r.da_pool st)
-  let decode_attr_runtime_invisible_annotations _ r st : t =
+  let decode_attr_runtime_invisible_annotations _ r st : HA.t =
     `RuntimeInvisibleAnnotations (read_annotations r.da_pool st)
-  let decode_attr_runtime_visible_parameter_annotations _ r st : t =
+  let decode_attr_runtime_visible_parameter_annotations _ r st : HA.t =
     `RuntimeVisibleParameterAnnotations (read_annotations_list r.da_pool st)
-  let decode_attr_runtime_invisible_parameter_annotations _ r st : t =
+  let decode_attr_runtime_invisible_parameter_annotations _ r st : HA.t =
     `RuntimeInvisibleParameterAnnotations (read_annotations_list r.da_pool st)
 
   let decode_attr_runtime_visible_type_annotations _ = failwith "todo:decode_attr_runtime_visible_type_annotations"
   let decode_attr_runtime_invisible_type_annotations _ = failwith "todo:decode_attr_runtime_invisible_type_annotations"
 
-  let decode_attr_annotation_default _ r st : t =
+  let decode_attr_annotation_default _ r st : HA.t =
     let eiv = Annotation.read_info_element_value st in
     `AnnotationDefault (Annotation.decode_element_value r.da_pool eiv)
 
@@ -2586,8 +2643,8 @@ module HighAttribute = struct (* {{{ *)
   module UTF8Hashtbl = Hashtbl.Make (Utils.UTF8)
 
   let decoders :
-      ((decoding_arguments -> t) ->
-        decoding_arguments -> InputStream.t -> t)
+      ((decoding_arguments -> HA.t) ->
+        decoding_arguments -> InputStream.t -> HA.t)
       UTF8Hashtbl.t =
     let ds = [
       attr_annotation_default, decode_attr_annotation_default;
@@ -2633,20 +2690,20 @@ module HighAttribute = struct (* {{{ *)
 
   let decode_class da_pool da_i =
     match decode { da_element = A.Class; da_pool; da_i } with
-      | #for_class as g -> g
-      | b -> fail (Misplaced_attribute (name_of_attribute b, "class"))
+      | #HA.for_class as g -> g
+      | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "class"))
 
   let decode_field da_pool da_i =
     match decode { da_element = A.Field; da_pool; da_i } with
-      | #for_field as g -> g
-      | b -> fail (Misplaced_attribute (name_of_attribute b, "field"))
+      | #HA.for_field as g -> g
+      | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "field"))
 
   let decode_method da_pool da_i =
     match decode { da_element = A.Method; da_pool; da_i } with
-      | #for_method as g -> g
-      | b -> fail (Misplaced_attribute (name_of_attribute b, "method"))
+      | #HA.for_method as g -> g
+      | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "method"))
 
-  let rec version_bounds : t -> Version.bounds = function
+  let rec version_bounds : HA.t -> Version.bounds = function
     | `AnnotationDefault _ ->
         Version.make_bounds "'AnnotationDefault' attribute" Version.Java_1_5 None
     | `BootstrapMethods _ ->
@@ -2654,8 +2711,8 @@ module HighAttribute = struct (* {{{ *)
     | `ClassSignature _ ->
         Version.make_bounds "'ClassSignature' attribute" Version.Java_1_5 None
     | `Code cv ->
-        let instrs_bounds = List.map HI.version_bounds cv.code in
-        let attrs_bounds = List.map version_bounds (cv.attributes :> t list) in
+        let instrs_bounds = List.map HI.version_bounds cv.HA.code in
+        let attrs_bounds = List.map version_bounds (cv.HA.attributes :> HA.t list) in
         Version.intersect_list (instrs_bounds @ attrs_bounds)
     | `ConstantValue _ ->
         Version.make_bounds "'ConstantValue' attribute" Version.Java_1_0 None
@@ -2769,7 +2826,7 @@ module HighAttribute = struct (* {{{ *)
       let bc = HI.encode m ofs pool i in
       ((lbl, bc)::bcl, ofs + (BC.size_of ofs bc)) in
     let bcl, _ = List.fold_left fold ([], 0) l in
-    bcl
+    List.rev bcl
 
   let compute_ofs_map bcl =
     let m = HI.LabelHash.create 131 in
@@ -2777,7 +2834,7 @@ module HighAttribute = struct (* {{{ *)
       (* could check for clashes here *)
       HI.LabelHash.add m lbl ofs;
       ofs + (BC.size_of ofs bc) in
-    List.fold_left fold 0 bcl;
+    ignore (List.fold_left fold 0 bcl);
     m
 
   let encode_instr_list pool l =
@@ -2799,13 +2856,13 @@ module HighAttribute = struct (* {{{ *)
     let m = match m with
       | Some m -> m
       | None -> failwith "INTERNAL: encode_attr_code" in
-    let label_to_ofs, code_content = encode_instr_list enc.en_pool c.code in
+    let label_to_ofs, code_content = encode_instr_list enc.en_pool c.HA.code in
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
 
     let actual_code = Buffer.contents code_enc.en_buffer in
-    let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c.code in
+    let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c.HA.code in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
     let code_length = String.length actual_code in
@@ -2816,59 +2873,59 @@ module HighAttribute = struct (* {{{ *)
       (checked_length "Exceptions")
       enc.en_st
       (fun st elem ->
-        let catch_idx = match elem.caught with
+        let catch_idx = match elem.HA.caught with
         | Some exn_name -> CP.add_class enc.en_pool exn_name
         | None -> U.u2 0 in
-        OS.write_u2 st (U.u2 (label_to_ofs elem.try_start));
-        OS.write_u2 st (U.u2 (label_to_ofs elem.try_end));
-        OS.write_u2 st (U.u2 (label_to_ofs elem.catch));
+        OS.write_u2 st (U.u2 (label_to_ofs elem.HA.try_start));
+        OS.write_u2 st (U.u2 (label_to_ofs elem.HA.try_end));
+        OS.write_u2 st (U.u2 (label_to_ofs elem.HA.catch));
         OS.write_u2 st catch_idx)
-      c.exception_table;
-    let len' = checked_length "Attributes" c.attributes in
+      c.HA.exception_table;
+    let len' = checked_length "Attributes" c.HA.attributes in
     OS.write_u2 enc.en_st len';
     let sub_enc = make_encoder enc.en_pool 16 in
     List.iter
       (fun a ->
-        let res = encode (Some m) sub_enc.en_pool (a :> t) in
+        let res = encode (Some m) sub_enc.en_pool (a :> HA.t) in
         write_info sub_enc res)
-      c.attributes;
+      c.HA.attributes;
     OS.close sub_enc.en_st;
     OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
     enc_return enc attr_code
 
   let encode_attr_constant_value enc = function
-      | Boolean_value b ->
+      | HA.Boolean_value b ->
           let idx = CP.add_integer enc.en_pool (if b then 1l else 0l) in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
-      | Byte_value v | Character_value v | Short_value v ->
+      | HA.Byte_value v | HA.Character_value v | HA.Short_value v ->
           let idx = CP.add_integer enc.en_pool (Int32.of_int v) in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
-      | Double_value d ->
+      | HA.Double_value d ->
           let idx = CP.add_double enc.en_pool d in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
-      | Float_value f ->
+      | HA.Float_value f ->
           let idx = CP.add_float enc.en_pool f in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
-      | Integer_value i ->
+      | HA.Integer_value i ->
           let idx = CP.add_integer enc.en_pool i in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
-      | Long_value l ->
+      | HA.Long_value l ->
           let idx = CP.add_long enc.en_pool l in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
-      | String_value s ->
+      | HA.String_value s ->
           let idx = CP.add_string enc.en_pool s in
           OS.write_u2 enc.en_st idx;
           enc_return enc attr_constant_value
 
   let encode_attr_deprecated enc = enc_return enc attr_deprecated
 
-  let encode_attr_enclosing_method enc { innermost_class; enclosing_method } =
+  let encode_attr_enclosing_method enc { HA.innermost_class; HA.enclosing_method } =
       let class_idx = CP.add_class enc.en_pool innermost_class in
       let meth_idx = match enclosing_method with
       | Some (n, d) ->
@@ -2899,7 +2956,7 @@ module HighAttribute = struct (* {{{ *)
       OutputStream.write_elements
         (checked_length "inner classes")
         enc.en_st
-        (fun st { inner_class; outer_class; inner_name; inner_flags } ->
+        (fun st { HA.inner_class; HA.outer_class; HA.inner_name; HA.inner_flags } ->
           let inner_idx = match inner_class with
           | None -> U.u2 0
           | Some c -> CP.add_class enc.en_pool c in
@@ -2980,7 +3037,7 @@ module HighAttribute = struct (* {{{ *)
       Buffer.add_string enc.en_buffer v;
       enc_return enc n
 
-  let rec encode m pool : t -> A.info =
+  let rec encode m pool : HA.t -> A.info =
     let enc = make_encoder pool 64 in
   function
     | `AnnotationDefault ev -> encode_attr_annotation_default enc ev
@@ -3009,13 +3066,73 @@ module HighAttribute = struct (* {{{ *)
     | `Synthetic -> encode_attr_synthetic enc
     | `Unknown u -> encode_attr_unknown enc u
 
-  let encode_class pool a = encode None pool (a : for_class :> t)
-  let encode_field pool a = encode None pool (a : for_field :> t)
-  let encode_method m pool a = encode (Some m) pool (a : for_method :> t)
+  let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
+  let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
+  let encode_method m pool a =
+    (* printf "@[\nEncoding method %s@." (HM.to_string m); *)
+    encode (Some m) pool (a : HA.for_method :> HA.t)
 end
 (* }}} *)
-module HA = HighAttribute
+module HAO = HighAttributeOps
 
+module HighMethodOps = struct (* {{{ *)
+  let decode_initializer init_attributes flags _ =
+    let init_flags = AccessFlag.check_initializer_flags flags in
+    HM.Initializer { HM.init_flags; HM.init_attributes }
+
+  let decode_constructor (cstr_descriptor,_) cstr_attributes flags _ =
+    let cstr_flags = AccessFlag.check_constructor_flags flags in
+    HM.Constructor { HM.cstr_flags; HM.cstr_descriptor; HM.cstr_attributes }
+
+  let decode_regular i name descriptor attributes flags _ =
+    let flags = AccessFlag.check_method_flags i flags in
+    HM.Regular { HM.flags; HM.name; HM.descriptor; HM.attributes}
+
+  let decode is_interface pool m =
+    let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
+    let utf8_name = utf8 m.M.name_index in
+    let name = Name.make_for_method utf8_name in
+    let descriptor =
+      Descriptor.method_of_utf8 (utf8 m.M.descriptor_index) in
+    let attributes =
+      U.map_array_to_list (HAO.decode_method pool) m.M.attributes_array in
+    let flags = AccessFlag.from_u2 true m.M.access_flags in
+    U.switch U.UTF8.equal
+      [ class_initializer, decode_initializer attributes flags
+      ; class_constructor, decode_constructor descriptor attributes flags ]
+      (decode_regular is_interface name descriptor attributes flags)
+      utf8_name
+
+  let encode pool m =
+    let flags, name, desc, attrs = match m with
+      | HM.Regular r ->
+	r.HM.flags,
+	r.HM.name,
+	r.HM.descriptor,
+	r.HM.attributes
+      | HM.Constructor c ->
+	(c.HM.cstr_flags :> AF.for_method list),
+	(Name.make_for_method class_constructor),
+	(c.HM.cstr_descriptor, `Void),
+	c.HM.cstr_attributes
+      | HM.Initializer i ->
+	(i.HM.init_flags :> AF.for_method list),
+	(Name.make_for_method class_initializer),
+	([], `Void),
+	i.HM.init_attributes in
+    let acc_flags = AF.list_to_u2 (flags :> AF.t list) in
+    let name_idx = CP.add_utf8 pool (Name.utf8_for_method name) in
+    let desc_utf8 = Descriptor.utf8_of_method desc in
+    let desc_idx = CP.add_utf8 pool desc_utf8 in
+    { M.access_flags = acc_flags;
+      name_index = name_idx;
+      descriptor_index = desc_idx;
+      attributes_count = U.u2 (List.length attrs);
+      attributes_array = U.map_list_to_array (HAO.encode_method m pool) (attrs :> HA.for_method list); }
+end (* }}} *)
+module HMO = HighMethodOps
+
+(* }}} *)
 module F = Field
 module HighField = struct (* {{{ *)
   type t = {
@@ -3034,7 +3151,7 @@ module HighField = struct (* {{{ *)
     let descriptor = CP.get_utf8_entry pool i.F.descriptor_index in
     let descriptor = Descriptor.field_of_utf8 descriptor in
     let attributes =
-      U.map_array_to_list (HA.decode_field pool) i.F.attributes_array in
+      U.map_array_to_list (HAO.decode_field pool) i.F.attributes_array in
     { flags; name; descriptor; attributes }
 
   let encode pool f =
@@ -3044,95 +3161,13 @@ module HighField = struct (* {{{ *)
     let descriptor_index = CP.add_utf8 pool desc_utf8 in
     let attributes_count = U.u2 (List.length f.attributes) in
     let attributes_array =
-      U.map_list_to_array (HA.encode None pool) (f.attributes :> HA.t list) in
+      U.map_list_to_array (HAO.encode None pool) (f.attributes :> HA.t list) in
     { F.access_flags; name_index; descriptor_index; attributes_count
     ; attributes_array }
 
 end (* }}} *)
 module HF = HighField
 
-module M = Method
-module HighMethod = struct (* {{{ *)
-  type regular = {
-      flags : AccessFlag.for_method list;
-      name : Name.for_method;
-      descriptor : Descriptor.for_method;
-      attributes : HighAttribute.for_method list;
-    }
-
-  type constructor = {
-      cstr_flags : AccessFlag.for_constructor list;
-      cstr_descriptor : Descriptor.for_parameter list;
-      cstr_attributes : HighAttribute.for_method list;
-    }
-
-  type class_initializer = {
-      init_flags : AccessFlag.for_initializer list;
-      init_attributes : HighAttribute.for_method list;
-    }
-
-  type t =
-    | Regular of regular
-    | Constructor of constructor
-    | Initializer of class_initializer
-
-  let decode_initializer init_attributes flags _ =
-    let init_flags = AccessFlag.check_initializer_flags flags in
-    Initializer { init_flags; init_attributes }
-
-  let decode_constructor (cstr_descriptor,_) cstr_attributes flags _ =
-    let cstr_flags = AccessFlag.check_constructor_flags flags in
-    Constructor { cstr_flags; cstr_descriptor; cstr_attributes }
-
-  let decode_regular i name descriptor attributes flags _ =
-    let flags = AccessFlag.check_method_flags i flags in
-    Regular { flags; name; descriptor; attributes}
-
-  let decode is_interface pool m =
-    let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
-    let utf8_name = utf8 m.M.name_index in
-    let name = Name.make_for_method utf8_name in
-    let descriptor =
-      Descriptor.method_of_utf8 (utf8 m.M.descriptor_index) in
-    let attributes =
-      U.map_array_to_list (HA.decode_method pool) m.M.attributes_array in
-    let flags = AccessFlag.from_u2 true m.M.access_flags in
-    U.switch U.UTF8.equal
-      [ class_initializer, decode_initializer attributes flags
-      ; class_constructor, decode_constructor descriptor attributes flags ]
-      (decode_regular is_interface name descriptor attributes flags)
-      utf8_name
-
-  let encode pool m =
-    let flags, name, desc, attrs = match m with
-      | Regular r ->
-	r.flags,
-	r.name,
-	r.descriptor,
-	r.attributes
-      | Constructor c ->
-	(c.cstr_flags :> AF.for_method list),
-	(Name.make_for_method class_constructor),
-	(c.cstr_descriptor, `Void),
-	c.cstr_attributes
-      | Initializer i ->
-	(i.init_flags :> AF.for_method list),
-	(Name.make_for_method class_initializer),
-	([], `Void),
-	i.init_attributes in
-    let acc_flags = AF.list_to_u2 (flags :> AF.t list) in
-    let name_idx = CP.add_utf8 pool (Name.utf8_for_method name) in
-    let desc_utf8 = Descriptor.utf8_of_method desc in
-    let desc_idx = CP.add_utf8 pool desc_utf8 in
-    { M.access_flags = acc_flags;
-      name_index = name_idx;
-      descriptor_index = desc_idx;
-      attributes_count = U.u2 (List.length attrs);
-      attributes_array = U.map_list_to_array (HA.encode_method m pool) (attrs :> HA.for_method list); }
-end
-(* }}} *)
-module HM = HighMethod
-(* }}} *)
 (* rest/most of HighClass *) (* {{{ *)
 type t = {
     access_flags : AccessFlag.for_class list;
@@ -3146,7 +3181,7 @@ type t = {
 
 let check_version_high ?(version = Version.default) c =
   let check_flag x = Version.check (AF.version_bounds x) version in
-  let check_attribute x = Version.check (HA.version_bounds x) version in
+  let check_attribute x = Version.check (HAO.version_bounds x) version in
   let check_field x =
     List.iter check_flag (x.HF.flags :> AF.t list);
     List.iter check_attribute (x.HF.attributes :> HA.t list) in
@@ -3181,8 +3216,8 @@ let decode ?(version = Version.default) cf =
     else Some (class_name cf.ClassFile.super_class) in
   let is_interface = List.mem `Interface flags in
   let field_decode = HF.decode is_interface pool in
-  let method_decode = HM.decode is_interface pool in
-  let attribute_decode = HA.decode_class pool in
+  let method_decode = HMO.decode is_interface pool in
+  let attribute_decode = HAO.decode_class pool in
   check_version_high ~version:version { access_flags = flags;
     name = class_name cf.CF.this_class;
     extends = extends;
@@ -3204,8 +3239,8 @@ let encode ?(version = Version.default) cd =
     | None -> no_super_class in
   let itfs = U.map_list_to_array (fun s -> CP.add_class pool s) cd.implements in
   let flds = U.map_list_to_array (HF.encode pool) cd.fields in
-  let mths = U.map_list_to_array (HM.encode pool) cd.methods in
-  let atts = U.map_list_to_array (HA.encode_class pool) cd.attributes in
+  let mths = U.map_list_to_array (HMO.encode pool) cd.methods in
+  let atts = U.map_list_to_array (HAO.encode_class pool) cd.attributes in
   let cpool = CP.to_pool pool in
   let checked_number s sz =
     if sz <= U.max_u2 then
