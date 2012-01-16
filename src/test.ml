@@ -26,7 +26,7 @@ let check fn =
 
 let handle fn =
   try begin
-    printf "@[%s" fn;
+    printf "@[<2>%s@?" fn;
     check fn;
     printf " ✓@."
   end with

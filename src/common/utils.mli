@@ -194,6 +194,8 @@ val map2 : ('a -> 'b) -> ('a * 'a) -> ('b * 'b)
 val map3 : ('a -> 'b) -> ('a * 'a * 'a) -> ('b * 'b * 'b)
 val map4 : ('a -> 'b) -> ('a * 'a * 'a * 'a) -> ('b * 'b * 'b * 'b)
 
+module IntMap : Map.S with type key = int
+
 val identity : 'a -> 'a
 (** The identity function. *)
 

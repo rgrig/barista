@@ -309,17 +309,27 @@ end (* }}} *)
 module SymbExe : sig (* {{{ *)
   type t
   val make_empty : unit -> t
-  val execute_method :
-    ('a -> HighInstruction.t -> HighInstruction.label
-      -> 'a * HighInstruction.label list) -> (* step *)
+
+  type 'a stepper =
+    'a -> (* abstract value *)
+    HighInstruction.t -> (* instruction to execute *)
+    HighInstruction.label -> (* next instruction in program text *)
+    'a * HighInstruction.label list (* successors *)
+
+  type ('a, 'b) executor =
+    'a stepper ->
     'a ->                          (* init; has locals for args *)
-    'a ->                          (* init state for exception handlers *)
-    ('a -> 'a -> 'a) ->            (* unify *)
+    ('a -> 'a) ->                  (* prepares for exception handling *)
     HighAttribute.code_value ->    (* the method code *)
-    'a HighInstruction.LabelHash.t (* abstract values for each program point *)
-  val step :
-    t -> HighInstruction.t -> HighInstruction.label ->
-    t * HighInstruction.label list
+    'b HighInstruction.LabelHash.t
+                          (* for each program point, something *)
+(*
+  val execute_method_general : ('a, ('a, unit) Hashtbl.t) executor
+  val execute_method :
+    ('a -> 'a -> 'a) -> (* unifier *)
+    ('a, 'a) executor
+  val step : t stepper
+  *)
 end (* }}} *)
 
 module HighAttributeOps : sig (* {{{ *)

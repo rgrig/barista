@@ -1,5 +1,6 @@
 (* open modules *) (* {{{ *)
 open Consts
+open Debug
 open Format
 (* }}} *)
 (* module shorthands *) (* {{{ *)
@@ -1247,7 +1248,7 @@ module SymbExe = struct  (* {{{ *)
   let empty () = []
 
   let push v s =
-(* printf "@[push %s@." (string_of_verification_type_info v); *)
+    if log_se then printf "+";
     v :: s
 
   let push_return_value x s = match x with
@@ -1261,7 +1262,7 @@ module SymbExe = struct  (* {{{ *)
 
   let pop =
   function
-    | _ :: tl -> (* printf "@[pop@."; *) tl
+    | _ :: tl -> if log_se then printf "-"; tl
     | [] -> fail SE_empty_stack
 
   let pop_if v s =
@@ -1290,29 +1291,25 @@ module SymbExe = struct  (* {{{ *)
 
   let pop_if_category1 = function
     | hd :: tl ->
-      if is_category1 hd then
-(* (printf "@[pop C1@."; *)
-	hd, tl
-(* ) *)
+      if is_category1 hd
+      then (if log_se then printf "-"; (hd, tl))
       else fail (report_category1_expected hd)
     | [] -> fail SE_empty_stack
 
   let pop_if_category2 = function
     | hd :: tl ->
-      if not (is_category1 hd) then
-(* (printf "@[pop C2@."; *)
-	hd, tl
-(* ) *)
+      if not (is_category1 hd)
+      then (if log_se then printf "-"; (hd, tl))
       else fail (report_category2_expected hd)
     | [] -> fail SE_empty_stack
   (* }}} *)
   (* symbolic pool {{{ *)
-  type locals = verification_type_info array
+  type locals = verification_type_info U.IntMap.t
 
   let load i l =
-    let len = Array.length l in
-    if i >= 0 && i < len then l.(i)
-    else fail (SE_invalid_local_index (i, len))
+    let max_i, _ = U.IntMap.max_binding l in
+    if i < 0 || max_i < i then fail (SE_invalid_local_index (i, succ max_i));
+    try U.IntMap.find i l with Not_found -> VI_top
 
   let check_load i l v =
     let v' = load i l in
@@ -1320,24 +1317,11 @@ module SymbExe = struct  (* {{{ *)
       fail (report_invalid_local_contents (i, v, v'))
 
   let store i v l =
-    let len = Array.length l in
-    let sz = (succ i)
-      + (match v with
-	| VI_long
-	| VI_double -> 1
-	| _ -> 0) in
-    let l =
-      if sz > len then
-        Array.init
-          sz
-          (fun i -> if i < len then l.(i) else VI_top)
-      else l in
-    l.(i) <- v;
-    (match v with
+    let l = U.IntMap.add i v l in
+    match v with
       | VI_long
-      | VI_double -> l.(succ i) <- VI_top
-      | _ -> ());
-    l
+      | VI_double -> U.IntMap.add (succ i) VI_top l
+      | _ -> l
   (* }}} *)
   (* checks {{{ *)
   let check_reference x =
@@ -1352,8 +1336,26 @@ module SymbExe = struct  (* {{{ *)
       | VI_uninitialized_this
       | VI_object _
       | VI_uninitialized _ -> ()
+
+  let check_reference_or_return x =
+    if not (equal_verification_type_info x (VI_return_address HI.invalid_label))
+    then check_reference x
   (* }}} *)
   (* symbolic execution {{{ *)
+  type 'a stepper =
+    'a -> (* abstract value *)
+    HighInstruction.t -> (* instruction to execute *)
+    HighInstruction.label -> (* next instruction in program text *)
+    'a * HighInstruction.label list (* successors *)
+
+  type ('a, 'b) executor =
+    'a stepper ->
+    'a ->                          (* init; has locals for args *)
+    ('a -> 'a) ->                  (* prepares for exception handling *)
+    HighAttribute.code_value ->    (* the method code *)
+    'b HighInstruction.LabelHash.t
+                          (* for each program point, something *)
+
   type t = {
     locals : locals;
     stack : stack;
@@ -1364,7 +1366,7 @@ module SymbExe = struct  (* {{{ *)
   let java_lang_Object = `Class_or_interface java_lang_Object_name
 
   let make_empty () =
-    { locals = [||]; stack = []; }
+    { locals = U.IntMap.empty; stack = []; }
 
   let stack_size st =
     List.fold_left
@@ -1378,52 +1380,100 @@ module SymbExe = struct  (* {{{ *)
       st.stack
 
   let locals_size st =
-    Array.length st.locals
+    let (max_i, _) = U.IntMap.max_binding st.locals in
+    succ max_i
 
   exception Found of int
 
-  let execute_method step init eh_init unify code = match code.HA.code with
+  let diag x y =
+    let s = x + y in
+    s * (s + 1) / 2 + y
+
+  let hash_type = function
+      | VI_integer -> 1
+      | VI_float -> 2
+      | VI_long -> 3
+      | VI_double -> 4
+      | VI_top -> 5
+      | VI_null -> 6
+      | VI_uninitialized_this -> 7
+      | VI_object _ -> 8
+      | VI_return_address l -> 9 + 2 * l
+      | VI_uninitialized l -> 10 + 2 * l
+(*
+  let hash_list l =
+    let rec hc = function
+      | [] -> 0
+      | l :: ls -> diag (hash_type l) (hc ls) in
+    diag (hc l) (List.length l)
+  let hash_array a = hash_list (Array.to_list a)
+  let hash_state { stack; locals } = diag (hash_list stack) (hash_array locals)
+  let hash_sl (s, l) = diag (hash_state s) l
+*)
+  let execute_method_general step init exec_throw code = match code.HA.code with
     | [] -> HI.LabelHash.create 2
     | ((first_label, _) :: _) as i_list ->
       let i_array = Array.of_list i_list in
-      let r_array = Array.make (Array.length i_array) false in
-      let s_array = Array.make (Array.length i_array) None in
+      let i_size = Array.length i_array in
+      let s_array = Array.init i_size (fun _ -> Hashtbl.create 13) in
+      let h_array = Array.make i_size [] in
       let index_of_label =
         let h = HI.LabelHash.create 13 in
         Array.iteri (fun i (l, _) -> HI.LabelHash.add h l i) i_array;
         fun l ->
           try HI.LabelHash.find h l
-          with Not_found -> fail SE_missing_return in
+          with Not_found -> fail SE_missing_return in (* TODO *)
       let next_label l =
         try fst i_array.(succ (index_of_label l))
         with Invalid_argument _ -> HI.invalid_label in
-      let lift d f = function None -> d | Some x -> f x in
-      let u_xO x = lift x (unify x) in
-      let record_state lbl state =
+      let record_handler h =
+        for i = index_of_label h.HA.try_start to index_of_label h.HA.try_end - 1 do
+          h_array.(i) <- h.HA.catch :: h_array.(i)
+        done in
+      let handlers_at l = h_array.(index_of_label l) in
+      List.iter record_handler code.HA.exception_table;
+      let record_state state lbl =
         let n = index_of_label lbl in
-        let r = u_xO state s_array.(n) in
-        let p = s_array.(n) <> Some r in
-        s_array.(n) <- Some r; (r, p) in
+        if Hashtbl.mem s_array.(n) state
+        then false
+        else (Hashtbl.add s_array.(n) state (); true) in
       let instruction_at l = i_array.(index_of_label l) in
-      let record_return l = r_array.(index_of_label l) <- true in
-      let rec exec prev old_state lbl = (* main part *)
-(* printf "@[exec %d -> %d@." prev lbl; *)
-        let state, made_progress = record_state lbl old_state in
-        if made_progress then begin
-(* printf "@[... continue@."; *)
+let tmp_h = ref [] in
+      let rec exec state lbl = (* main part *)
+        let log_exec c oh n l =
+          let nh = Hashtbl.hash (n, l) in
+          if log_se then printf "@\n@[%d -> %d [color=%s];@]@?" oh nh c;
+          exec n l in
+        if record_state state lbl then begin
+printf "@\n@[%d %d %d@]" lbl (stack_size state) (locals_size state);
+(*(try ignore (List.find ((=) (state, lbl)) !tmp_h); printf "@\n@[OOPS@]@?"
+with Not_found -> ());
+tmp_h := (state, lbl) :: !tmp_h;*)
+          let h = Hashtbl.hash (state, lbl) in
+          if log_se then printf "@\n@[%d [label=\"%d:" h (index_of_label lbl);
           let state, lbls = step state (instruction_at lbl) (next_label lbl) in
-          if lbls = [] then record_return lbl;
-          List.iter (exec lbl state) lbls
+          if log_se then printf "\"];@]@?";
+          List.iter (log_exec "black" h state) lbls;
+          List.iter (log_exec "red" h (exec_throw state)) (handlers_at lbl)
         end in
-      exec (-1) init first_label;
-      List.iter (fun h -> exec (-1) eh_init h.HA.catch) code.HA.exception_table;
+      exec init first_label;
       let r = HI.LabelHash.create 13 in
       for i = 0 to Array.length i_array - 1 do begin
-        match s_array.(i) with
-          | Some s -> HI.LabelHash.add r (fst i_array.(i)) s
-          | None -> ()
+        HI.LabelHash.add r (fst i_array.(i)) s_array.(i)
       end done;
       r
+
+  let execute_method unify step init exec_throw code =
+    let h = execute_method_general step init exec_throw code in
+    let unify s () = function
+      | None -> Some s
+      | Some s' -> Some (unify s s') in
+    let r = HI.LabelHash.create 13 in
+    let f l ss = match Hashtbl.fold unify ss None with
+      | None -> ()
+      | Some s -> HI.LabelHash.add r l s in
+    HI.LabelHash.iter f h;
+    r
 
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
@@ -1431,7 +1481,7 @@ module SymbExe = struct  (* {{{ *)
     let jump1 locals stack jump_lbl = ({stack; locals}, [jump_lbl]) in
     let jump2 locals stack jump_lbl = ({stack; locals}, [jump_lbl; next_lbl]) in
     let return locals stack = ({stack; locals}, []) in
-    let locals = Array.copy st.locals in
+    let locals = st.locals in
     let stack = st.stack in
     match i with
       | HI.AALOAD ->
@@ -1478,14 +1528,12 @@ module SymbExe = struct  (* {{{ *)
       | HI.ASTORE parameter ->
 	let loc = top stack in
 	let stack = pop stack in
-	check_reference loc;
+	check_reference_or_return loc;
 	let locals = store parameter loc locals in
 	continue locals stack
       | HI.ATHROW ->
 	let exc = top stack in
-	check_reference exc;
-	let stack = empty () in
-	let stack = push exc stack in
+        check_reference exc;
 	return locals stack
       | HI.BALOAD ->
 	let stack = pop_if VI_integer stack in
@@ -1961,6 +2009,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop stack in
 	let stack = push_return_value ret stack in
 	let locals, stack =
+        (* TODO(rgrig): This is wrong. Fix. *)
 	(* TODO(rlp) understand what happens here *)
           if U.UTF8.equal Consts.class_constructor (Name.utf8_for_method mn) then
             match topv with
@@ -1969,10 +2018,10 @@ module SymbExe = struct  (* {{{ *)
 		  | VI_uninitialized lbl' when lbl = lbl' ->
 		    VI_object (`Class_or_interface cn)
 		  | x -> x in
-		Array.map f locals, List.map f stack
+		U.IntMap.map f locals, List.map f stack
               | VI_uninitialized_this ->
 		let f = function VI_uninitialized_this -> VI_object (`Class_or_interface cn) | x -> x in
-		Array.map f locals, List.map f stack
+		U.IntMap.map f locals, List.map f stack
               | _ -> locals, stack
           else
             locals, stack in
@@ -2317,17 +2366,12 @@ module SymbExe = struct  (* {{{ *)
     let sz1 = List.length st1.stack in
     let sz2 = List.length st2.stack in
     if sz1 = sz2 then begin
-      let len1 = Array.length st1.locals in
-      let len2 = Array.length st2.locals in
-      let len = max len1 len2 in
       let locals =
-        Array.init
-          len
-          (fun i ->
-            if (i < len1) && (i < len2) then
-              unify_elements st1.locals.(i) st2.locals.(i)
-            else
-              VI_top) in
+        U.IntMap.merge
+        (fun _ o1 o2 -> match o1, o2 with
+        | Some s1, Some s2 -> Some (unify_elements s1 s2)
+        | _ -> None)
+        st1.locals st2.locals in
       let stack = List.map2 unify_elements st1.stack st2.stack in
       { locals; stack }
     end else
@@ -2347,45 +2391,35 @@ module SymbExe = struct  (* {{{ *)
           | x -> [x])
 	l in
     let l = List.concat l in
-    Array.of_list l
+    let fold (m, i) v = (U.IntMap.add i v m, succ i) in
+    let (m, _) = List.fold_left fold (U.IntMap.empty, 0) l in
+    m
 
-  let make_of_method =
-    function
+  let locals_of_method m = of_list (match m with
     | HM.Regular { HM.flags; descriptor; _ } ->
         let l = fst descriptor in
         let l = List.map verification_type_info_of_parameter_descriptor l in
-        let l =
-          if List.mem `Static flags then
-            l
-          else
-            (VI_object (`Class_or_interface java_lang_Class)) :: l in
-        { locals = of_list l; stack = [] }
+        if List.mem `Static flags then
+          l
+        else
+          (VI_object (`Class_or_interface java_lang_Class)) :: l
     | HM.Constructor { HM.cstr_descriptor = l ; _ } ->
         let l = List.map verification_type_info_of_parameter_descriptor l in
-        let l = VI_uninitialized_this :: l in
-        { locals = of_list l; stack = [] }
+        VI_uninitialized_this :: l
     | HM.Initializer _ ->
-        make_empty ()
+        [])
 
   (* public *) (* {{{ *)
   let compute_max_stack_locals m c =
-    let lift_state ({ stack; locals } as s) =
-      (s, List.length stack, Array.length locals) in
-    let init = lift_state (make_of_method m) in
-    let eh_init =
-      lift_state { locals = [||]; stack = [VI_object java_lang_Object] } in
+    let init = { locals = locals_of_method m; stack = [] } in
+    let exec_throw s = { s with stack = [VI_object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
-    let unify (s, ms, ml) (s', ms', ml') = (unify_states s s', max ms ms', max ml ml') in
-    let step (s, ms, ml) (l, i) nl =
-      let s', nl = step s (l, i) nl in
-      ((s', max ms (stack_size s), max ml (locals_size s)), nl) in
-    let map_scc = execute_method step init eh_init unify c in
-    let map_s = HI.LabelHash.create 13 in
-    let f l (s, ms, ml) (ms', ml') =
-      HI.LabelHash.add map_s l s; (max ms ms', max ml ml') in
-    let max_stack, max_regs = HI.LabelHash.fold f map_scc (0, 0) in
-    (map_s, max_stack, max_regs)
+    let map_s = execute_method unify_states step init exec_throw c in
+    let f l s (ms, ml) =
+      (max ms (stack_size s), max ml (locals_size s)) in
+    let max_stack, max_locals = HI.LabelHash.fold f map_s (0, 0) in
+    (map_s, max_stack, max_locals)
     (* }}} *)
 end (* }}} *)
 module SE = SymbExe
@@ -3065,8 +3099,10 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
   let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
   let encode_method m pool a =
-(*     printf "@[\nEncoding method %s@." (HM.to_string m); *)
-    encode (Some m) pool (a : HA.for_method :> HA.t)
+    if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
+    let r = encode (Some m) pool (a : HA.for_method :> HA.t) in
+    if log_se then printf "@]@\n}@?";
+    r
 end
 (* }}} *)
 module HAO = HighAttributeOps

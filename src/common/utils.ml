@@ -261,3 +261,5 @@ let rec list_equal ?(eq = (=)) l1 l2 =
 let map2 f (x, y) = (f x, f y)
 let map3 f (x, y, z) = (f x, f y, f z)
 let map4 f (x, y, z, u) = (f x, f y, f z, f u)
+
+module IntMap = Map.Make (struct type t = int let compare = compare end)
