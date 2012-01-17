@@ -1312,12 +1312,15 @@ module SymbExe = struct  (* {{{ *)
   (* symbolic pool {{{ *)
   type locals = verification_type_info U.IntMap.t
 
-  let locals_size l =
-    try let max_i, _ = U.IntMap.max_binding l in succ max_i
+  let intmap_width m =
+    try
+      let a, _ = U.IntMap.min_binding m in
+      let b, _ = U.IntMap.max_binding m in
+      b - a + 1
     with Not_found -> 0
 
   let load i l =
-    let size = locals_size l in
+    let size = intmap_width l in
     if 0 <= i && i < size then
       (try U.IntMap.find i l with Not_found -> VI_top)
     else fail (SE_invalid_local_index (i, size))
@@ -1377,7 +1380,7 @@ module SymbExe = struct  (* {{{ *)
       0
       st.stack
 
-  let locals_size st = locals_size st.locals
+  let locals_size st = intmap_width st.locals
 
   (*  PRE
         labels in code are distinct
@@ -1433,11 +1436,17 @@ module SymbExe = struct  (* {{{ *)
             let sl = Hashtbl.hash (s, l) in
             let tm = Hashtbl.hash (t, m) in
             let step s c ls =
-              printf "@\n@[%d [label=\"%Ld:" tm m;
+              printf "@\n@[%d [shape=box,label=\"%Ld:" tm m;
               let r = step s c ls in printf "\"];@]"; r in
-            printf "@\n@[%d -> %d [shape=box,color=%s];@]" sl tm color;
+            printf "@\n@[%d -> %d [color=%s];@]" sl tm color;
             exec log_exec step t m in
+          let limit_exec n =
+            let x = ref n in
+            let rec f _ _ _ t m =
+              if !x > 0 then (decr x; exec f step t m) in
+            f in
           let exec = if log_se then log_exec else normal_exec in
+(*           let exec = limit_exec 1000 in *)
           exec "green" init HI.invalid_label init l; result
 
   (* was StackState.update *)
@@ -2491,23 +2500,21 @@ module HighAttributeOps = struct (* {{{ *)
     let code_stream = IS.make_of_string code_content in
     let instr_codes = BC.read code_stream 0 in
     let ofs_to_label, ofs_to_prev_label =
-      let rec f o ps = function
+      let rec f o ps = function (* note the sentinel added at the end *)
         | [] -> Array.of_list (List.rev ((o, HI.invalid_label) :: ps))
         | s :: ss -> f (o + BC.size_of o s) ((o, HI.fresh_label ()) :: ps) ss in
       let a = f 0 [] instr_codes in
       let n = Array.length a in
       assert (n > 1); (* see Invalid_code_length check above *)
-      let rec search o l h =
-        if l + 1 = h then l else begin
+      let rec bs o l h =
+        if l + 1 = h then
+          (if fst a.(l) = o then l else fail Invalid_offset)
+        else begin
           let m = l + (h - l) / 2 in
-          if fst a.(m) <= o then search o m h else search o l m
+          if fst a.(m) <= o then bs o m h else bs o l m
         end in
-      ((fun o ->
-        let i = search o 0 (pred n) in
-        if fst a.(i) <> o then fail Invalid_offset else snd a.(i)),
-      (fun o ->
-        let i = search (pred o) 0 (pred n) in
-        if fst a.(succ i) <> o then fail Invalid_offset else snd a.(i))) in
+      ( (fun o -> snd a.(bs o 0 (pred n))),
+        (fun o -> snd a.(pred (bs o 1 n))) ) in
     let instrs =
       let f (o, ss) s =
         (o + BC.size_of o s,
@@ -3095,7 +3102,7 @@ module HighMethodOps = struct (* {{{ *)
 
   let decode_regular i name descriptor attributes flags _ =
     let flags = AccessFlag.check_method_flags i flags in
-    HM.Regular { HM.flags; HM.name; HM.descriptor; HM.attributes}
+    HM.Regular { HM.flags; HM.name; HM.descriptor; HM.attributes }
 
   let decode is_interface pool m =
     let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
