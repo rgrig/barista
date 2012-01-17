@@ -1455,12 +1455,14 @@ module SymbExe = struct  (* {{{ *)
             try
               let t = H.find result l in
               let s = unify s t in
-              H.replace result l s; not (eq s t)
+              H.replace result l s;
+              (s, not (eq s t))
             with Not_found ->
-              (H.add result l s; true) in
+              (H.add result l s; (s, true)) in
           let exec exec' step s l = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
-            if record_state s l then begin
+            let s, progress = record_state s l in
+            if progress then begin
 (* pp_map_t std_formatter result; *)
               let t, ls = step s (instruction_at l) (next_label l) in
               List.iter (exec' "black" s l t) ls;
@@ -2251,10 +2253,10 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
       | HI.RET index ->
-        let lbl = match load index locals with
+        let lbl = (match load index locals with
           | VI_return_address lbl -> lbl
           | v -> fail (report_invalid_local_contents
-              (index, v, VI_return_address HI.invalid_label)) in
+              (index, v, VI_return_address HI.invalid_label))) in
         jump1 locals stack lbl
       | HI.RETURN ->
 	return locals stack
