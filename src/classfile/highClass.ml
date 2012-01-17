@@ -1425,7 +1425,7 @@ module SymbExe = struct  (* {{{ *)
             with Not_found ->
               (H.add result l s; true) in
           let exec exec' step s l = (* this is the main part *)
-            assert (l <> HI.invalid_label);
+            if l = HI.invalid_label then fail SE_missing_return;
             if record_state s l then begin
               let t, ls = step s (instruction_at l) (next_label l) in
               List.iter (exec' "black" s l t) ls;
