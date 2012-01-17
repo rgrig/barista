@@ -320,6 +320,7 @@ module SymbExe : sig (* {{{ *)
     'value stepper
     -> ('value -> 'value) (* simulates a (possibly JVM produced) exception *)
     -> ('value -> 'value -> 'value)   (* unifier *)
+    -> ('value -> 'value -> bool) (* equality test *)
     -> 'value   (* initial value *)
     -> HighAttribute.code_value   (* the code of the method *)
     -> 'value HighInstruction.LabelHash.t
@@ -388,7 +389,7 @@ type error =
   | SE_empty_stack
   | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
-  | SE_invalid_local_index of (int * int)
+  | SE_uninitialized_register of (int * int)
   | SE_invalid_stack_top of (string * string)
   | SE_missing_return
   | SE_reference_expected of string

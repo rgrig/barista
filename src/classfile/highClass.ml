@@ -35,7 +35,7 @@ type error =
   | SE_empty_stack
   | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
-  | SE_invalid_local_index of (int * int)
+  | SE_uninitialized_register of (int * int)
   | SE_invalid_stack_top of (string * string)
   | SE_missing_return
   | SE_reference_expected of string
@@ -57,7 +57,7 @@ let string_of_error = function
   | SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
   | SE_invalid_label -> "SE: jump to inexistent label"
   | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
-  | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
+  | SE_uninitialized_register (i, len) -> "SE: requesting uninitialized register " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
   | SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
   | SE_missing_return -> "SE: no return at end of method"
   | SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
@@ -1158,6 +1158,18 @@ module SymbExe = struct  (* {{{ *)
     | VI_uninitialized of HI.label
     | VI_return_address of HI.label
 
+  let pp_vi f = function
+    | VI_top -> fprintf f "top"
+    | VI_integer -> fprintf f "integer"
+    | VI_float -> fprintf f "float"
+    | VI_long -> fprintf f "long"
+    | VI_double -> fprintf f "double"
+    | VI_null -> fprintf f "null"
+    | VI_uninitialized_this -> fprintf f "uninitialized_this"
+    | VI_object _ -> fprintf f "object"
+    | VI_uninitialized l -> fprintf f "uninitialized(%Ld)" l
+    | VI_return_address l -> fprintf f "return_address(%Ld)" l
+
   let equal_verification_type_info x y = match (x, y) with
     | (VI_object (`Class_or_interface cn1)),
       (VI_object (`Class_or_interface cn2)) -> Name.equal_for_class cn1 cn2
@@ -1251,6 +1263,9 @@ module SymbExe = struct  (* {{{ *)
   (* symbolic stack {{{ *)
   type stack = verification_type_info list (* stack top is list head *)
 
+  let pp_list pe f = List.iter (fun e -> fprintf f "@ %a" pe e)
+  let pp_stack f x = fprintf f "@[[%a ]@]" (pp_list pp_vi) x
+
   let empty () = []
 
   let push v s =
@@ -1311,6 +1326,11 @@ module SymbExe = struct  (* {{{ *)
   (* }}} *)
   (* symbolic pool {{{ *)
   type locals = verification_type_info U.IntMap.t
+  let pp_locals f ls =
+    let pb r v = fprintf f "@ (%d->%a)" r pp_vi v in
+    fprintf f "@[["; U.IntMap.iter pb ls; fprintf f " ]@]"
+
+  let equal_locals a b = U.IntMap.equal (=) a b
 
   let intmap_width m =
     try
@@ -1320,10 +1340,9 @@ module SymbExe = struct  (* {{{ *)
     with Not_found -> 0
 
   let load i l =
-    let size = intmap_width l in
-    if 0 <= i && i < size then
-      (try U.IntMap.find i l with Not_found -> VI_top)
-    else fail (SE_invalid_local_index (i, size))
+    try U.IntMap.find i l
+    with Not_found ->
+      fail (SE_uninitialized_register (i, intmap_width l))
 
   let check_load i l v =
     let v' = load i l in
@@ -1359,13 +1378,28 @@ module SymbExe = struct  (* {{{ *)
 
   type 'a stepper = 'a -> HI.t -> HI.label -> 'a * HI.label list
   type 'a executor =
-    'a stepper -> ('a -> 'a) -> ('a -> 'a -> 'a) -> 'a -> HA.code_value
+    'a stepper -> ('a -> 'a) -> ('a -> 'a -> 'a) -> ('a -> 'a -> bool) -> 'a -> HA.code_value
     -> 'a HI.LabelHash.t
 
   type t = {
     locals : locals;
     stack : stack;
   }
+
+  let pp_t f { locals; stack } =
+    fprintf f "@[<1>(%a,@ %a)@]" pp_locals locals pp_stack stack
+
+  let pp_map_t f m =
+    let l = ref [] in
+    HI.LabelHash.iter (fun k v -> l := (k, v) :: !l) m;
+    let l = List.sort compare !l in
+    let pb (l, t) = fprintf f "@\n@[%Ld -> %a@]" l pp_t t in
+    fprintf f "@\n@[<2>(symbolic execution state %d" (HI.LabelHash.length m);
+    List.iter pb l;
+    fprintf f "@\n)@]@\n"
+
+  let equal_t a b =
+    equal_locals a.locals b.locals && a.stack = b.stack
 
   let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
 
@@ -1392,7 +1426,7 @@ module SymbExe = struct  (* {{{ *)
         s t   state
         e     exception handler (or label of)
    *)
-  let execute_method step exec_throw unify init code =
+  let execute_method step exec_throw unify eq init code =
     let module H = HI.LabelHash in
     match code.HA.code with
       | [] -> H.create 2
@@ -1421,12 +1455,13 @@ module SymbExe = struct  (* {{{ *)
             try
               let t = H.find result l in
               let s = unify s t in
-              H.replace result l s; s <> t
+              H.replace result l s; not (eq s t)
             with Not_found ->
               (H.add result l s; true) in
           let exec exec' step s l = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
             if record_state s l then begin
+(* pp_map_t std_formatter result; *)
               let t, ls = step s (instruction_at l) (next_label l) in
               List.iter (exec' "black" s l t) ls;
               List.iter (exec' "red" s l (exec_throw t)) (handlers_at l)
@@ -1446,8 +1481,9 @@ module SymbExe = struct  (* {{{ *)
               if !x > 0 then (decr x; exec f step t m) in
             f in
           let exec = if log_se then log_exec else normal_exec in
-(*           let exec = limit_exec 1000 in *)
-          exec "green" init HI.invalid_label init l; result
+(*           let exec = limit_exec 10000 in *)
+          exec "green" init HI.invalid_label init l;
+          result
 
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
@@ -2344,7 +2380,8 @@ module SymbExe = struct  (* {{{ *)
         U.IntMap.merge
         (fun _ o1 o2 -> match o1, o2 with
         | Some s1, Some s2 -> Some (unify_elements s1 s2)
-        | _ -> None)
+        | Some _, None | None, Some _ -> Some VI_top
+        | None, None -> None)
         st1.locals st2.locals in
       let stack = List.map2 unify_elements st1.stack st2.stack in
       { locals; stack }
@@ -2389,7 +2426,7 @@ module SymbExe = struct  (* {{{ *)
     let exec_throw s = { s with stack = [VI_object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
-    let map_s = execute_method step exec_throw unify_states init c in
+    let map_s = execute_method step exec_throw unify_states equal_t init c in
     let f l s (ms, ml) =
       (max ms (stack_size s), max ml (locals_size s)) in
     let max_stack, max_locals = HI.LabelHash.fold f map_s (0, 0) in
