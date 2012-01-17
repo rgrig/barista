@@ -310,26 +310,21 @@ module SymbExe : sig (* {{{ *)
   type t
   val make_empty : unit -> t
 
-  type 'a stepper =
-    'a -> (* abstract value *)
-    HighInstruction.t -> (* instruction to execute *)
-    HighInstruction.label -> (* next instruction in program text *)
-    'a * HighInstruction.label list (* successors *)
+  type 'value stepper =
+    'value    (* abstract value *)
+    -> HighInstruction.t    (* instruction to execute *)
+    -> HighInstruction.label    (* next instruction in program text *)
+    -> 'value * HighInstruction.label list    (* successors *)
 
-  type ('a, 'b) executor =
-    'a stepper ->
-    'a ->                          (* init; has locals for args *)
-    ('a -> 'a) ->                  (* prepares for exception handling *)
-    HighAttribute.code_value ->    (* the method code *)
-    'b HighInstruction.LabelHash.t
-                          (* for each program point, something *)
-(*
-  val execute_method_general : ('a, ('a, unit) Hashtbl.t) executor
-  val execute_method :
-    ('a -> 'a -> 'a) -> (* unifier *)
-    ('a, 'a) executor
+  type 'value executor =
+    'value stepper
+    -> ('value -> 'value) (* simulates a (possibly JVM produced) exception *)
+    -> ('value -> 'value -> 'value)   (* unifier *)
+    -> 'value   (* initial value *)
+    -> HighAttribute.code_value   (* the code of the method *)
+    -> 'value HighInstruction.LabelHash.t
+
   val step : t stepper
-  *)
 end (* }}} *)
 
 module HighAttributeOps : sig (* {{{ *)
@@ -381,6 +376,7 @@ type error =
   | Invalid_method_handle
   | Invalid_module
   | Invalid_name
+  | Invalid_offset
   | Invalid_pool_element
   | Invalid_pool_entry
   | Invalid_primitive_array_type
@@ -390,6 +386,7 @@ type error =
   | SE_category2_expected of string
   | SE_different_stack_sizes of (int * int)
   | SE_empty_stack
+  | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
   | SE_invalid_local_index of (int * int)
   | SE_invalid_stack_top of (string * string)

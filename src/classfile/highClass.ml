@@ -23,6 +23,7 @@ type error =
   | Invalid_method_handle
   | Invalid_module
   | Invalid_name
+  | Invalid_offset
   | Invalid_pool_element
   | Invalid_pool_entry
   | Invalid_primitive_array_type
@@ -32,6 +33,7 @@ type error =
   | SE_category2_expected of string
   | SE_different_stack_sizes of (int * int)
   | SE_empty_stack
+  | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
   | SE_invalid_local_index of (int * int)
   | SE_invalid_stack_top of (string * string)
@@ -46,12 +48,14 @@ let fail e = raise (Exception e)
 
 let string_of_error = function
   | Invalid_TABLESWITCH -> "TABLESWITCH with empty range [low..high]"
+  | Invalid_offset -> "offset does not point at start of instruction"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
   | SE_category1_expected s -> "SE: found " ^ s ^ " where a value of category 1 was expected"
   | SE_category2_expected s -> "SE: found " ^ s ^ " where a value of category 2 was expected"
   | SE_different_stack_sizes (s, s') -> "SE: saw a stack with size " ^ (string_of_int s) ^ " but expected one with size " ^ (string_of_int s')
   | SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
+  | SE_invalid_label -> "SE: jump to inexistent label"
   | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
   | SE_invalid_local_index (i, len) -> "SE: requesting index " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
   | SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
@@ -78,10 +82,17 @@ let checked_length_u1 s l =
 (* }}} *)
 (* HighInstruction, SymbExe, HighAttribute, HighField and HighMethod *) (* {{{ *)
 module HighInstruction = struct (* {{{ *)
-  type label = int
+  type label = int64
 
-  let fresh_label = let x = ref (-1) in fun () -> incr x; !x
-  let invalid_label = -1
+  let fresh_label =
+    let x = ref (-1L) in
+    fun () ->
+      if !x = Int64.max_int then
+        failwith "INTERNAL ERROR: run out of unique identifiers";
+      x := Int64.succ !x;
+      !x
+
+  let invalid_label = -1L
 
   type iinc = { ii_var: int; ii_inc: int }
   type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
@@ -259,7 +270,7 @@ module HighInstruction = struct (* {{{ *)
   module LabelHash = Hashtbl.Make (struct
     type t = label
     let equal = (=)
-    let hash x = x
+    let hash = Hashtbl.hash
   end)
 
   (* TODO(rgrig): Why is [s1_to_int x] any better than [(x : U.s1 :> int)] ? *)
@@ -978,8 +989,6 @@ module HighInstruction = struct (* {{{ *)
     | TABLESWITCH _ -> Version.make_bounds "'TABLESWITCH' instruction" Version.Java_1_0 None
 end (* }}} *)
 module HI = HighInstruction
-
-
 module A = Attribute
 module HighAttribute = struct (* {{{ *)
   open Consts
@@ -1018,12 +1027,11 @@ module HighAttribute = struct (* {{{ *)
     | `LocalVariableTypeTable of unit (** signatures for local variables *)
   ]
 
-  type exception_table_element = {
-      try_start : HI.label;
-      try_end : HI.label;
-      catch : HI.label;
-      caught : Name.for_class option;
-    }
+  type exception_table_element =
+    { try_start : HI.label  (* inclusive *)
+    ; try_end : HI.label  (* inclusive *)
+    ; catch : HI.label
+    ; caught : Name.for_class option }
 
   type code_value = {
       code : HI.t list;
@@ -1104,7 +1112,6 @@ module HighAttribute = struct (* {{{ *)
 end
 (* }}} *)
 module HA = HighAttribute
-
 module M = Method
 module HighMethod = struct (* {{{ *)
   type regular = {
@@ -1137,7 +1144,6 @@ module HighMethod = struct (* {{{ *)
 end
 (* }}} *)
 module HM = HighMethod
-
 module SymbExe = struct  (* {{{ *)
   (* symbolic types {{{ *)
   type verification_type_info =
@@ -1177,8 +1183,8 @@ module SymbExe = struct  (* {{{ *)
     | VI_object (`Array_type ((`Array _) as a)) ->
       let res = Descriptor.external_utf8_of_java_type (a :> Descriptor.java_type) in
       (U.UTF8.to_string_noerr res)
-    | VI_uninitialized ofs ->
-      Printf.sprintf "uninit %d" (ofs :> int)
+    | VI_uninitialized label ->
+      Printf.sprintf "uninit %Ld" (label :> int64)
     | VI_return_address _ -> "returnAddress"
 
   let verification_type_info_of_parameter_descriptor = function
@@ -1306,10 +1312,15 @@ module SymbExe = struct  (* {{{ *)
   (* symbolic pool {{{ *)
   type locals = verification_type_info U.IntMap.t
 
+  let locals_size l =
+    try let max_i, _ = U.IntMap.max_binding l in succ max_i
+    with Not_found -> 0
+
   let load i l =
-    let max_i, _ = U.IntMap.max_binding l in
-    if i < 0 || max_i < i then fail (SE_invalid_local_index (i, succ max_i));
-    try U.IntMap.find i l with Not_found -> VI_top
+    let size = locals_size l in
+    if 0 <= i && i < size then
+      (try U.IntMap.find i l with Not_found -> VI_top)
+    else fail (SE_invalid_local_index (i, size))
 
   let check_load i l v =
     let v' = load i l in
@@ -1342,19 +1353,11 @@ module SymbExe = struct  (* {{{ *)
     then check_reference x
   (* }}} *)
   (* symbolic execution {{{ *)
-  type 'a stepper =
-    'a -> (* abstract value *)
-    HighInstruction.t -> (* instruction to execute *)
-    HighInstruction.label -> (* next instruction in program text *)
-    'a * HighInstruction.label list (* successors *)
 
-  type ('a, 'b) executor =
-    'a stepper ->
-    'a ->                          (* init; has locals for args *)
-    ('a -> 'a) ->                  (* prepares for exception handling *)
-    HighAttribute.code_value ->    (* the method code *)
-    'b HighInstruction.LabelHash.t
-                          (* for each program point, something *)
+  type 'a stepper = 'a -> HI.t -> HI.label -> 'a * HI.label list
+  type 'a executor =
+    'a stepper -> ('a -> 'a) -> ('a -> 'a -> 'a) -> 'a -> HA.code_value
+    -> 'a HI.LabelHash.t
 
   type t = {
     locals : locals;
@@ -1370,110 +1373,72 @@ module SymbExe = struct  (* {{{ *)
 
   let stack_size st =
     List.fold_left
-      (fun acc x ->
-	acc +
-          (match x with
-            | VI_double
-            | VI_long -> 2
-            | _ -> 1))
+      (fun acc x -> acc + (match x with VI_double | VI_long -> 2 | _ -> 1))
       0
       st.stack
 
-  let locals_size st =
-    let (max_i, _) = U.IntMap.max_binding st.locals in
-    succ max_i
+  let locals_size st = locals_size st.locals
 
-  exception Found of int
-
-  let diag x y =
-    let s = x + y in
-    s * (s + 1) / 2 + y
-
-  let hash_type = function
-      | VI_integer -> 1
-      | VI_float -> 2
-      | VI_long -> 3
-      | VI_double -> 4
-      | VI_top -> 5
-      | VI_null -> 6
-      | VI_uninitialized_this -> 7
-      | VI_object _ -> 8
-      | VI_return_address l -> 9 + 2 * l
-      | VI_uninitialized l -> 10 + 2 * l
-(*
-  let hash_list l =
-    let rec hc = function
-      | [] -> 0
-      | l :: ls -> diag (hash_type l) (hc ls) in
-    diag (hc l) (List.length l)
-  let hash_array a = hash_list (Array.to_list a)
-  let hash_state { stack; locals } = diag (hash_list stack) (hash_array locals)
-  let hash_sl (s, l) = diag (hash_state s) l
-*)
-  let execute_method_general step init exec_throw code = match code.HA.code with
-    | [] -> HI.LabelHash.create 2
-    | ((first_label, _) :: _) as i_list ->
-      let i_array = Array.of_list i_list in
-      let i_size = Array.length i_array in
-      let s_array = Array.init i_size (fun _ -> Hashtbl.create 13) in
-      let h_array = Array.make i_size [] in
-      let index_of_label =
-        let h = HI.LabelHash.create 13 in
-        Array.iteri (fun i (l, _) -> HI.LabelHash.add h l i) i_array;
-        fun l ->
-          try HI.LabelHash.find h l
-          with Not_found -> fail SE_missing_return in (* TODO *)
-      let next_label l =
-        try fst i_array.(succ (index_of_label l))
-        with Invalid_argument _ -> HI.invalid_label in
-      let record_handler h =
-        for i = index_of_label h.HA.try_start to index_of_label h.HA.try_end - 1 do
-          h_array.(i) <- h.HA.catch :: h_array.(i)
-        done in
-      let handlers_at l = h_array.(index_of_label l) in
-      List.iter record_handler code.HA.exception_table;
-      let record_state state lbl =
-        let n = index_of_label lbl in
-        if Hashtbl.mem s_array.(n) state
-        then false
-        else (Hashtbl.add s_array.(n) state (); true) in
-      let instruction_at l = i_array.(index_of_label l) in
-let tmp_h = ref [] in
-      let rec exec state lbl = (* main part *)
-        let log_exec c oh n l =
-          let nh = Hashtbl.hash (n, l) in
-          if log_se then printf "@\n@[%d -> %d [color=%s];@]@?" oh nh c;
-          exec n l in
-        if record_state state lbl then begin
-printf "@\n@[%d %d %d@]" lbl (stack_size state) (locals_size state);
-(*(try ignore (List.find ((=) (state, lbl)) !tmp_h); printf "@\n@[OOPS@]@?"
-with Not_found -> ());
-tmp_h := (state, lbl) :: !tmp_h;*)
-          let h = Hashtbl.hash (state, lbl) in
-          if log_se then printf "@\n@[%d [label=\"%d:" h (index_of_label lbl);
-          let state, lbls = step state (instruction_at lbl) (next_label lbl) in
-          if log_se then printf "\"];@]@?";
-          List.iter (log_exec "black" h state) lbls;
-          List.iter (log_exec "red" h (exec_throw state)) (handlers_at lbl)
-        end in
-      exec init first_label;
-      let r = HI.LabelHash.create 13 in
-      for i = 0 to Array.length i_array - 1 do begin
-        HI.LabelHash.add r (fst i_array.(i)) s_array.(i)
-      end done;
-      r
-
-  let execute_method unify step init exec_throw code =
-    let h = execute_method_general step init exec_throw code in
-    let unify s () = function
-      | None -> Some s
-      | Some s' -> Some (unify s s') in
-    let r = HI.LabelHash.create 13 in
-    let f l ss = match Hashtbl.fold unify ss None with
-      | None -> ()
-      | Some s -> HI.LabelHash.add r l s in
-    HI.LabelHash.iter f h;
-    r
+  (*  PRE
+        labels in code are distinct
+      NOTATIONS
+        h     cache (hash table)
+        f g   small 'anonymous' function
+        l m   label
+        c     instruction
+        s t   state
+        e     exception handler (or label of)
+   *)
+  let execute_method step exec_throw unify init code =
+    let module H = HI.LabelHash in
+    match code.HA.code with
+      | [] -> H.create 2
+      | ((l, _) :: _) as cs ->
+          let instruction_at =
+            let h = H.create 13 in
+            let f ((l, _) as c) = H.add h l c in
+            List.iter f cs;
+            fun l -> try H.find h l with Not_found -> fail SE_invalid_label in
+          let next_label =
+            let h = H.create 13 in
+            let rec f = function
+              | (l, _) :: (((m, _) :: _) as cs) -> H.add h l m; f cs
+              | _ -> () in
+            f cs;
+            fun l -> try H.find h l with Not_found -> HI.invalid_label in
+          let handlers_at =
+            let h = H.create 13 in
+            let get l = try H.find h l with Not_found -> [] in
+            let add l e = H.replace h l (e :: (get l)) in
+            let rec f e l m = add m e; if l <> m then f e l (next_label m) in
+            let g e = f e.HA.catch e.HA.try_end e.HA.try_start in
+            List.iter g code.HA.exception_table; get in
+          let result = H.create 13 in
+          let record_state s l =
+            try
+              let t = H.find result l in
+              let s = unify s t in
+              H.replace result l s; s <> t
+            with Not_found ->
+              (H.add result l s; true) in
+          let exec exec' step s l = (* this is the main part *)
+            assert (l <> HI.invalid_label);
+            if record_state s l then begin
+              let t, ls = step s (instruction_at l) (next_label l) in
+              List.iter (exec' "black" s l t) ls;
+              List.iter (exec' "red" s l (exec_throw t)) (handlers_at l)
+            end in
+          let rec normal_exec _ _ _ = exec normal_exec step in
+          let rec log_exec color s l t m =
+            let sl = Hashtbl.hash (s, l) in
+            let tm = Hashtbl.hash (t, m) in
+            let step s c ls =
+              printf "@\n@[%d [label=\"%Ld:" tm m;
+              let r = step s c ls in printf "\"];@]"; r in
+            printf "@\n@[%d -> %d [shape=box,color=%s];@]" sl tm color;
+            exec log_exec step t m in
+          let exec = if log_se then log_exec else normal_exec in
+          exec "green" init HI.invalid_label init l; result
 
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
@@ -2415,7 +2380,7 @@ tmp_h := (state, lbl) :: !tmp_h;*)
     let exec_throw s = { s with stack = [VI_object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
-    let map_s = execute_method unify_states step init exec_throw c in
+    let map_s = execute_method step exec_throw unify_states init c in
     let f l s (ms, ml) =
       (max ms (stack_size s), max ml (locals_size s)) in
     let max_stack, max_locals = HI.LabelHash.fold f map_s (0, 0) in
@@ -2423,7 +2388,6 @@ tmp_h := (state, lbl) :: !tmp_h;*)
     (* }}} *)
 end (* }}} *)
 module SE = SymbExe
-
 module HighAttributeOps = struct (* {{{ *)
   (* helper functions *)
 
@@ -2440,7 +2404,7 @@ module HighAttributeOps = struct (* {{{ *)
         Annotation.decode pool a)
 
   let read_extended_annotations pool st =
-    InputStream.read_elements
+    IS.read_elements
       st
       (fun st ->
         let a = Annotation.read_extended_info st in
@@ -2461,7 +2425,7 @@ module HighAttributeOps = struct (* {{{ *)
     List.rev !res
 
   let read_module_info pool st =
-    let module_index = InputStream.read_u2 st in
+    let module_index = IS.read_u2 st in
     let name_index, version_index =
       match CP.get_entry pool module_index with
       | CP.ModuleId (n, v) -> n, v
@@ -2471,12 +2435,12 @@ module HighAttributeOps = struct (* {{{ *)
     (name, version)
 
   let read_info st =
-    let name = InputStream.read_u2 st in
-    let len = InputStream.read_u4 st in
+    let name = IS.read_u2 st in
+    let len = IS.read_u4 st in
     if (len :> int64) > (Int64.of_int max_int) then
-      raise (InputStream.Exception InputStream.Data_is_too_large)
+      raise (IS.Exception IS.Data_is_too_large)
     else
-      let dat = InputStream.read_bytes st (Int64.to_int (len :> int64)) in
+      let dat = IS.read_bytes st (Int64.to_int (len :> int64)) in
       { A.name_index = name;
 	length = len;
 	data = dat; }
@@ -2496,7 +2460,7 @@ module HighAttributeOps = struct (* {{{ *)
     ; da_i : A.info }
 
   let decode_attr_constant_value _ r st =
-        let const_index = InputStream.read_u2 st in
+        let const_index = IS.read_u2 st in
         match CP.get_entry r.da_pool const_index with
         | CP.Long (hi, lo) ->
             let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
@@ -2514,37 +2478,50 @@ module HighAttributeOps = struct (* {{{ *)
 
   let decode_attr_code decode r st =
     (* read these anyway to get into the stream *)
-    let (*mx_stack*) _ = InputStream.read_u2 st in
-    let (*mx_locals*) _ = InputStream.read_u2 st in
-    let code_len' = InputStream.read_u4 st in
+    let (*mx_stack*) _ = IS.read_u2 st in
+    let (*mx_locals*) _ = IS.read_u2 st in
+    let code_len' = IS.read_u4 st in
     let code_len =
-      if (code_len' :> int64) < 65536L then
-        Int64.to_int (code_len' :> int64)
+      let x = (code_len' : Utils.u4 :> int64) in
+      if 0L < x && x < 65536L then
+        Int64.to_int x
       else
         fail Invalid_code_length in
-    let code_content = InputStream.read_bytes st code_len in
-    let code_stream = InputStream.make_of_string code_content in
+    let code_content = IS.read_bytes st code_len in
+    let code_stream = IS.make_of_string code_content in
     let instr_codes = BC.read code_stream 0 in
-    let fold_size (l, ofs, lbl) inst =
-      let s = BC.size_of ofs inst in
-      assert (s > 0);
-      (inst, ofs, lbl) :: l, ofs + s, lbl + 1 in
-    let instr_codes_annot, _, _ = List.fold_left fold_size ([], 0, 0) instr_codes in
-    let instr_codes_annot = List.rev instr_codes_annot in
-    (* TODO: faster structure for this? *)
-    let ofs_to_label ofs =
-      let (_, _, lbl) = List.find (fun (_, o, _) -> o = ofs) instr_codes_annot in
-      lbl in
-    let decode_inst_code (inst, ofs, lbl) = lbl, HI.decode r.da_pool ofs_to_label ofs inst in
-    let instrs = List.map decode_inst_code instr_codes_annot in
+    let ofs_to_label, ofs_to_prev_label =
+      let rec f o ps = function
+        | [] -> Array.of_list (List.rev ((o, HI.invalid_label) :: ps))
+        | s :: ss -> f (o + BC.size_of o s) ((o, HI.fresh_label ()) :: ps) ss in
+      let a = f 0 [] instr_codes in
+      let n = Array.length a in
+      assert (n > 1); (* see Invalid_code_length check above *)
+      let rec search o l h =
+        if l + 1 = h then l else begin
+          let m = l + (h - l) / 2 in
+          if fst a.(m) <= o then search o m h else search o l m
+        end in
+      ((fun o ->
+        let i = search o 0 (pred n) in
+        if fst a.(i) <> o then fail Invalid_offset else snd a.(i)),
+      (fun o ->
+        let i = search (pred o) 0 (pred n) in
+        if fst a.(succ i) <> o then fail Invalid_offset else snd a.(i))) in
+    let instrs =
+      let f (o, ss) s =
+        (o + BC.size_of o s,
+          (ofs_to_label o, HI.decode r.da_pool ofs_to_label o s) :: ss) in
+      let _, r = List.fold_left f (0, []) instr_codes in
+      List.rev r in
     let exceptions =
-      InputStream.read_elements
+      IS.read_elements
         st
         (fun st ->
-          let start_pc = InputStream.read_u2 st in
-          let end_pc = InputStream.read_u2 st in
-          let handler_pc = InputStream.read_u2 st in
-          let catch_index = InputStream.read_u2 st in
+          let start_pc = IS.read_u2 st in
+          let end_pc = IS.read_u2 st in
+          let handler_pc = IS.read_u2 st in
+          let catch_index = IS.read_u2 st in
           let catch_type =
             if (catch_index :> int) <> 0 then
               Some (CP.get_class_name r.da_pool catch_index)
@@ -2552,7 +2529,7 @@ module HighAttributeOps = struct (* {{{ *)
               None in
 	  let u2_ofs_to_label ofs = ofs_to_label (ofs : Utils.u2 :> int) in
           { HA.try_start = u2_ofs_to_label start_pc;
-            HA.try_end = u2_ofs_to_label end_pc;
+            HA.try_end = ofs_to_prev_label (end_pc : Utils.u2 :> int);
             HA.catch = u2_ofs_to_label handler_pc;
             HA.caught = catch_type; }) in
     let attrs = IS.read_elements
@@ -2562,7 +2539,7 @@ module HighAttributeOps = struct (* {{{ *)
       | `LineNumberTable h ->
           let r = HI.LabelHash.create 13 in
           let f ofs ln =
-            let label = ofs_to_label ofs in
+            let label = ofs_to_label (Int64.to_int ofs) in
             assert (not (HI.LabelHash.mem r label));
             HI.LabelHash.add r label ln in
           HI.LabelHash.iter f h;
@@ -2611,7 +2588,7 @@ module HighAttributeOps = struct (* {{{ *)
     `Synthetic
 
   let decode_attr_signature _ r st : HA.t =
-    let signature_index = InputStream.read_u2 st in
+    let signature_index = IS.read_u2 st in
     let s = CP.get_utf8_entry r.da_pool signature_index in
     match r.da_element with
       | A.Class -> `ClassSignature (Signature.class_signature_of_utf8 s)
@@ -2628,13 +2605,14 @@ module HighAttributeOps = struct (* {{{ *)
   (* We provisionally build a table using program counters instead of labels,
   because we might have not yet seen the code. The decoding of methods must
   post-process to change program counters into labels. *)
+  (* TODO(rgrig): The casts between in int and int64 are ugly and must go.*)
   let decode_attr_line_number_table _ _ st =
     let h = IS.read_elements
       st
       (fun st ->
         let start_pc = IS.read_u2 st in
         let line_number = IS.read_u2 st in
-        ((start_pc :> HI.label), (line_number :> int))) in
+        (Int64.of_int (start_pc :> int), (line_number :> int))) in
     let h = hash_of_list HI.LabelHash.create HI.LabelHash.replace h in
     `LineNumberTable h
 
@@ -2674,7 +2652,7 @@ module HighAttributeOps = struct (* {{{ *)
 
   let decoders :
       ((decoding_arguments -> HA.t) ->
-        decoding_arguments -> InputStream.t -> HA.t)
+        decoding_arguments -> IS.t -> HA.t)
       UTF8Hashtbl.t =
     let ds = [
       attr_annotation_default, decode_attr_annotation_default;
@@ -3101,12 +3079,11 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_method m pool a =
     if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
     let r = encode (Some m) pool (a : HA.for_method :> HA.t) in
-    if log_se then printf "@]@\n}@?";
+    if log_se then printf "@]@\n}";
     r
 end
 (* }}} *)
 module HAO = HighAttributeOps
-
 module HighMethodOps = struct (* {{{ *)
   let decode_initializer init_attributes flags _ =
     let init_flags = AccessFlag.check_initializer_flags flags in
@@ -3163,8 +3140,6 @@ module HighMethodOps = struct (* {{{ *)
       attributes_array = U.map_list_to_array (HAO.encode_method m pool) (attrs :> HA.for_method list); }
 end (* }}} *)
 module HMO = HighMethodOps
-
-(* }}} *)
 module F = Field
 module HighField = struct (* {{{ *)
   type t = {
@@ -3200,6 +3175,7 @@ module HighField = struct (* {{{ *)
 end (* }}} *)
 module HF = HighField
 
+(* }}} *)
 (* rest/most of HighClass *) (* {{{ *)
 type t = {
     access_flags : AccessFlag.for_class list;
