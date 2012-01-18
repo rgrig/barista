@@ -84,13 +84,7 @@ let checked_length_u1 s l =
 module HighInstruction = struct (* {{{ *)
   type label = int64
 
-  let fresh_label =
-    let x = ref (-1L) in
-    fun () ->
-      if !x = Int64.max_int then
-        failwith "INTERNAL ERROR: run out of unique identifiers";
-      x := Int64.succ !x;
-      !x
+  let fresh_label = U.fresh ()
 
   let invalid_label = -1L
 
