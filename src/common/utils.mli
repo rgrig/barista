@@ -211,3 +211,6 @@ val list_equal : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> bool
     used to compare list elements. *)
 
 val pp_list : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a list -> unit
+
+val fresh : unit -> unit -> int64
+(** [fresh ()] returns a function that, in turn, generates 0L, 1L, 2L, ... *)

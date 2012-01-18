@@ -266,3 +266,11 @@ let map4 f (x, y, z, u) = (f x, f y, f z, f u)
 module IntMap = Map.Make (struct type t = int let compare = compare end)
 
 let pp_list pe f = List.iter (fun e -> fprintf f "@ %a" pe e)
+
+let fresh () =
+  let x = ref (-1L) in
+  fun () ->
+    if !x = Int64.max_int then
+      failwith "INTERNAL ERROR: run out of unique identifiers";
+    x := Int64.succ !x;
+    !x

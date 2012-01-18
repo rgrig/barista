@@ -29,16 +29,16 @@ type error =
   | Invalid_primitive_array_type
   | Misplaced_attribute of (string * string)
   | SE_array_expected of string
-  | SE_category1_expected of string
-  | SE_category2_expected of string
   | SE_different_stack_sizes of (int * int)
+  | SE_double_new
   | SE_empty_stack
   | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
-  | SE_uninitialized_register of (int * int)
   | SE_invalid_stack_top of (string * string)
   | SE_missing_return
   | SE_reference_expected of string
+  | SE_unexpected_size of (int * string)
+  | SE_uninitialized_register of (int * int)
   | Too_many of string
   | Unsupported_instruction of string
 
@@ -51,9 +51,9 @@ let string_of_error = function
   | Invalid_offset -> "offset does not point at start of instruction"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
-  | SE_category1_expected s -> "SE: found " ^ s ^ " where a value of category 1 was expected"
-  | SE_category2_expected s -> "SE: found " ^ s ^ " where a value of category 2 was expected"
+  | SE_unexpected_size (s, x) -> "SE: found " ^ x ^ " where a value of size " ^  (string_of_int s) ^ " was expected"
   | SE_different_stack_sizes (s, s') -> "SE: saw a stack with size " ^ (string_of_int s) ^ " but expected one with size " ^ (string_of_int s')
+  | SE_double_new -> "SE: NEW instruction executed again without an interposing <init>"
   | SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
   | SE_invalid_label -> "SE: jump to inexistent label"
   | SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
@@ -84,13 +84,7 @@ let checked_length_u1 s l =
 module HighInstruction = struct (* {{{ *)
   type label = int64
 
-  let fresh_label =
-    let x = ref (-1L) in
-    fun () ->
-      if !x = Int64.max_int then
-        failwith "INTERNAL ERROR: run out of unique identifiers";
-      x := Int64.succ !x;
-      !x
+  let fresh_label = U.fresh ()
 
   let invalid_label = -1L
 
@@ -1336,6 +1330,9 @@ module SymbExe = struct  (* {{{ *)
     | VI_uninitialized l -> fprintf f "uninitialized(%Ld)" l
     | VI_return_address l -> fprintf f "return_address [%a]" (pp_label_set (fun f a -> fprintf f "%Ld" a)) l
 
+  let string_of_verification_type_info vi =
+    pp_vi str_formatter vi; flush_str_formatter ()
+
   let equal_verification_type_info x y = match (x, y) with
     | (VI_object (`Class_or_interface cn1)),
       (VI_object (`Class_or_interface cn2)) -> Name.equal_for_class cn1 cn2
@@ -1348,22 +1345,7 @@ module SymbExe = struct  (* {{{ *)
     | VI_return_address _, VI_return_address _ -> true
     | _ -> x = y
 
-  let string_of_verification_type_info = function
-    | VI_top -> "top"
-    | VI_integer -> "int"
-    | VI_float -> "float"
-    | VI_long -> "long"
-    | VI_double -> "double"
-    | VI_null -> "null"
-    | VI_uninitialized_this -> "uninit this"
-    | VI_object (`Class_or_interface cn) ->
-      U.UTF8.to_string_noerr (Name.external_utf8_for_class cn)
-    | VI_object (`Array_type ((`Array _) as a)) ->
-      let res = Descriptor.external_utf8_of_java_type (a :> Descriptor.java_type) in
-      (U.UTF8.to_string_noerr res)
-    | VI_uninitialized label ->
-      Printf.sprintf "uninit %Ld" (label :> int64)
-    | VI_return_address _ -> "returnAddress"
+  let size_of_vi = function VI_double | VI_long -> 2 | _ -> 1
 
   let verification_type_info_of_parameter_descriptor = function
     | `Boolean -> VI_integer
@@ -1423,8 +1405,8 @@ module SymbExe = struct  (* {{{ *)
   let report_invalid_local_contents (i, v, v') =
     SE_invalid_local_contents (i, string_of_verification_type_info v, string_of_verification_type_info v')
 
-  let report_category1_expected x = SE_category1_expected (string_of_verification_type_info x)
-  let report_category2_expected x = SE_category2_expected (string_of_verification_type_info x)
+  let report_unexpected_size s x =
+    SE_unexpected_size (s, string_of_verification_type_info x)
   (* }}} *)
   (* symbolic stack {{{ *)
   type stack = verification_type_info list (* stack top is list head *)
@@ -1461,33 +1443,15 @@ module SymbExe = struct  (* {{{ *)
     else
       fail (report_invalid_stack_top (v, v'))
 
-  let is_category1 = function
-    | VI_float
-    | VI_integer
-    | VI_null
-    | VI_object _
-    | VI_return_address _
-    | VI_top
-    | VI_uninitialized_this
-    | VI_uninitialized _
-        -> true
-    | VI_double
-    | VI_long
-        -> false
-
-  let pop_if_category1 = function
+  let pop_if_size s =
+    assert (s = 1 || s = 2);
+    function
     | hd :: tl ->
-      if is_category1 hd
-      then (if log_se then printf "-"; (hd, tl))
-      else fail (report_category1_expected hd)
+        if size_of_vi hd = 1
+        then (if log_se then printf "-"; (hd, tl))
+        else fail (report_unexpected_size s hd)
     | [] -> fail SE_empty_stack
 
-  let pop_if_category2 = function
-    | hd :: tl ->
-      if not (is_category1 hd)
-      then (if log_se then printf "-"; (hd, tl))
-      else fail (report_category2_expected hd)
-    | [] -> fail SE_empty_stack
   (* }}} *)
   (* symbolic pool {{{ *)
   type locals = verification_type_info U.IntMap.t
@@ -1660,6 +1624,8 @@ module SymbExe = struct  (* {{{ *)
     let return locals stack = ({stack; locals}, []) in
     let locals = st.locals in
     let stack = st.stack in
+    let state_contains vi =
+      List.mem vi stack || U.IntMap.exists (fun _ v -> v = vi) locals in
     match i with
       | HI.AALOAD ->
 	let stack = pop_if VI_integer stack in
@@ -1818,7 +1784,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push VI_double stack in
 	continue locals stack
       | HI.DUP ->
-	let v, stack = pop_if_category1 stack in
+	let v, stack = pop_if_size 1 stack in
 	let stack = push v stack in
 	let stack = push v stack in
 	continue locals stack
@@ -1826,8 +1792,8 @@ module SymbExe = struct  (* {{{ *)
 	let v1 = top stack in
 	let stack = pop stack in
 	let stack =
-          if is_category1 v1 then
-            let v2, stack = pop_if_category1 stack in
+          if size_of_vi v1 = 1 then
+            let v2, stack = pop_if_size 1 stack in
             let stack = push v2 stack in
             let stack = push v1 stack in
             let stack = push v2 stack in
@@ -1838,10 +1804,10 @@ module SymbExe = struct  (* {{{ *)
       | HI.DUP2_X1 ->
 	let v1 = top stack in
 	let stack =
-          if is_category1 v1 then
+          if size_of_vi v1 = 1 then
             let stack = pop stack in
-            let v2, stack = pop_if_category1 stack in
-            let v3, stack = pop_if_category1 stack in
+            let v2, stack = pop_if_size 1 stack in
+            let v3, stack = pop_if_size 1 stack in
             let stack = push v2 stack in
             let stack = push v1 stack in
             let stack = push v3 stack in
@@ -1849,7 +1815,7 @@ module SymbExe = struct  (* {{{ *)
             push v1 stack
           else
             let stack = pop stack in
-            let v2, stack = pop_if_category1 stack in
+            let v2, stack = pop_if_size 1 stack in
             let stack = push v1 stack in
             let stack = push v2 stack in
             push v1 stack in
@@ -1857,11 +1823,11 @@ module SymbExe = struct  (* {{{ *)
       | HI.DUP2_X2 ->
 	let v1 = top stack in
 	let stack =
-          if is_category1 v1 then begin
+          if size_of_vi v1 = 1 then begin
             let stack = pop stack in
-            let v2, stack = pop_if_category1 stack in
+            let v2, stack = pop_if_size 1 stack in
             let v3 = top stack in
-            if is_category1 v3 then begin
+            if size_of_vi v3 = 1 then begin
               let stack = pop stack in
               let v4 = top stack in
               let stack = pop stack in
@@ -1882,9 +1848,9 @@ module SymbExe = struct  (* {{{ *)
           end else begin
             let stack = pop stack in
             let v2 = top stack in
-            if is_category1 v2 then begin
+            if size_of_vi v2 = 1 then begin
               let stack = pop stack in
-              let v3, stack = pop_if_category1 stack in
+              let v3, stack = pop_if_size 1 stack in
               let stack = push v1 stack in
               let stack = push v3 stack in
               let stack = push v2 stack in
@@ -1898,25 +1864,25 @@ module SymbExe = struct  (* {{{ *)
           end in
 	continue locals stack
       | HI.DUP_X1 ->
-	let v1, stack = pop_if_category1 stack in
-	let v2, stack = pop_if_category1 stack in
+	let v1, stack = pop_if_size 1 stack in
+	let v2, stack = pop_if_size 1 stack in
 	let stack = push v1 stack in
 	let stack = push v2 stack in
 	let stack = push v1 stack in
 	continue locals stack
       | HI.DUP_X2 ->
-	let v1, stack = pop_if_category1 stack in
+	let v1, stack = pop_if_size 1 stack in
 	let v2 = top stack in
 	let stack =
-          if is_category1 v2 then
-            let v2, stack = pop_if_category1 stack in
-            let v3, stack = pop_if_category1 stack in
+          if size_of_vi v2 = 1 then
+            let v2, stack = pop_if_size 1 stack in
+            let v3, stack = pop_if_size 1 stack in
             let stack = push v1 stack in
             let stack = push v3 stack in
             let stack = push v2 stack in
             push v1 stack
           else
-            let v2, stack = pop_if_category2 stack in
+            let v2, stack = pop_if_size 2 stack in
             let stack = push v1 stack in
             let stack = push v2 stack in
             push v1 stack in
@@ -2186,7 +2152,6 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop stack in
 	let stack = push_return_value ret stack in
 	let locals, stack =
-        (* TODO(rgrig): This is wrong. Fix. *)
 	(* TODO(rlp) understand what happens here *)
           if U.UTF8.equal Consts.class_constructor (Name.utf8_for_method mn) then
             match topv with
@@ -2389,7 +2354,9 @@ module SymbExe = struct  (* {{{ *)
 	continue locals stack
       | HI.NEW _ ->
       (* TODO(rlp) understand why the argument to NEW is thrown away *)
-	let stack = push (VI_uninitialized lbl) stack in
+        let vi = VI_uninitialized lbl in
+        if state_contains vi then fail SE_double_new;
+	let stack = push vi stack in
 	continue locals stack
       | HI.NEWARRAY parameter ->
 	let stack = pop_if VI_integer stack in
@@ -2398,13 +2365,13 @@ module SymbExe = struct  (* {{{ *)
       | HI.NOP ->
 	continue locals stack
       | HI.POP ->
-	let _, stack = pop_if_category1 stack in
+	let _, stack = pop_if_size 1 stack in
 	continue locals stack
       | HI.POP2 ->
 	let v1 = top stack in
 	let stack =
-          if is_category1 v1 then
-            snd (pop_if_category1 (snd (pop_if_category1 stack)))
+          if size_of_vi v1 = 1 then
+            snd (pop_if_size 1 (snd (pop_if_size 1 stack)))
           else
             pop stack in
 	continue locals stack
@@ -2439,8 +2406,8 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push VI_integer stack in
 	continue locals stack
       | HI.SWAP ->
-	let v1, stack = pop_if_category1 stack in
-	let v2, stack = pop_if_category1 stack in
+	let v1, stack = pop_if_size 1 stack in
+	let v2, stack = pop_if_size 1 stack in
 	let stack = push v1 stack in
 	let stack = push v2 stack in
 	continue locals stack
