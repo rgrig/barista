@@ -27,6 +27,7 @@ type error =
   | Invalid_pool_element
   | Invalid_pool_entry
   | Invalid_primitive_array_type
+  | Invalid_stack_map_table
   | Misplaced_attribute of (string * string)
   | SE_array_expected of string
   | SE_different_stack_sizes of (int * int)
@@ -49,6 +50,7 @@ let fail e = raise (Exception e)
 let string_of_error = function
   | Invalid_TABLESWITCH -> "TABLESWITCH with empty range [low..high]"
   | Invalid_offset -> "offset does not point at start of instruction"
+  | Invalid_stack_map_table -> "invalid stack map table"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
   | SE_unexpected_size (s, x) -> "SE: found " ^ x ^ " where a value of size " ^  (string_of_int s) ^ " was expected"
@@ -1461,8 +1463,9 @@ module SymbExe = struct  (* {{{ *)
     | [] -> fail SE_empty_stack
 
   (* }}} *)
-  (* symbolic pool {{{ *)
+  (* symbolic locals {{{ *)
   type locals = verification_type_info U.IntMap.t
+
   let pp_locals f ls =
     let pb r v = fprintf f "@ (%d->%a)" r pp_vi v in
     fprintf f "@[["; U.IntMap.iter pb ls; fprintf f " ]@]"
@@ -1488,10 +1491,18 @@ module SymbExe = struct  (* {{{ *)
 
   let store i v l =
     let l = U.IntMap.add i v l in
-    match v with
-      | VI_long
-      | VI_double -> U.IntMap.add (succ i) VI_top l
-      | _ -> l
+    let l = if size_of_vi v = 2 then U.IntMap.add (succ i) VI_top l else l in
+    l
+
+  let encode_locals m =
+    try
+      let max, _ = U.IntMap.max_binding m in
+      let r = ref [] in
+      for i = 0 to max do
+        r := (try U.IntMap.find i m with Not_found -> VI_top) :: !r
+      done;
+      List.rev !r
+    with Not_found -> []
   (* }}} *)
   (* checks {{{ *)
   let check_reference x =
@@ -1614,11 +1625,11 @@ module SymbExe = struct  (* {{{ *)
               let r = step s c ls in printf "\"];@]"; r in
             printf "@\n@[%d -> %d [color=%s];@]" sl tm color;
             exec log_exec step t m in
-          let limit_exec n =
+(*          let limit_exec n =
             let x = ref n in
             let rec f _ _ _ t m =
               if !x > 0 then (decr x; exec f step t m) in
-            f in
+            f in *)
           let exec = if log_se then log_exec else normal_exec in
 (*           let exec = limit_exec 10000 in *)
           exec "green" init HI.invalid_label init l;
@@ -3005,6 +3016,55 @@ module HighAttributeOps = struct (* {{{ *)
         Annotation.write_extended_info st a')
       l
 
+  (* PRE: ool is injective *)
+  let encode_attr_stackmaptable (ool : HI.label -> int) pool m : A.info =
+    try
+      let enc = make_encoder pool 16 in
+      let rec filter acc = function
+        | x :: SE.VI_top :: xs when SE.size_of_vi x = 2 ->
+            filter (x :: acc) xs
+        | x :: xs -> filter (x :: acc) xs
+        | [] -> List.rev acc in
+      let full_frame l s acc =
+        ( ool l
+        , filter (SE.encode_locals s.SE.locals) []
+        , List.rev s.SE.stack )
+        :: acc in
+      let smt = HI.LabelHash.fold full_frame m [] in
+      let smt = List.sort compare smt in
+      let write_vi = function
+        | SE.VI_top -> OS.write_u1 enc.en_st (U.u1 0)
+        | SE.VI_return_address _ (* TODO(rgrig): check whether this is OK. *)
+        | SE.VI_integer -> OS.write_u1 enc.en_st (U.u1 1)
+        | SE.VI_float -> OS.write_u1 enc.en_st (U.u1 2)
+        | SE.VI_double -> OS.write_u1 enc.en_st (U.u1 3)
+        | SE.VI_long -> OS.write_u1 enc.en_st (U.u1 4)
+        | SE.VI_null -> OS.write_u1 enc.en_st (U.u1 5)
+        | SE.VI_uninitialized_this -> OS.write_u1 enc.en_st (U.u1 6)
+        | SE.VI_object d ->
+            OS.write_u1 enc.en_st (U.u1 7);
+            let idx = match d with
+              | `Class_or_interface u -> CP.add_class enc.en_pool u
+              | `Array_type t -> CP.add_array_class enc.en_pool t in
+            OS.write_u2 enc.en_st idx
+        | SE.VI_uninitialized l ->
+            OS.write_u1 enc.en_st (U.u1 8);
+            OS.write_u2 enc.en_st (U.u2 (ool l)) in
+      OS.write_u2 enc.en_st (U.u2 (HI.LabelHash.length m));
+      let write_list l =
+        OS.write_u2 enc.en_st (U.u2 (List.length l));
+        List.iter write_vi l in
+      let po = ref (-1) in
+      let write_smf (o, locals, stack) =
+        OS.write_u1 enc.en_st (U.u1 255);
+        OS.write_u2 enc.en_st (U.u2 (o - !po - 1));
+        write_list locals;
+        write_list stack;
+        po := o in
+      List.iter write_smf smt;
+      enc_return enc attr_stack_map_table
+    with _ -> fail Invalid_stack_map_table
+
   let encode_attr_annotation_default enc ev =
       let eiv = Annotation.encode_element_value enc.en_pool ev in
       Annotation.write_info_element_value enc.en_st eiv;
@@ -3056,7 +3116,6 @@ module HighAttributeOps = struct (* {{{ *)
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
     let actual_code = Buffer.contents code_enc.en_buffer in
-    (* TODO: write the stackmap at some point *)
     let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
@@ -3076,14 +3135,16 @@ module HighAttributeOps = struct (* {{{ *)
         OS.write_u2 st (U.u2 (label_to_ofs elem.HA.catch));
         OS.write_u2 st catch_idx)
       c.HA.exception_table;
-    let len' = checked_length "Attributes" c.HA.attributes in
-    OS.write_u2 enc.en_st len';
+    let len = checked_length "Attributes" c.HA.attributes in
+    OS.write_u2 enc.en_st (U.u2 (succ (len : U.u2 :> int)));
     let sub_enc = make_encoder enc.en_pool 16 in
     List.iter
       (fun a ->
         let res = encode (Some m) sub_enc.en_pool (a :> HA.t) in
         write_info sub_enc res)
       c.HA.attributes;
+    let res = encode_attr_stackmaptable label_to_ofs enc.en_pool stackmap in
+    write_info sub_enc res;
     OS.close sub_enc.en_st;
     OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
     enc_return enc attr_code
