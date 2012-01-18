@@ -1602,20 +1602,20 @@ module SymbExe = struct  (* {{{ *)
             let rec f e l m = add m e; if l <> m then f e l (next_label m) in
             let g e = f e.HA.catch e.HA.try_end e.HA.try_start in
             List.iter g code.HA.exception_table; get in
-          let result = H.create 13 in
+          let state = H.create 13 in
           let record_state s l =
             try
-              let t = H.find result l in
+              let t = H.find state l in
               let s = unify s t in
-              H.replace result l s;
+              H.replace state l s;
               (s, not (eq s t))
             with Not_found ->
-              (H.add result l s; (s, true)) in
+              (H.add state l s; (s, true)) in
           let exec exec' step s l = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
             let s, progress = record_state s l in
             if progress then begin
-	      if log_se_full then pp_map_t std_formatter result;
+	      if log_se_full then pp_map_t std_formatter state;
               let t, ls = step s (instruction_at l) (next_label l) in
               List.iter (exec' "black" s l t) ls;
               List.iter (exec' "red" s l (exec_throw t)) (handlers_at l)
@@ -1637,7 +1637,7 @@ module SymbExe = struct  (* {{{ *)
           let exec = if log_se then log_exec else normal_exec in
 (*           let exec = limit_exec 10000 in *)
           exec "green" init HI.invalid_label init l;
-          result
+          state
 
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
@@ -3171,15 +3171,19 @@ module HighAttributeOps = struct (* {{{ *)
         OS.write_u2 st catch_idx)
       c.HA.exception_table;
     let len = checked_length "Attributes" c.HA.attributes in
-    OS.write_u2 enc.en_st (U.u2 (succ (len : U.u2 :> int)));
+    (* TODO(rgrig): Turn on once issue 8 is resolved. *)
+(*     let len = U.u2 (succ (len : U.u2 :> int)) in *)
+    OS.write_u2 enc.en_st len;
     let sub_enc = make_encoder enc.en_pool 16 in
     List.iter
       (fun a ->
         let res = encode (Some m) sub_enc.en_pool (a :> HA.t) in
         write_info sub_enc res)
       c.HA.attributes;
+(*  TODO(rgrig): Turn on once issue 8 is resolved.
     let res = encode_attr_stackmaptable label_to_ofs enc.en_pool stackmap in
     write_info sub_enc res;
+*)
     OS.close sub_enc.en_st;
     OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
     enc_return enc attr_code
