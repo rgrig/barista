@@ -382,6 +382,7 @@ type error =
   | Invalid_pool_element
   | Invalid_pool_entry
   | Invalid_primitive_array_type
+  | Invalid_stack_map_table
   | Misplaced_attribute of (string * string)
   | SE_array_expected of string
   | SE_different_stack_sizes of (int * int)
