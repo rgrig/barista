@@ -383,16 +383,16 @@ type error =
   | Invalid_primitive_array_type
   | Misplaced_attribute of (string * string)
   | SE_array_expected of string
-  | SE_category1_expected of string
-  | SE_category2_expected of string
   | SE_different_stack_sizes of (int * int)
+  | SE_double_new
   | SE_empty_stack
   | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
-  | SE_uninitialized_register of (int * int)
   | SE_invalid_stack_top of (string * string)
   | SE_missing_return
   | SE_reference_expected of string
+  | SE_unexpected_size of (int * string)
+  | SE_uninitialized_register of (int * int)
   | Too_many of string
   | Unsupported_instruction of string
 
