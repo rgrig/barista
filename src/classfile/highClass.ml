@@ -2330,9 +2330,10 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if VI_long stack in
 	let stack = push VI_long stack in
 	continue locals stack
-      | HI.LOOKUPSWITCH _ ->
+      | HI.LOOKUPSWITCH {HI.ls_def; ls_branches} ->
 	let stack = pop_if VI_integer stack in
-	continue locals stack
+        let targets = ls_def :: (List.map snd ls_branches) in
+	jump1 locals stack targets
       | HI.LOR ->
 	let stack = pop_if VI_long stack in
 	let stack = pop_if VI_long stack in
@@ -2451,9 +2452,10 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push v1 stack in
 	let stack = push v2 stack in
 	continue locals stack
-      | HI.TABLESWITCH _ ->
+      | HI.TABLESWITCH {HI.ts_def; ts_ofss; _} ->
 	let stack = pop_if VI_integer stack in
-	continue locals stack
+        let targets = ts_def :: ts_ofss in
+	jump1 locals stack targets
   (* }}} *)
   (* unification {{{ *)
   type 'a unifier = 'a -> 'a -> 'a
@@ -3139,31 +3141,32 @@ module HighAttributeOps = struct (* {{{ *)
     let m = HI.LabelHash.create 131 in
     let fold ofs (lbl, bc) =
       (* could check for clashes here *)
-      HI.LabelHash.add m lbl ofs;
-      ofs + (BC.size_of ofs bc) in
+      let next_ofs = ofs + (BC.size_of ofs bc) in
+      HI.LabelHash.add m lbl (ofs, next_ofs);
+      next_ofs in
     ignore (List.fold_left fold 0 bcl);
     m
 
   let encode_instr_list pool l =
-    let dummy_map _ = 0 in
+    let get f h x = f (HI.LabelHash.find h x) in
     let rec fix_map m bcl =
       let m' = compute_ofs_map bcl in
       let same =
         let f k v same = same && m k = v in
         HI.LabelHash.fold f m' true in
-      if same then (m, List.map snd bcl)
+      if same then (get fst m', get snd m', List.map snd bcl)
       else
-        let m' = HI.LabelHash.find m' in
-	let bcl' = i_list_to_labeled_bc_list m' pool l in
-	fix_map m' bcl' in
-    let bcl = i_list_to_labeled_bc_list dummy_map pool l in
-    fix_map dummy_map bcl
+	let bcl' = i_list_to_labeled_bc_list (get fst m') pool l in
+	fix_map (HI.LabelHash.find m') bcl' in
+    let bcl = i_list_to_labeled_bc_list (fun _ -> 0) pool l in
+    fix_map (fun _ -> (0,0)) bcl
 
   let rec encode_attr_code m enc encode c =
     let m = match m with
       | Some m -> m
       | None -> failwith "INTERNAL: encode_attr_code" in
-    let label_to_ofs, code_content = encode_instr_list enc.en_pool c.HA.code in
+    let label_to_ofs, label_to_next_ofs, code_content =
+      encode_instr_list enc.en_pool c.HA.code in
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
@@ -3183,7 +3186,7 @@ module HighAttributeOps = struct (* {{{ *)
         | Some exn_name -> CP.add_class enc.en_pool exn_name
         | None -> U.u2 0 in
         OS.write_u2 st (U.u2 (label_to_ofs elem.HA.try_start));
-        OS.write_u2 st (U.u2 (label_to_ofs elem.HA.try_end));
+        OS.write_u2 st (U.u2 (label_to_next_ofs elem.HA.try_end));
         OS.write_u2 st (U.u2 (label_to_ofs elem.HA.catch));
         OS.write_u2 st catch_idx)
       c.HA.exception_table;
@@ -3492,7 +3495,7 @@ type t = {
     attributes : HA.for_class list;
   }
 
-let check_version_high ?(version = Version.default) c =
+let check_version_high version c =
   let check_flag x = Version.check (AF.version_bounds x) version in
   let check_attribute x = Version.check (HAO.version_bounds x) version in
   let check_field x =
@@ -3527,7 +3530,7 @@ let decode cf =
   let field_decode = HF.decode is_interface pool in
   let method_decode = HMO.decode is_interface pool in
   let attribute_decode = HAO.decode_class pool in
-  let hc = check_version_high ~version { access_flags = flags;
+  let hc = check_version_high version { access_flags = flags;
     name = class_name cf.CF.this_class;
     extends = extends;
     implements = List.map class_name (Array.to_list cf.CF.interfaces);
@@ -3540,7 +3543,7 @@ let decode cf =
 let no_super_class = U.u2 0
 
 let encode (cd, version) =
-  ignore (check_version_high ~version:version cd);
+  ignore (check_version_high version cd);
   let major, minor = Version.major_minor_of_version version in
   let pool = CP.make_extendable () in
   let this_index = CP.add_class pool cd.name in

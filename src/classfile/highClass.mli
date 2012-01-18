@@ -402,7 +402,7 @@ val string_of_error : error -> string
 
 exception Exception of error
 
-val check_version_high : ?version : Version.t -> t -> t
+val check_version_high : Version.t -> t -> t
 val decode : ClassFile.t -> (t * Version.t)
 val encode : (t * Version.t) -> ClassFile.t
 
