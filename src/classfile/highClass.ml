@@ -1146,6 +1146,13 @@ end
 module HM = HighMethod
 module SymbExe = struct  (* {{{ *)
   (* symbolic types {{{ *)
+  module LabelSet = Set.Make(struct
+    type t = HI.label
+    let compare = compare
+  end)
+  module LS = LabelSet
+  let pp_label_set pe f = LS.iter (fun e -> fprintf f "@ %a" pe e)
+
   type verification_type_info =
     | VI_top
     | VI_integer
@@ -1156,7 +1163,7 @@ module SymbExe = struct  (* {{{ *)
     | VI_uninitialized_this
     | VI_object of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
     | VI_uninitialized of HI.label
-    | VI_return_address of HI.label list
+    | VI_return_address of LS.t
 
   let pp_vi f = function
     | VI_top -> fprintf f "top"
@@ -1168,7 +1175,7 @@ module SymbExe = struct  (* {{{ *)
     | VI_uninitialized_this -> fprintf f "uninitialized_this"
     | VI_object _ -> fprintf f "object"
     | VI_uninitialized l -> fprintf f "uninitialized(%Ld)" l
-    | VI_return_address l -> fprintf f "return_address [%a]" (U.pp_list (fun f a -> fprintf f "%Ld" a)) l
+    | VI_return_address l -> fprintf f "return_address [%a]" (pp_label_set (fun f a -> fprintf f "%Ld" a)) l
 
   let equal_verification_type_info x y = match (x, y) with
     | (VI_object (`Class_or_interface cn1)),
@@ -1370,7 +1377,7 @@ module SymbExe = struct  (* {{{ *)
       | VI_uninitialized _ -> ()
 
   let check_reference_or_return x =
-    if not (equal_verification_type_info x (VI_return_address []))
+    if not (equal_verification_type_info x (VI_return_address LS.empty))
     then check_reference x
   (* }}} *)
   (* symbolic execution {{{ *)
@@ -2093,7 +2100,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push VI_integer stack in
 	continue locals stack
       | HI.JSR lbl ->
-        let stack = push (VI_return_address [next_lbl]) stack in
+        let stack = push (VI_return_address (LS.singleton next_lbl)) stack in
 	jump1 locals stack [lbl]
       | HI.L2D ->
 	let stack = pop_if VI_long stack in
@@ -2253,9 +2260,9 @@ module SymbExe = struct  (* {{{ *)
 	continue locals stack
       | HI.RET index ->
         let lbls = (match load index locals with
-          | VI_return_address lbls -> lbls
+          | VI_return_address lbls -> LS.elements lbls
           | v -> fail (report_invalid_local_contents
-              (index, v, VI_return_address []))) in
+              (index, v, VI_return_address LS.empty))) in
         jump1 locals stack lbls
       | HI.RETURN ->
 	return locals stack
@@ -2373,7 +2380,7 @@ module SymbExe = struct  (* {{{ *)
       | (VI_object o1), (VI_object o2) -> VI_object (f o1 o2)
       | VI_null, (VI_object _) -> vti2
       | (VI_object _), VI_null -> vti1
-      | (VI_return_address l1), (VI_return_address l2) -> VI_return_address (l1 @ l2)
+      | (VI_return_address l1), (VI_return_address l2) -> VI_return_address (LS.union l1 l2)
       | _ -> if vti1 = vti2 then vti1 else VI_top in
     let sz1 = List.length st1.stack in
     let sz2 = List.length st2.stack in
