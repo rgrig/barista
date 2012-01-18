@@ -1333,6 +1333,7 @@ module SymbExe = struct  (* {{{ *)
   let string_of_verification_type_info vi =
     pp_vi str_formatter vi; flush_str_formatter ()
 
+  (* equal shape, used for verification *)
   let equal_verification_type_info x y = match (x, y) with
     | (VI_object (`Class_or_interface cn1)),
       (VI_object (`Class_or_interface cn2)) -> Name.equal_for_class cn1 cn2
@@ -1344,6 +1345,11 @@ module SymbExe = struct  (* {{{ *)
     | (VI_object _), (VI_object _) -> false
     | VI_return_address _, VI_return_address _ -> true
     | _ -> x = y
+
+  (* equal shape and value, used for symbolic execution *)
+  let equal_vi_se x y = match (x, y) with
+    | VI_return_address sx, VI_return_address sy -> LS.equal sx sy
+    | _ -> equal_verification_type_info x y
 
   let size_of_vi = function VI_double | VI_long -> 2 | _ -> 1
 
@@ -1413,6 +1419,8 @@ module SymbExe = struct  (* {{{ *)
 
   let pp_stack f x = fprintf f "@[[%a ]@]" (U.pp_list pp_vi) x
 
+  let equal_stack a b = List.fold_left2 (fun r a b -> r && equal_vi_se a b) true a b 
+
   let empty () = []
 
   let push v s =
@@ -1459,7 +1467,7 @@ module SymbExe = struct  (* {{{ *)
     let pb r v = fprintf f "@ (%d->%a)" r pp_vi v in
     fprintf f "@[["; U.IntMap.iter pb ls; fprintf f " ]@]"
 
-  let equal_locals a b = U.IntMap.equal (=) a b
+  let equal_locals a b = U.IntMap.equal equal_vi_se a b
 
   let intmap_width m =
     try
@@ -1528,7 +1536,7 @@ module SymbExe = struct  (* {{{ *)
     fprintf f "@\n)@]@\n"
 
   let equal_t a b =
-    equal_locals a.locals b.locals && a.stack = b.stack
+    equal_locals a.locals b.locals && equal_stack a.stack b.stack
 
   let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
 
