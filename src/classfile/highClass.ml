@@ -1591,13 +1591,30 @@ module SymbExe = struct  (* {{{ *)
           let record_state s l =
             try
               let t = H.find result l in
-              let s = unify s t in
-              H.replace result l s;
-              (s, not (eq s t))
+              let u = unify s t in
+	      (if log_se && not (eq s u) then
+		  let sl = Hashtbl.hash (s,l) in
+		  printf "@\n@[%d [shape=box,label=\"%Ld\",color=%s];@]" sl l "blue";
+		  printf "@\n@[%d -> %d [color=%s];@]" sl (Hashtbl.hash (u,l)) "blue");
+              H.replace result l u;
+              (u, not (eq u t))
             with Not_found ->
               (H.add result l s; (s, true)) in
+(* turn on to detect hash collisions
+	  let states_seen = Hashtbl.create 13 in
+	  let state_hashes_seen = Hashtbl.create 13 in
+*)
           let exec exec' step s l = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
+(* turn on to detect hash collisions
+	    let h = Hashtbl.hash (s,l) in
+	    if (Hashtbl.mem state_hashes_seen h) && not (Hashtbl.mem states_seen (s,l))
+	    then printf "@\n@[%d [color=\"red\"];@]" h;
+	    (* printf "@\n@[%d [shape=box,label=\"HASH COLLISION:%Ld\"];@]" (h+1) l; *)
+	    (*"@[HASH COLLISION!@."; *)
+	    Hashtbl.add states_seen (s,l) ();
+	    Hashtbl.add state_hashes_seen h ();
+*)
             let s, progress = record_state s l in
             if progress then begin
 	      if log_se_full then pp_map_t std_formatter result;
@@ -1709,7 +1726,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if VI_integer stack in
 	let stack = pop stack in
 	continue locals stack
-      | HI.CHECKCAST parameter ->
+      | HI.CHECKCAST parameter -> (* no check needed? *)
 	let stack = pop stack in
 	let stack = push (verification_type_info_of_parameter_descriptor (match parameter with `Array_type at -> (at :> Descriptor.for_parameter) | `Class_or_interface cn -> `Class cn)) stack in
 	continue locals stack
@@ -3264,6 +3281,7 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
   let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
   let encode_method m pool a =
+    if log_se_full then printf "@\n@[encoding method %s@\n@." (HM.to_string m);
     if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
     let r = encode (Some m) pool (a : HA.for_method :> HA.t) in
     if log_se then printf "@]@\n}";
