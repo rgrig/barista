@@ -183,6 +183,7 @@ module HighInstruction : sig (* {{{ *)
     | SIPUSH of int
     | SWAP
     | TABLESWITCH of tableswitch
+  val instruction_to_string : instruction -> string
   type t = label * instruction
 
   module LabelHash : Hashtbl.S with type key = label
