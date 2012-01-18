@@ -209,3 +209,5 @@ val switch : ('a -> 'a -> bool) -> ('a * ('a -> 'b)) list -> ('a -> 'b) -> 'a ->
 val list_equal : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 (** Equality over lists, [eq] (defaulting to [(=)]) being the predicate
     used to compare list elements. *)
+
+val pp_list : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a list -> unit

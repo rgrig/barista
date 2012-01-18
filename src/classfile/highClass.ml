@@ -1156,7 +1156,7 @@ module SymbExe = struct  (* {{{ *)
     | VI_uninitialized_this
     | VI_object of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
     | VI_uninitialized of HI.label
-    | VI_return_address of HI.label
+    | VI_return_address of HI.label list
 
   let pp_vi f = function
     | VI_top -> fprintf f "top"
@@ -1168,7 +1168,7 @@ module SymbExe = struct  (* {{{ *)
     | VI_uninitialized_this -> fprintf f "uninitialized_this"
     | VI_object _ -> fprintf f "object"
     | VI_uninitialized l -> fprintf f "uninitialized(%Ld)" l
-    | VI_return_address l -> fprintf f "return_address(%Ld)" l
+    | VI_return_address l -> fprintf f "return_address [%a]" (U.pp_list (fun f a -> fprintf f "%Ld" a)) l
 
   let equal_verification_type_info x y = match (x, y) with
     | (VI_object (`Class_or_interface cn1)),
@@ -1263,8 +1263,7 @@ module SymbExe = struct  (* {{{ *)
   (* symbolic stack {{{ *)
   type stack = verification_type_info list (* stack top is list head *)
 
-  let pp_list pe f = List.iter (fun e -> fprintf f "@ %a" pe e)
-  let pp_stack f x = fprintf f "@[[%a ]@]" (pp_list pp_vi) x
+  let pp_stack f x = fprintf f "@[[%a ]@]" (U.pp_list pp_vi) x
 
   let empty () = []
 
@@ -1371,7 +1370,7 @@ module SymbExe = struct  (* {{{ *)
       | VI_uninitialized _ -> ()
 
   let check_reference_or_return x =
-    if not (equal_verification_type_info x (VI_return_address HI.invalid_label))
+    if not (equal_verification_type_info x (VI_return_address []))
     then check_reference x
   (* }}} *)
   (* symbolic execution {{{ *)
@@ -1463,7 +1462,7 @@ module SymbExe = struct  (* {{{ *)
             if l = HI.invalid_label then fail SE_missing_return;
             let s, progress = record_state s l in
             if progress then begin
-(* pp_map_t std_formatter result; *)
+	      if log_se_full then pp_map_t std_formatter result;
               let t, ls = step s (instruction_at l) (next_label l) in
               List.iter (exec' "black" s l t) ls;
               List.iter (exec' "red" s l (exec_throw t)) (handlers_at l)
@@ -1490,7 +1489,7 @@ module SymbExe = struct  (* {{{ *)
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
     let continue locals stack = ({stack; locals}, [next_lbl]) in
-    let jump1 locals stack jump_lbl = ({stack; locals}, [jump_lbl]) in
+    let jump1 locals stack jump_lbls = ({stack; locals}, jump_lbls) in
     let jump2 locals stack jump_lbl = ({stack; locals}, [jump_lbl; next_lbl]) in
     let return locals stack = ({stack; locals}, []) in
     let locals = st.locals in
@@ -1847,7 +1846,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
       | HI.GOTO lbl ->
-	jump1 locals stack lbl
+	jump1 locals stack [lbl]
       | HI.I2B ->
 	let stack = pop_if VI_integer stack in
 	let stack = push VI_integer stack in
@@ -2094,8 +2093,8 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push VI_integer stack in
 	continue locals stack
       | HI.JSR lbl ->
-        let stack = push (VI_return_address next_lbl) stack in
-	jump1 locals stack lbl
+        let stack = push (VI_return_address [next_lbl]) stack in
+	jump1 locals stack [lbl]
       | HI.L2D ->
 	let stack = pop_if VI_long stack in
 	let stack = push VI_double stack in
@@ -2253,11 +2252,11 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
       | HI.RET index ->
-        let lbl = (match load index locals with
-          | VI_return_address lbl -> lbl
+        let lbls = (match load index locals with
+          | VI_return_address lbls -> lbls
           | v -> fail (report_invalid_local_contents
-              (index, v, VI_return_address HI.invalid_label))) in
-        jump1 locals stack lbl
+              (index, v, VI_return_address []))) in
+        jump1 locals stack lbls
       | HI.RETURN ->
 	return locals stack
       | HI.SALOAD ->
@@ -2374,6 +2373,7 @@ module SymbExe = struct  (* {{{ *)
       | (VI_object o1), (VI_object o2) -> VI_object (f o1 o2)
       | VI_null, (VI_object _) -> vti2
       | (VI_object _), VI_null -> vti1
+      | (VI_return_address l1), (VI_return_address l2) -> VI_return_address (l1 @ l2)
       | _ -> if vti1 = vti2 then vti1 else VI_top in
     let sz1 = List.length st1.stack in
     let sz2 = List.length st2.stack in
