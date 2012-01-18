@@ -1501,7 +1501,11 @@ module SymbExe = struct  (* {{{ *)
       for i = 0 to max do
         r := (try U.IntMap.find i m with Not_found -> VI_top) :: !r
       done;
-      List.rev !r
+      let rec f acc = function
+        | VI_top :: l :: ls when size_of_vi l = 2 -> f (l :: acc) ls
+        | l :: ls -> f (l :: acc) ls
+        | [] -> acc in
+      f !r []
     with Not_found -> []
   (* }}} *)
   (* checks {{{ *)
@@ -3020,48 +3024,79 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_attr_stackmaptable (ool : HI.label -> int) pool m : A.info =
     try
       let enc = make_encoder pool 16 in
-      let rec filter acc = function
-        | x :: SE.VI_top :: xs when SE.size_of_vi x = 2 ->
-            filter (x :: acc) xs
-        | x :: xs -> filter (x :: acc) xs
-        | [] -> List.rev acc in
       let full_frame l s acc =
         ( ool l
-        , filter (SE.encode_locals s.SE.locals) []
+        , SE.encode_locals s.SE.locals
         , List.rev s.SE.stack )
         :: acc in
       let smt = HI.LabelHash.fold full_frame m [] in
       let smt = List.sort compare smt in
-      let write_vi = function
-        | SE.VI_top -> OS.write_u1 enc.en_st (U.u1 0)
-        | SE.VI_return_address _ (* TODO(rgrig): check whether this is OK. *)
-        | SE.VI_integer -> OS.write_u1 enc.en_st (U.u1 1)
-        | SE.VI_float -> OS.write_u1 enc.en_st (U.u1 2)
-        | SE.VI_double -> OS.write_u1 enc.en_st (U.u1 3)
-        | SE.VI_long -> OS.write_u1 enc.en_st (U.u1 4)
-        | SE.VI_null -> OS.write_u1 enc.en_st (U.u1 5)
-        | SE.VI_uninitialized_this -> OS.write_u1 enc.en_st (U.u1 6)
-        | SE.VI_object d ->
-            OS.write_u1 enc.en_st (U.u1 7);
-            let idx = match d with
-              | `Class_or_interface u -> CP.add_class enc.en_pool u
-              | `Array_type t -> CP.add_array_class enc.en_pool t in
-            OS.write_u2 enc.en_st idx
-        | SE.VI_uninitialized l ->
-            OS.write_u1 enc.en_st (U.u1 8);
-            OS.write_u2 enc.en_st (U.u2 (ool l)) in
-      OS.write_u2 enc.en_st (U.u2 (HI.LabelHash.length m));
-      let write_list l =
-        OS.write_u2 enc.en_st (U.u2 (List.length l));
-        List.iter write_vi l in
-      let po = ref (-1) in
-      let write_smf (o, locals, stack) =
-        OS.write_u1 enc.en_st (U.u1 255);
-        OS.write_u2 enc.en_st (U.u2 (o - !po - 1));
-        write_list locals;
-        write_list stack;
-        po := o in
-      List.iter write_smf smt;
+      let write_smf previous (o, locals, stack) =
+        let write_vi = function
+          | SE.VI_top -> OS.write_u1 enc.en_st (U.u1 0)
+          | SE.VI_return_address _ (* TODO(rgrig): check whether this is OK. *)
+          | SE.VI_integer -> OS.write_u1 enc.en_st (U.u1 1)
+          | SE.VI_float -> OS.write_u1 enc.en_st (U.u1 2)
+          | SE.VI_double -> OS.write_u1 enc.en_st (U.u1 3)
+          | SE.VI_long -> OS.write_u1 enc.en_st (U.u1 4)
+          | SE.VI_null -> OS.write_u1 enc.en_st (U.u1 5)
+          | SE.VI_uninitialized_this -> OS.write_u1 enc.en_st (U.u1 6)
+          | SE.VI_object d ->
+              OS.write_u1 enc.en_st (U.u1 7);
+              let idx = match d with
+                | `Class_or_interface u -> CP.add_class enc.en_pool u
+                | `Array_type t -> CP.add_array_class enc.en_pool t in
+              OS.write_u2 enc.en_st idx
+          | SE.VI_uninitialized l ->
+              OS.write_u1 enc.en_st (U.u1 8);
+              OS.write_u2 enc.en_st (U.u2 (ool l)) in
+        OS.write_u2 enc.en_st (U.u2 (HI.LabelHash.length m));
+        let write_list l =
+          OS.write_u2 enc.en_st (U.u2 (List.length l));
+          List.iter write_vi l in
+        let o = match previous with None -> 0 | Some (o',_,_) -> o-o'-1 in
+        let same vi =
+          assert (0 <= o);
+          let e = 64 <= o in    (* extended *)
+          let s = vi <> None in (* with stack *)
+          let frame_type = match e, s with
+            | false, false -> o
+            | false, true -> o + 64
+            | true, false -> 251
+            | true, true -> 247 in
+          OS.write_u1 enc.en_st (U.u1 frame_type);
+          if e then OS.write_u2 enc.en_st (U.u2 o);
+          if s then write_vi (U.from_some vi) in
+        let diff (k, vis) =
+          assert (-4 < k && k < 4);
+          assert (k <> 0);
+          assert (k < 0 || k = List.length vis);
+          OS.write_u1 enc.en_st (U.u1 (k + 251));
+          OS.write_u2 enc.en_st (U.u2 o);
+          List.iter write_vi vis in
+        let full () =
+          OS.write_u1 enc.en_st (U.u1 255);
+          OS.write_u2 enc.en_st (U.u2 o);
+          write_list locals;
+          write_list stack in
+        let rec ldiff xs ys = match xs, ys with
+          | x :: xs, y :: ys when x = y -> ldiff xs ys
+          | xs, ys -> (xs, ys) in
+        let dist xs ys = match ldiff xs ys with
+          | ([], zs) | (zs, []) -> List.length zs
+          | _ -> max_int in
+        let grow_info xs ys = match ldiff xs ys with
+          | [], zs -> (List.length zs, zs)
+          | zs, [] -> (-(List.length zs), [])
+          | _ -> assert false in
+        (match previous, stack with
+          | Some (_,l,_), [] when dist l locals = 0 -> same None
+          | Some (_,l,_), [x] when dist l locals = 0 -> same (Some x)
+          | Some (_,l,_), []  when dist l locals < 4 ->
+              diff (grow_info l locals)
+          | _ -> full ()) in
+      let write_smf p n = write_smf p n; Some n in
+      ignore (List.fold_left write_smf None smt);
       enc_return enc attr_stack_map_table
     with _ -> fail Invalid_stack_map_table
 
