@@ -1610,8 +1610,11 @@ module SymbExe = struct  (* {{{ *)
               let u = unify s t in
 	      (if log_se && not (eq s u) then
 		  let sl = Hashtbl.hash (s,l) in
-		  printf "@\n@[%d [shape=box,label=\"%Ld\",color=%s];@]" sl l "blue";
-		  printf "@\n@[%d -> %d [color=%s];@]" sl (Hashtbl.hash (u,l)) "blue");
+		  let tl = Hashtbl.hash (t,l) in
+		  printf "@\n@[%d [shape=box,label=\"%Ld\"];@]" sl l;
+		  printf "@\n@[%d -> %d [color=%s];@]" sl (Hashtbl.hash (u,l)) "blue";
+		  printf "@\n@[%d [shape=box,label=\"%Ld\"];@]" tl l;
+		  printf "@\n@[%d -> %d [color=%s];@]" tl (Hashtbl.hash (u,l)) "blue");
               H.replace state l u;
               (u, not (eq u t))
             with Not_found ->
@@ -1634,8 +1637,8 @@ module SymbExe = struct  (* {{{ *)
               (try
                 let tm = Hashtbl.find hash_codes hc in
                 if not (eq sl tm) then
-                  printf "@\n@[%d [style=filled,color=\"yellow\"];@]" hc;
-              with Not_found -> Hashtbl.add hash_codes hc (s, l));
+                  printf "@\n@[%d [style=filled,color=\"yellow\"];@]" hc
+              with Not_found -> Hashtbl.add hash_codes hc sl);
               hc in
             let sl = hash (s, l) in
             let tm = hash (t, m) in
