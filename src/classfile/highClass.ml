@@ -1615,21 +1615,8 @@ module SymbExe = struct  (* {{{ *)
               (u, not (eq u t))
             with Not_found ->
               (H.add state l s; (s, true)) in
-(* turn on to detect hash collisions
-	  let states_seen = Hashtbl.create 13 in
-	  let state_hashes_seen = Hashtbl.create 13 in
-*)
           let exec exec' step s l = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
-(* turn on to detect hash collisions
-	    let h = Hashtbl.hash (s,l) in
-	    if (Hashtbl.mem state_hashes_seen h) && not (Hashtbl.mem states_seen (s,l))
-	    then printf "@\n@[%d [color=\"red\"];@]" h;
-	    (* printf "@\n@[%d [shape=box,label=\"HASH COLLISION:%Ld\"];@]" (h+1) l; *)
-	    (*"@[HASH COLLISION!@."; *)
-	    Hashtbl.add states_seen (s,l) ();
-	    Hashtbl.add state_hashes_seen h ();
-*)
             let s, progress = record_state s l in
             if progress then begin
 	      if log_se_full then pp_map_t std_formatter state;
@@ -1638,9 +1625,19 @@ module SymbExe = struct  (* {{{ *)
               List.iter (exec' "red" s l (exec_throw t)) (handlers_at l)
             end in
           let rec normal_exec _ _ _ = exec normal_exec step in
+          let hash_codes = Hashtbl.create 13 in
           let rec log_exec color s l t m =
-            let sl = Hashtbl.hash (s, l) in
-            let tm = Hashtbl.hash (t, m) in
+            let hash sl =
+              let eq (s, l) (t, m) = l = m && eq s t in
+              let hc = Hashtbl.hash sl in
+              (try
+                let tm = Hashtbl.find hash_codes hc in
+                if not (eq sl tm) then
+                  printf "@\n@[%d [style=filled,color=\"yellow\"];@]" hc;
+              with Not_found -> Hashtbl.add hash_codes hc (s, l));
+              hc in
+            let sl = hash (s, l) in
+            let tm = hash (t, m) in
             let step s c ls =
               printf "@\n@[%d [shape=box,label=\"%Ld:" tm m;
               let r = step s c ls in printf "\"];@]"; r in
