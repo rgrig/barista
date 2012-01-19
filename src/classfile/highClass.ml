@@ -1306,6 +1306,7 @@ module SymbExe = struct  (* {{{ *)
     let compare = compare
   end)
   module LS = LabelSet
+  module H = HI.LabelHash
   let pp_label_set pe f = LS.iter (fun e -> fprintf f "@ %a" pe e)
 
   type verification_type_info =
@@ -1579,9 +1580,8 @@ module SymbExe = struct  (* {{{ *)
         e     exception handler (or label of)
    *)
   let execute_method step exec_throw unify eq init code =
-    let module H = HI.LabelHash in
     match code.HA.code with
-      | [] -> H.create 2
+      | [] -> (H.create 2, H.create 2)
       | ((l, _) :: _) as cs ->
           let instruction_at =
             let h = H.create 13 in
@@ -1603,6 +1603,7 @@ module SymbExe = struct  (* {{{ *)
             let g e = f e.HA.catch e.HA.try_end e.HA.try_start in
             List.iter g code.HA.exception_table; get in
           let state = H.create 13 in
+          let graph = H.create 13 in
           let record_state s l =
             try
               let t = H.find state l in
@@ -1649,9 +1650,14 @@ module SymbExe = struct  (* {{{ *)
               if !x > 0 then (decr x; exec f step t m) in
             f in *)
           let exec = if log_se then log_exec else normal_exec in
+          let exec color s l t m =
+            let prev =
+              try H.find graph m with Not_found -> LS.empty in
+            H.replace graph m (LS.add l prev);
+            exec color s l t m in
 (*           let exec = limit_exec 10000 in *)
           exec "green" init HI.invalid_label init l;
-          state
+          (graph, state)
 
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
@@ -2600,11 +2606,18 @@ module SymbExe = struct  (* {{{ *)
     let exec_throw s = { s with stack = [VI_object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
-    let map_s = execute_method step exec_throw unify_states equal_t init c in
+    let cfg, smfs =
+      execute_method step exec_throw unify_states equal_t init c in
+    let count_incoming l =
+      try LS.cardinal (H.find cfg l) with Not_found -> 0 in
+    let first_label = match c.HA.code with [] -> None | (l, _) :: _ -> Some l in
+    let stripped_smfs = H.create 13 in
     let f l s (ms, ml) =
+      if Some l = first_label || count_incoming l > 1 then
+        H.add stripped_smfs l s;
       (max ms (stack_size s), max ml (locals_size s)) in
-    let max_stack, max_locals = HI.LabelHash.fold f map_s (0, 0) in
-    (map_s, max_stack, max_locals)
+    let max_stack, max_locals = HI.LabelHash.fold f smfs (0, 0) in
+    (stripped_smfs, max_stack, max_locals)
     (* }}} *)
 end (* }}} *)
 module SE = SymbExe
@@ -3188,8 +3201,7 @@ module HighAttributeOps = struct (* {{{ *)
         OS.write_u2 st catch_idx)
       c.HA.exception_table;
     let len = checked_length "Attributes" c.HA.attributes in
-    (* TODO(rgrig): Turn on once issue 8 is resolved. *)
-(*     let len = U.u2 (succ (len : U.u2 :> int)) in *)
+    let len = U.u2 (succ (len : U.u2 :> int)) in
     OS.write_u2 enc.en_st len;
     let sub_enc = make_encoder enc.en_pool 16 in
     List.iter
@@ -3197,10 +3209,8 @@ module HighAttributeOps = struct (* {{{ *)
         let res = encode (Some m) sub_enc.en_pool (a :> HA.t) in
         write_info sub_enc res)
       c.HA.attributes;
-(*  TODO(rgrig): Turn on once issue 8 is resolved.
     let res = encode_attr_stackmaptable label_to_ofs enc.en_pool stackmap in
     write_info sub_enc res;
-*)
     OS.close sub_enc.en_st;
     OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
     enc_return enc attr_code

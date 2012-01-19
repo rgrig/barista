@@ -197,6 +197,7 @@ val map4 : ('a -> 'b) -> ('a * 'a * 'a * 'a) -> ('b * 'b * 'b * 'b)
 val from_some : 'a option -> 'a
 
 module IntMap : Map.S with type key = int
+module IntSet : Set.S with type elt = int
 
 val identity : 'a -> 'a
 (** The identity function. *)

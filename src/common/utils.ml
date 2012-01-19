@@ -265,6 +265,8 @@ let map4 f (x, y, z, u) = (f x, f y, f z, f u)
 let from_some = function Some x -> x | _ -> failwith "INTERNAL: expected Some"
 
 module IntMap = Map.Make (struct type t = int let compare = compare end)
+module IntSet = Set.Make (struct type t = int let compare = compare end)
+  (* NOTE: leave the comparator inlined *)
 
 let pp_list pe f = List.iter (fun e -> fprintf f "@ %a" pe e)
 
