@@ -1617,47 +1617,61 @@ module SymbExe = struct  (* {{{ *)
 	      (if log_se && not (eq s u) then
 		  let sl = Hashtbl.hash (s,l) in
 		  let tl = Hashtbl.hash (t,l) in
+                  let ul = Hashtbl.hash (u,l) in
 		  printf "@\n@[%d [shape=box,label=\"%Ld\"];@]" sl l;
-		  printf "@\n@[%d -> %d [color=%s];@]" sl (Hashtbl.hash (u,l)) "blue";
+		  printf "@\n@[%d -> %d [color=blue];@]" sl ul;
 		  printf "@\n@[%d [shape=box,label=\"%Ld\"];@]" tl l;
-		  printf "@\n@[%d -> %d [color=%s];@]" tl (Hashtbl.hash (u,l)) "blue");
+		  printf "@\n@[%d -> %d [color=blue];@]" tl ul);
               H.replace state l u;
               (u, not (eq u t))
             with Not_found ->
               (H.add state l s; (s, true)) in
-          let exec exec' (step', s, l) = (* this is the main part *)
+          let exec exec' (_, step', s, l) = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
             let s, progress = record_state s l in
             if progress then begin
 	      if log_se_full then pp_map_t std_formatter state;
               let t, ls = step' s (instruction_at l) (next_label l) in
-              List.iter (fun l -> exec' (step, t, l)) ls;
+              List.iter (fun l -> exec' ("black", step, t, l)) ls;
               let t = exec_throw t in
-              List.iter (fun l -> exec' (step, t, l)) (handlers_at l)
+              List.iter (fun l -> exec' ("red", step, t, l)) (handlers_at l)
             end in
+          let log_collisions =
+            let eq (s, l) (t, m) = l = m && eq s t in
+            let hash_codes = Hashtbl.create 13 in
+            let rs (_, _, s, l) =
+              let sl = (s, l) in
+              let hc = Hashtbl.hash sl in
+              try
+                let tm = Hashtbl.find hash_codes hc in
+                if not (eq sl tm) then
+                  printf "@\n@[%d [style=fill,fillcolor=yellow];@]" hc
+              with Not_found -> Hashtbl.add hash_codes hc sl in
+            U.k_log rs in
           let log_state =
-            let map_step step s lc l =
+            let map_step step s (l, c) m =
               printf "@\n@[%d [shape=box,label=\"%Ld:" (Hashtbl.hash (s, l)) l;
-              let ls = step s lc l in printf "\"];@]"; ls in
-            U.k_map (fun (step, s, l) -> (map_step step, s, l)) in
+              let ls = step s (l, c) m in printf "\"];@]"; ls in
+            U.k_map (fun (color, step, s, l) -> (color, map_step step, s, l)) in
           let log_edge =
-            let pe ((_, s, l), (_, t, m)) =
+            let pe ((_, _, s, l), (color, _, t, m)) =
               let sl = Hashtbl.hash (s, l) in
               let tm = Hashtbl.hash (t, m) in
-              printf "@\n@[%d -> %d [color=black];@]" sl tm in
+              printf "@\n@[%d -> %d [color=%s];@]" sl tm color in
             U.k_log pe in
           let update_cfg =
-            let re ((_, _, l), (_, _, m)) =
+            let re ((_, _, _, l), (_, _, _, m)) =
               let prev = try H.find graph m with Not_found -> LS.empty in
               H.replace graph m (LS.add l prev) in
             U.k_log re in
           let exec =
             if log_se
-            then log_edge (U.k_successive (log_state exec))
+            then log_edge (U.k_successive (log_state (log_collisions exec)))
             else U.k_successive exec in
           let exec = update_cfg exec in
           let exec = U.k_y exec in
-          exec ((step, init, HI.invalid_label), (step, init, l));
+          exec (("", (fun _ -> failwith "what?"), init, HI.invalid_label),
+                ("green", step, init, l));
           (graph, state)
 
   (* was StackState.update *)
@@ -3416,12 +3430,7 @@ module HighAttributeOps = struct (* {{{ *)
 
   let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
   let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
-  let encode_method m pool a =
-    if log_se_full then printf "@\n@[encoding method %s@\n@." (HM.to_string m);
-    if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
-    let r = encode (Some m) pool (a : HA.for_method :> HA.t) in
-    if log_se then printf "@]@\n}";
-    r
+  let encode_method m pool a = encode (Some m) pool (a : HA.for_method :> HA.t)
 end
 (* }}} *)
 module HAO = HighAttributeOps
@@ -3474,11 +3483,17 @@ module HighMethodOps = struct (* {{{ *)
     let name_idx = CP.add_utf8 pool (Name.utf8_for_method name) in
     let desc_utf8 = Descriptor.utf8_of_method desc in
     let desc_idx = CP.add_utf8 pool desc_utf8 in
-    { M.access_flags = acc_flags;
-      name_index = name_idx;
-      descriptor_index = desc_idx;
-      attributes_count = U.u2 (List.length attrs);
-      attributes_array = U.map_list_to_array (HAO.encode_method m pool) (attrs :> HA.for_method list); }
+    if log_se_full then printf "@\n@[encoding method %s@\n@." (HM.to_string m);
+    if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
+    let r =
+      { M.access_flags = acc_flags;
+        name_index = name_idx;
+        descriptor_index = desc_idx;
+        attributes_count = U.u2 (List.length attrs);
+        attributes_array = U.map_list_to_array (HAO.encode_method m pool) (attrs :> HA.for_method list); }
+    in
+    if log_se then printf "@]@\n}";
+    r
 end (* }}} *)
 module HMO = HighMethodOps
 module F = Field
