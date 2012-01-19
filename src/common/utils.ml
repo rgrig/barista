@@ -198,8 +198,7 @@ let lexer_switch matches default ls =
   let next_char = ls#peek in
   switch UCharImpl.equal matches default next_char
 
-
-(* Miscellaneous *)
+(* Fixed-point magic *)
 
 let rec fix_point eq f x =
   let y = f x in
@@ -207,6 +206,13 @@ let rec fix_point eq f x =
     y
   else
     fix_point eq f y
+
+let rec k_y f x = f (k_y f) x
+let k_successive f g (x, y) = f (fun z -> g (y, z)) y
+let k_map m ff f x = ff f (m x)
+let k_log l ff f x = l x; ff f x
+
+(* Miscellaneous *)
 
 let compose_list l =
   fun x -> List.fold_left (fun acc f -> f acc) x l
@@ -277,3 +283,4 @@ let fresh () =
       failwith "INTERNAL ERROR: run out of unique identifiers";
     x := Int64.succ !x;
     !x
+

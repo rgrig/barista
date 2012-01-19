@@ -166,11 +166,18 @@ val lexer_switch : (UCharImpl.t * (UCharImpl.t -> 'a)) list -> (UCharImpl.t -> '
     [default] to [char]. *)
 
 
-(** {6 Miscellaneous} *)
+(* {6 Fixed-point magic} *)
 
 val fix_point : ('a -> 'a -> bool) -> ('a -> 'a) -> 'a -> 'a
 (** [fix_point eq f x] returns a fix point of [f] seeding with value [x],
     and using [eq] as the equality function. *)
+
+val k_y : (('a -> 'b) -> 'a -> 'b) -> 'a -> 'b
+val k_successive : (('a -> 'b) -> 'c -> 'd) -> ('c * 'a -> 'b) -> 'e * 'c -> 'd
+val k_map : ('a -> 'b) -> ('c -> 'b -> 'd) -> 'c -> 'a -> 'd
+val k_log : ('a -> 'b) -> ('c -> 'a -> 'd) -> 'c -> 'a -> 'd
+
+(** {6 Miscellaneous} *)
 
 val compose_list : ('a -> 'a) list -> 'a -> 'a
 (** [compose_list [f1; f2; ...; fn] x] returns [f1 (f2 ... (fn x))]. *)

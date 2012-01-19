@@ -82,6 +82,8 @@ let attr_synthetic = UTF8.of_string "Synthetic"
 
 let attr_unknown = UTF8.of_string "Unknown"
 
+let attr_ignored = UTF8.of_string "IgnoredByBarista"
+
 let attr_all = [ attr_annotation_default;
                  attr_bootstrap_methods;
                  attr_code;

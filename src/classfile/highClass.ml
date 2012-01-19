@@ -1174,6 +1174,7 @@ module HighAttribute = struct (* {{{ *)
     }
 
   type code_attribute = [
+    | `IgnoredAttribute
     | `LineNumberTable of int HI.LabelHash.t
     | `Unknown of Utils.UTF8.t * string
 
@@ -1248,6 +1249,7 @@ module HighAttribute = struct (* {{{ *)
     | `EnclosingMethod _ -> attr_enclosing_method
     | `Exceptions _ -> attr_exceptions
     | `FieldSignature _ -> attr_signature
+    | `IgnoredAttribute -> attr_ignored
     | `InnerClasses _ -> attr_inner_classes
     | `LineNumberTable _ -> attr_line_number_table
     | `LocalVariableTable _ -> attr_local_variable_table
@@ -1569,6 +1571,16 @@ module SymbExe = struct  (* {{{ *)
 
   let locals_size st = intmap_width st.locals
 
+  let prev_next_label lcs =
+    let hp, hn = H.create 13, H.create 13 in
+    let rec f = function
+      | (l, _) :: (((m, _) :: _) as lcs) ->
+          H.add hp m l; H.add hn l m; f lcs
+      | _ -> () in
+    f lcs;
+    let get h l = try H.find h l with Not_found -> HI.invalid_label in
+    (get hp, get hn)
+
   (*  PRE
         labels in code are distinct
       NOTATIONS
@@ -1588,13 +1600,7 @@ module SymbExe = struct  (* {{{ *)
             let f ((l, _) as c) = H.add h l c in
             List.iter f cs;
             fun l -> try H.find h l with Not_found -> fail SE_invalid_label in
-          let next_label =
-            let h = H.create 13 in
-            let rec f = function
-              | (l, _) :: (((m, _) :: _) as cs) -> H.add h l m; f cs
-              | _ -> () in
-            f cs;
-            fun l -> try H.find h l with Not_found -> HI.invalid_label in
+          let _, next_label = prev_next_label cs in
           let handlers_at =
             let h = H.create 13 in
             let get l = try H.find h l with Not_found -> [] in
@@ -1619,47 +1625,39 @@ module SymbExe = struct  (* {{{ *)
               (u, not (eq u t))
             with Not_found ->
               (H.add state l s; (s, true)) in
-          let exec exec' step s l = (* this is the main part *)
+          let exec exec' (step', s, l) = (* this is the main part *)
             if l = HI.invalid_label then fail SE_missing_return;
             let s, progress = record_state s l in
             if progress then begin
 	      if log_se_full then pp_map_t std_formatter state;
-              let t, ls = step s (instruction_at l) (next_label l) in
-              List.iter (exec' "black" s l t) ls;
-              List.iter (exec' "red" s l (exec_throw t)) (handlers_at l)
+              let t, ls = step' s (instruction_at l) (next_label l) in
+              List.iter (fun l -> exec' (step, t, l)) ls;
+              let t = exec_throw t in
+              List.iter (fun l -> exec' (step, t, l)) (handlers_at l)
             end in
-          let rec normal_exec _ _ _ = exec normal_exec step in
-          let hash_codes = Hashtbl.create 13 in
-          let rec log_exec color s l t m =
-            let hash sl =
-              let eq (s, l) (t, m) = l = m && eq s t in
-              let hc = Hashtbl.hash sl in
-              (try
-                let tm = Hashtbl.find hash_codes hc in
-                if not (eq sl tm) then
-                  printf "@\n@[%d [style=filled,color=\"yellow\"];@]" hc
-              with Not_found -> Hashtbl.add hash_codes hc sl);
-              hc in
-            let sl = hash (s, l) in
-            let tm = hash (t, m) in
-            let step s c ls =
-              printf "@\n@[%d [shape=box,label=\"%Ld:" tm m;
-              let r = step s c ls in printf "\"];@]"; r in
-            printf "@\n@[%d -> %d [color=%s];@]" sl tm color;
-            exec log_exec step t m in
-(*          let limit_exec n =
-            let x = ref n in
-            let rec f _ _ _ t m =
-              if !x > 0 then (decr x; exec f step t m) in
-            f in *)
-          let exec = if log_se then log_exec else normal_exec in
-          let exec color s l t m =
-            let prev =
-              try H.find graph m with Not_found -> LS.empty in
-            H.replace graph m (LS.add l prev);
-            exec color s l t m in
-(*           let exec = limit_exec 10000 in *)
-          exec "green" init HI.invalid_label init l;
+          let log_state =
+            let map_step step s lc l =
+              printf "@\n@[%d [shape=box,label=\"%Ld:" (Hashtbl.hash (s, l)) l;
+              let ls = step s lc l in printf "\"];@]"; ls in
+            U.k_map (fun (step, s, l) -> (map_step step, s, l)) in
+          let log_edge =
+            let pe ((_, s, l), (_, t, m)) =
+              let sl = Hashtbl.hash (s, l) in
+              let tm = Hashtbl.hash (t, m) in
+              printf "@\n@[%d -> %d [color=black];@]" sl tm in
+            U.k_log pe in
+          let update_cfg =
+            let re ((_, _, l), (_, _, m)) =
+              let prev = try H.find graph m with Not_found -> LS.empty in
+              H.replace graph m (LS.add l prev) in
+            U.k_log re in
+          let exec =
+            if log_se
+            then log_edge (U.k_successive (log_state exec))
+            else U.k_successive exec in
+          let exec = update_cfg exec in
+          let exec = U.k_y exec in
+          exec ((step, init, HI.invalid_label), (step, init, l));
           (graph, state)
 
   (* was StackState.update *)
@@ -2603,6 +2601,19 @@ module SymbExe = struct  (* {{{ *)
     | HM.Initializer _ ->
         [])
 
+  (* Makes sure exception handlers refer only to live labels. *)
+  let adjust_exception_table is_live c =
+    let prev, next = prev_next_label c.HA.code in
+    let rec advance until next l =
+      if is_live l || l = until then l else advance until next (next l) in
+    let adjust_handler h =
+      let l = advance h.HA.try_end next h.HA.try_start in
+      let r = advance l prev h.HA.try_end in
+      if not (is_live h.HA.catch) || (l = r && not (is_live l))
+      then None
+      else Some { h with HA.try_start = l; try_end = r } in
+    U.map_partial adjust_handler c.HA.exception_table
+
   (* public *) (* {{{ *)
   let compute_max_stack_locals m c =
     let init = { locals = locals_of_method m; stack = [] } in
@@ -2613,14 +2624,21 @@ module SymbExe = struct  (* {{{ *)
       execute_method step exec_throw unify_states equal_t init c in
     let count_incoming l =
       try LS.cardinal (H.find cfg l) with Not_found -> 0 in
-    let first_label = match c.HA.code with [] -> None | (l, _) :: _ -> Some l in
+    let first_label =
+      match c.HA.code with [] -> assert false | (l, _) :: _ -> l in
     let stripped_smfs = H.create 13 in
+    let live_labels = ref LS.empty in
     let f l s (ms, ml) =
-      if Some l = first_label || count_incoming l > 1 then
-        H.add stripped_smfs l s;
+      let count = count_incoming l in
+      if l = first_label || count > 1 then H.add stripped_smfs l s;
+      if l = first_label || count > 0 then live_labels := LS.add l !live_labels;
       (max ms (stack_size s), max ml (locals_size s)) in
     let max_stack, max_locals = HI.LabelHash.fold f smfs (0, 0) in
-    (stripped_smfs, max_stack, max_locals)
+    let code = List.filter (fun (l,_) -> LS.mem l !live_labels) c.HA.code in
+    let exception_table =
+      adjust_exception_table (fun l -> LS.mem l !live_labels) c in
+    let c = { c with HA.code = code; exception_table } in
+    (c, stripped_smfs, max_stack, max_locals)
     (* }}} *)
 end (* }}} *)
 module SE = SymbExe
@@ -2876,6 +2894,8 @@ module HighAttributeOps = struct (* {{{ *)
     let eiv = Annotation.read_info_element_value st in
     `AnnotationDefault (Annotation.decode_element_value r.da_pool eiv)
 
+  let decode_attr_stack_map_table _ _ _ : HA.t = `IgnoredAttribute
+
   let decode_attr_bootstrap_methods _ = failwith "todo:decode_attr_bootstrap_methods"
   let decode_attr_module _ = failwith "todo:decode_attr_module"
   let decode_attr_module_requires _ = failwith "todo:decode_attr_module_requires"
@@ -2914,10 +2934,7 @@ module HighAttributeOps = struct (* {{{ *)
       attr_source_debug_extension, decode_attr_source_debug_extension;
       attr_source_file, decode_attr_source_file;
       attr_synthetic, decode_attr_synthetic;
-
-(*  This one is too low-level to be decoded. It needs to be reconstructed
-    during encoding.
-      attr_stack_map_table, decode_attr_stack_map_table; *)
+      attr_stack_map_table, decode_attr_stack_map_table;
     ] in
     hash_of_list UTF8Hashtbl.create UTF8Hashtbl.add ds
 
@@ -2966,6 +2983,8 @@ module HighAttributeOps = struct (* {{{ *)
         Version.make_bounds "'Exceptions' attribute" Version.Java_1_0 None
     | `FieldSignature _ ->
         Version.make_bounds "'Signature' attribute" Version.Java_1_5 None
+    | `IgnoredAttribute ->
+        Version.make_bounds "ignored attribute" Version.Java_1_0 None
     | `InnerClasses _ ->
         Version.make_bounds "'InnerClasses' attribute" Version.Java_1_1 None
     | `LineNumberTable _ ->
@@ -3082,7 +3101,6 @@ module HighAttributeOps = struct (* {{{ *)
           | SE.VI_uninitialized l ->
               OS.write_u1 enc.en_st (U.u1 8);
               OS.write_u2 enc.en_st (U.u2 (ool l)) in
-        OS.write_u2 enc.en_st (U.u2 (HI.LabelHash.length m));
         let write_list l =
           OS.write_u2 enc.en_st (U.u2 (List.length l));
           List.iter write_vi l in
@@ -3128,6 +3146,7 @@ module HighAttributeOps = struct (* {{{ *)
               diff (grow_info l locals)
           | _ -> full ()) in
       let write_smf p n = write_smf p n; Some n in
+      OS.write_u2 enc.en_st (U.u2 (List.length smt));
       ignore (List.fold_left write_smf None smt);
       enc_return enc attr_stack_map_table
     with _ -> fail Invalid_stack_map_table
@@ -3178,13 +3197,14 @@ module HighAttributeOps = struct (* {{{ *)
     let m = match m with
       | Some m -> m
       | None -> failwith "INTERNAL: encode_attr_code" in
+    let c, stackmap, max_stack, max_locals =
+      SE.compute_max_stack_locals m c in
     let label_to_ofs, label_to_next_ofs, code_content =
       encode_instr_list enc.en_pool c.HA.code in
     let code_enc = make_encoder enc.en_pool 16 in
     BC.write code_enc.en_st 0 code_content;
     OS.close code_enc.en_st;
     let actual_code = Buffer.contents code_enc.en_buffer in
-    let stackmap, max_stack, max_locals = SE.compute_max_stack_locals m c in
     OS.write_u2 enc.en_st (U.u2 max_stack);
     OS.write_u2 enc.en_st (U.u2 max_locals);
     let code_length = String.length actual_code in
@@ -3308,14 +3328,14 @@ module HighAttributeOps = struct (* {{{ *)
     enc_return enc attr
 
   (* TODO(rgrig): Implement. *)
-  let encode_attr_line_number_table enc _ =
-    write_empty_list "line numbers" attr_line_number_table enc
+  let encode_attr_line_number_table =
+    write_empty_list "line numbers" attr_line_number_table
 
   let encode_attr_local_variable_table =
     write_empty_list "local variables" attr_local_variable_table
 
   let encode_attr_local_variable_type_table =
-    write_empty_list "local variable types" attr_local_variable_type_table
+    write_empty_list "local types" attr_local_variable_type_table
 
   let encode_attr_method_signature enc s =
       let idx = CP.add_utf8 enc.en_pool (Signature.utf8_of_method_signature s) in
@@ -3361,6 +3381,8 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_attr_unknown enc (n, v) =
       Buffer.add_string enc.en_buffer v;
       enc_return enc n
+  let encode_attr_ignored enc =
+      enc_return enc attr_ignored
 
   let rec encode m pool : HA.t -> A.info =
     let enc = make_encoder pool 64 in
@@ -3374,8 +3396,9 @@ module HighAttributeOps = struct (* {{{ *)
     | `EnclosingMethod em -> encode_attr_enclosing_method enc em
     | `Exceptions l -> encode_attr_exceptions enc l
     | `FieldSignature s -> encode_attr_field_signature enc s
+    | `IgnoredAttribute -> encode_attr_ignored enc
     | `InnerClasses l -> encode_attr_inner_classes enc l
-    | `LineNumberTable h -> encode_attr_line_number_table enc h
+    | `LineNumberTable _ -> encode_attr_line_number_table enc
     | `LocalVariableTable _ -> encode_attr_local_variable_table enc
     | `LocalVariableTypeTable _ -> encode_attr_local_variable_type_table enc
     | `MethodSignature s -> encode_attr_method_signature enc s

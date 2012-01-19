@@ -215,6 +215,7 @@ module HighAttribute : sig (* {{{ *)
     }
 
   type code_attribute = [
+    | `IgnoredAttribute
     | `LineNumberTable of int HighInstruction.LabelHash.t
     | `Unknown of Utils.UTF8.t * string
 
