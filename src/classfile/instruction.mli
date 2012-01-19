@@ -253,7 +253,7 @@ type t =
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_pool_element
   | Invalid_field
   | Invalid_dynamic_method
@@ -279,12 +279,6 @@ type error =
   | Unknown_instruction
   | Invalid_method_handle
   | Too_many_bootstrap_specifiers
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Conversion functions} *)

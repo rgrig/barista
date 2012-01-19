@@ -40,20 +40,21 @@ BODY{background:white;}
 <!--HEVEA command line is: hevea -fix -O -exec /usr/local/lib/hevea/xxdate.exe book.hva -o barista.html article.hva fancysection.hva barista.tex -->
 <!--CUT DEF chapter 1 --><TABLE CLASS="title"><TR><TD><H1 CLASS="titlemain">Barista 2.0-alpha<BR>
 Reference Manual</H1><H3 CLASS="titlerest">Copyright &#XA9; 2007-2011 Xavier Clerc &#X2013; <A HREF="mailto:barista@x9c.fr">barista@x9c.fr</A><BR>
-Released under the LGPL v3</H3><H3 CLASS="titlerest">July&#XA0;14, 2011</H3></TD></TR>
+Released under the LGPL v3</H3><H3 CLASS="titlerest">December
+&#XA0;17, 2011</H3></TD></TR>
 </TABLE><!--TOC chapter Abstract-->
 <H1 CLASS="chapter"><!--SEC ANCHOR -->Abstract</H1><!--SEC END --><P>
-This document presents Barista, the command-line program as well as the underlying Objective Caml library. The purpose of both is to allow easy manipulation of Java<SUP>&#X2122;</SUP> class files in their compiled (<I>a.k.a.&#XA0;</I>bytecode form).<BR>
+This document presents Barista, the command-line program as well as the underlying OCaml library. The purpose of both is to allow easy manipulation of Java<SUP>&#X2122;</SUP> class files in their compiled (<I>a.k.a.&#XA0;</I>bytecode form).<BR>
 
 The program allows one to asssemble and disassemble class file, respectively from and to a source format called assembler (which is essentially a human-readable form of the bytecode). The program also allows one to retrieve information about a classfile, by printing either the contents of a class or the control flow of a method.<BR>
 
-The Objective Caml library (upon which the program is built) allows more sophisticate analysis and manipulation of class file (and also package and module files). Its primary goal is to be used as the back-end for code generation in the OCaml-Java project (<TT><A HREF="http://ocamljava.x9c.fr">http://ocamljava.x9c.fr</A></TT>), which provides a compiler from Objective Caml sources into Java<SUP>&#X2122;</SUP> class files.<BR>
+The OCaml library (upon which the program is built) allows more sophisticate analysis and manipulation of class file (and also package and module files). Its primary goal is to be used as the back-end for code generation in the OCaml-Java project (<TT><A HREF="http://ocamljava.x9c.fr">http://ocamljava.x9c.fr</A></TT>), which provides a compiler from OCaml sources into Java<SUP>&#X2122;</SUP> class files.<BR>
 
 <BR>
 <BR>
 <BR>
-</P><P>This manual is structured in five chapters, and three appendixes.<BR>
-After a first chapter providing an overview of the Barista project, the second chapter explains how Barista can be built from sources and details its dependencies. Then, chapter three introduces the Barista program and how it can be executed, while chapter four introduces the the format of so-called <I>assembler</I> source file. The last chapter shed light on Barista as an Objective Caml library and provides entry points to its API. Finally, the three appendixes summarize all the instructions recognized by the Barista assembler, classified under three different ways (namely: alphabetically, by categories, and by opcode number) for easy reference.
+</P><P>This manual is structured in five chapters, and four appendixes.<BR>
+After a first chapter providing an overview of the Barista project, the second chapter explains how Barista can be built from sources and details its dependencies. Then, chapter three introduces the Barista program and how it can be executed, while chapter four introduces the the format of so-called <I>assembler</I> source file. The last chapter shed light on Barista as an OCaml library and provides entry points to its API. Finally, the three appendixes summarize all the instructions recognized by the Barista assembler, classified under three different ways (namely: alphabetically, by categories, and by opcode number) for easy reference. The fourth appendix presents the syntax extension used throughout the Barista sources.
 
 </P><!--TOC chapter Contents-->
 <H1 CLASS="chapter"><!--SEC ANCHOR -->Contents</H1><!--SEC END --><UL CLASS="ftoc1"><LI CLASS="li-toc">
@@ -125,7 +126,7 @@ After a first chapter providing an overview of the Barista project, the second c
 </LI></UL>
 </LI><LI CLASS="li-toc"><A HREF="#htoc54">4.7&#XA0;&#XA0;Example</A>
 </LI></UL>
-</LI><LI CLASS="li-toc"><A HREF="#htoc55">Chapter&#XA0;5&#XA0;&#XA0;Using Barista as an Objective Caml library</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc55">Chapter&#XA0;5&#XA0;&#XA0;Using Barista as an OCaml library</A>
 <UL CLASS="ftoc2"><LI CLASS="li-toc">
 <A HREF="#htoc56">5.1&#XA0;&#XA0;Compilation</A>
 <UL CLASS="ftoc3"><LI CLASS="li-toc">
@@ -145,19 +146,24 @@ Appendixes
 <A HREF="#htoc63">Appendix&#XA0;A&#XA0;&#XA0;Instructions and related parameters</A>
 </LI><LI CLASS="li-toc"><A HREF="#htoc64">Appendix&#XA0;B&#XA0;&#XA0;Instructions by categories</A>
 </LI><LI CLASS="li-toc"><A HREF="#htoc65">Appendix&#XA0;C&#XA0;&#XA0;Instructions by opcode</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc66">Appendix&#XA0;D&#XA0;&#XA0;Syntax extension</A>
+<UL CLASS="ftoc3"><LI CLASS="li-toc">
+<A HREF="#htoc67">D.1&#XA0;&#XA0;Unicode constants</A>
+</LI><LI CLASS="li-toc"><A HREF="#htoc68">D.2&#XA0;&#XA0;Exception pattern</A>
+</LI></UL>
 </LI></UL>
 </LI></UL><!--TOC chapter Overview-->
 <H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc1">Chapter&#XA0;1</A>&#XA0;&#XA0;Overview</H1><!--SEC END --><P>
 <A NAME="ch:overview"></A></P><P>This chapter presents some elements about the Barista project: its contents and objectives, its evolution, and also its management.</P><!--TOC section Current state-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc2">1.1</A>&#XA0;&#XA0;Current state</H2><!--SEC END --><P>
-Barista is initially an Objective Caml<SUP><A NAME="text1" HREF="#note1">1</A></SUP> library designed to load, construct, manipulate and save Java<SUP>&#X2122;<A NAME="text2" HREF="#note2">2</A></SUP> class files. The library supports the whole class file format as defined by Oracle<SUP>&#XAE;</SUP>(formerly Sun<SUP>&#XAE;</SUP>). The Barista library was designed to be used in the OCaml-Java project (available at <TT><A HREF="http://ocamljava.x9c.fr">http://ocamljava.x9c.fr</A></TT>) for code generation.<BR>
+Barista is initially an OCaml<SUP><A NAME="text1" HREF="#note1">1</A></SUP> library designed to load, construct, manipulate and save Java<SUP>&#X2122;<A NAME="text2" HREF="#note2">2</A></SUP> class files. The library supports the whole class file format as defined by Oracle<SUP>&#XAE;</SUP>(formerly Sun<SUP>&#XAE;</SUP>). The Barista library was designed to be used in the OCaml-Java project (available at <TT><A HREF="http://ocamljava.x9c.fr">http://ocamljava.x9c.fr</A></TT>) for code generation.<BR>
 
-Upon the library, a command-line utility (also named &#X201C;barista&#X201D;) has been developped: both an assembler and a disassembler for the Java<SUP>&#X2122;</SUP> platform. In its 2.0-alpha version, Barista supports Java<SUP>&#X2122;</SUP> 1.7 and needs Objective Caml 3.12.1 to build. Code sample&#XA0;<A HREF="#hello-world">1.1</A> below shows the canonical basic example coded in the Barista assembler; the assembler will turn it into a class file to be run into ja Java<SUP>&#X2122;</SUP> virtual machine. Chapter&#XA0;<A HREF="#ch:programming-assembler-language">3.3</A> describes the format of such assembler sources.<BR>
+Upon the library, a command-line utility (also named &#X201C;barista&#X201D;) has been developped: both an assembler and a disassembler for the Java<SUP>&#X2122;</SUP> platform. In its 2.0-alpha version, Barista supports Java<SUP>&#X2122;</SUP> 1.7 and needs OCaml 3.12.1 to build. Code sample&#XA0;<A HREF="#hello-world">1.1</A> below shows the canonical basic example coded in the Barista assembler; the assembler will turn it into a class file to be run into ja Java<SUP>&#X2122;</SUP> virtual machine. Chapter&#XA0;<A HREF="#ch:programming-assembler-language">4</A> describes the format of such assembler sources.<BR>
 The disassembler does the same work in the opposite direction: it takes the fully qualified name of a Java<SUP>&#X2122;</SUP> bytecode class file present in the classpath, and transforms it into an assembler source. Two other utility allow to inspect the contents of a bytecode file; it is possible to just print the list of methods of a given class, and also to print the control flow of a given method as a graph.<BR>
 
 </P><!--TOC section Some history-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc3">1.2</A>&#XA0;&#XA0;Some history</H2><!--SEC END --><P>
-From version 1.0&#X3B2; to 1.4, Barista also featured a Java<SUP>&#X2122;</SUP> API allowing to use Barista directly from Java<SUP>&#X2122;</SUP>. This API has been removed as of version 2.0. This removal was motivated by the following three reasons, sorted from most to least valuable. First, it introduced a circular dependency between Barista and the rest of the OCaml-Java project, intricating both. Second, it was a burden to manually update the API in order to keep it a Java<I><SUP>&#X2122;</SUP></I> look and feel. Third, it was pretty unused; those who actually want to use Barista from Java<SUP>&#X2122;</SUP> should take a look at the OCaml-Java project, and the ways it provides to interface Objective Caml and Java<SUP>&#X2122;</SUP> codes.<BR>
+From version 1.0&#X3B2; to 1.4, Barista also featured a Java<SUP>&#X2122;</SUP> API allowing to use Barista directly from Java<SUP>&#X2122;</SUP>. This API has been removed as of version 2.0. This removal was motivated by the following three reasons, sorted from most to least valuable. First, it introduced a circular dependency between Barista and the rest of the OCaml-Java project, intricating both. Second, it was a burden to manually update the API in order to keep it a Java<I><SUP>&#X2122;</SUP></I> look and feel. Third, it was pretty unused; those who actually want to use Barista from Java<SUP>&#X2122;</SUP> should take a look at the OCaml-Java project, and the ways it provides to interface OCaml and Java<SUP>&#X2122;</SUP> codes.<BR>
 
 The 2.0 version of Barista is quite a leap forward: it claims full support for Java<SUP>&#X2122;</SUP> 1.7 (including serialization, various optimization on produced class files, and handling of package files), and has seen a major overhaul of the API to make it as simple, readable, and type-safe as can be. Of course, this induced backward-incompatible changes which motivated the jump in version numbering from 1.4 to 2.0.</P><!--TOC section Glimpse of the assembler syntax-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc4">1.3</A>&#XA0;&#XA0;Glimpse of the assembler syntax</H2><!--SEC END --><P>
@@ -184,7 +190,7 @@ Other requests can be sent to <A HREF="mailto:barista@x9c.fr">barista@x9c.fr</A>
 
 </P><!--BEGIN NOTES chapter-->
 <HR CLASS="ffootnoterule"><DL CLASS="thefootnotes"><DT CLASS="dt-thefootnotes">
-<A NAME="note1" HREF="#text1">1</A></DT><DD CLASS="dd-thefootnotes">The official Objective Caml website can be reached at <TT><A HREF="http://caml.inria.fr">http://caml.inria.fr</A></TT> and contains the full development suite (compilers, tools, virtual machine, <I>etc.</I>) as well as links to third-party contributions.
+<A NAME="note1" HREF="#text1">1</A></DT><DD CLASS="dd-thefootnotes">The official OCaml website can be reached at <TT><A HREF="http://caml.inria.fr">http://caml.inria.fr</A></TT> and contains the full development suite (compilers, tools, virtual machine, <I>etc.</I>) as well as links to third-party contributions.
 </DD><DT CLASS="dt-thefootnotes"><A NAME="note2" HREF="#text2">2</A></DT><DD CLASS="dd-thefootnotes">The official Java<SUP>&#X2122;</SUP> website can be reached at <TT><A HREF="http://java.sun.com">http://java.sun.com</A></TT> where most of official Java<SUP>&#X2122;</SUP> information can be found.
 </DD></DL>
 <!--END NOTES-->
@@ -192,9 +198,9 @@ Other requests can be sent to <A HREF="mailto:barista@x9c.fr">barista@x9c.fr</A>
 <H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc6">Chapter&#XA0;2</A>&#XA0;&#XA0;Building Barista from sources</H1><!--SEC END --><P>
 <A NAME="ch:building-from-sources"></A></P><P>This chapter first lists the various libraries and tools Barista depends upon. Then, the following sections explains the steps to follow in order to build, and then install Barista (both the program and the library) from sources. </P><!--TOC section Dependencies-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc7">2.1</A>&#XA0;&#XA0;Dependencies</H2><!--SEC END --><P>
-In order to compile the Barista sources, one needs Objective Caml 3.12.1, and GNU make 3.81. Compilation is actually realized by the <TT>ocamlbuild</TT> tool, although launched through the targets of a <TT>Makefile</TT>. Additionally, Barista depends upon the following Objective Caml libraries that should hence be installed before build:
+In order to compile the Barista sources, one needs OCaml 3.12.1, and GNU make 3.81. Compilation is actually realized by the <TT>ocamlbuild</TT> tool, although launched through the targets of a <TT>Makefile</TT>. Additionally, Barista depends upon the following OCaml libraries that should hence be installed before build:
 </P><UL CLASS="itemize"><LI CLASS="li-itemize">
-<B>bigarray</B>, <B>str</B>, <B>unix</B> available in the Objective Caml standard distribution;
+<B>bigarray</B>, <B>unix</B> available in the OCaml standard distribution;
 </LI><LI CLASS="li-itemize"><B>camlzip</B> (zip/gzip/jar library), at least version 1.04<BR>
  available at: <TT><A HREF="http://cristal.inria.fr/~xleroy/software.html">http://cristal.inria.fr/~xleroy/software.html</A></TT>;
 </LI><LI CLASS="li-itemize"><B>camomile</B> (Unicode library), at least version 0.8.3<BR>
@@ -203,11 +209,11 @@ In order to compile the Barista sources, one needs Objective Caml 3.12.1, and GN
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc8">2.2</A>&#XA0;&#XA0;Configuration</H2><!--SEC END --><P>
 Before the actual compilation could be launched, it is necessary to configure the build process to the actuel machine and system used. To this end, one should execute the <TT>configure</TT> script (<I>e.g.&#XA0;</I>by running <TT>sh configure</TT>). This script recognizes the following command-line options, that can be used to supersede the autodetection the script performs:
 </P><UL CLASS="itemize"><LI CLASS="li-itemize">
-<TT>-ocaml-prefix</TT> to indicate where Objective Caml should actually be found (it should hence be the same value as the one passed to Objective Caml&#X2019;s <TT>configure</TT> script through the <TT>-prefix</TT> option);
+<TT>-ocaml-prefix</TT> to indicate where OCaml should actually be found (it should hence be the same value as the one passed to OCaml&#X2019;s <TT>configure</TT> script through the <TT>-prefix</TT> option);
 </LI><LI CLASS="li-itemize"><TT>-ocamlfind</TT> to indicate the path to the <TT>ocamlfind</TT><SUP><A NAME="text3" HREF="#note3">1</A></SUP> program (setting it to the empty string will disable the use of <TT>ocamlfind</TT>).
 </LI></UL><P>Upon sucessful execution, a <TT>Makefile.config</TT> file is produced which contains the information either inferred by or passed to the script.</P><!--TOC section Compilation-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc9">2.3</A>&#XA0;&#XA0;Compilation</H2><!--SEC END --><P>
-Once configured, Barista can be built by calling the <TT>make</TT> program.<BR>
+Once configured, Barista can be built by calling the <TT>make</TT> program. It will first compile the syntax extension used for all sources (presented at appendix D), and then compile the actual sources.<BR>
 The following targets are available:
 </P><UL CLASS="itemize"><LI CLASS="li-itemize">
  <TT>all</TT> compiles all files
@@ -223,19 +229,19 @@ The following targets are available:
 Finally, as shown in the previous section, the installation of Barista is done by calling <TT>make install</TT>.
 However, two important things should be noted about installation.<BR>
 
-First, the actual installation path depends on whether <TT>ocamlfind</TT> is enabled: if so, every file will be installed in the <TT>ocamlfind</TT> hierarchy; otherwise, the library will be installed in the &#X2026;<TT>/lib/ocaml/barista</TT> directory, and the program executables will be installed in the same directory as the Objective Caml compilers.<BR>
+First, the actual installation path depends on whether <TT>ocamlfind</TT> is enabled: if so, every file will be installed in the <TT>ocamlfind</TT> hierarchy; otherwise, the library will be installed in the &#X2026;<TT>/lib/ocaml/barista</TT> directory, and the program executables will be installed in the same directory as the OCaml compilers.<BR>
 
 Second, to install the files to their final destination, the user may need to have to acquire privileged rights; this is usually done through the <TT>sudo</TT> command, leading to a full installation command of <TT>sudo make install</TT>.
 
 </P><!--BEGIN NOTES chapter-->
 <HR CLASS="ffootnoterule"><DL CLASS="thefootnotes"><DT CLASS="dt-thefootnotes">
-<A NAME="note3" HREF="#text3">1</A></DT><DD CLASS="dd-thefootnotes">Findlib, a library manager for Objective Caml, is available at <TT><A HREF="http://projects.camlcity.org/projects/findlib.html">http://projects.camlcity.org/projects/findlib.html</A></TT>
+<A NAME="note3" HREF="#text3">1</A></DT><DD CLASS="dd-thefootnotes">Findlib, a library manager for OCaml, is available at <TT><A HREF="http://projects.camlcity.org/projects/findlib.html">http://projects.camlcity.org/projects/findlib.html</A></TT>
 </DD></DL>
 <!--END NOTES-->
 <!--TOC chapter Using Barista as a command-line program-->
 <H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc11">Chapter&#XA0;3</A>&#XA0;&#XA0;Using Barista as a command-line program</H1><!--SEC END --><P>
 <A NAME="ch:using-command-line"></A>
-The Barista program exists under two or three forms: <TT>barista.byte</TT>, <TT>barista.native</TT>, and optionally <TT>barista.jar</TT>. The first one is an Objective Caml bytecode file, the second one is a native executable, and the third one is an executable jar file compiled only if the <TT>ocamljava</TT> compiler is present. All three programs should behave the same way, only differing in execution speed.<BR>
+The Barista program exists under two or three forms: <TT>barista.byte</TT>, <TT>barista.native</TT>, and optionally <TT>barista.jar</TT>. The first one is an OCaml bytecode file, the second one is a native executable, and the third one is an executable jar file compiled only if the <TT>ocamljava</TT> compiler is present. All three programs should behave the same way, only differing in execution speed.<BR>
 
 For convenience, at installation a symbolic link is created from <TT>barista</TT> to either <TT>barista.native</TT> or <TT>barista.byte</TT> in the installation directory. This allows one to only refer to <TT>barista</TT> in order to launch the faster version of the program.<BR>
 
@@ -266,7 +272,7 @@ The <TT>disassemble</TT> subcommand recognizes the following parameters:
 </LI><LI CLASS="li-itemize"><TT>-classpath</TT> &#X27E8;colon-separated-list&#X27E9; set classpath
 </LI></UL><!--TOC section The <TT>flow</TT> subcommand-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc14">3.3</A>&#XA0;&#XA0;The <TT>flow</TT> subcommand</H2><!--SEC END --><P>
-Prints onto the standard output the control flow of the passed methods. The output format is the dot format<SUP><A NAME="text4" HREF="#note4">1</A></SUP>. The passed methods should follow the format for method signatures as presented in chapter <A NAME="ch:programming-assembler-language"></A>. As an example, printing the control flow for the <TT>toString</TT> method is done by the following command line:</P><DIV CLASS="center"> <TT>barista flow &#X2019;java.lang.Object.toString():java.lang.String&#X2019;</TT></DIV><P>It is important to enclose the signature of the method inside quotes, as otherwise the shell whould interpret the parentheses.<BR>
+Prints onto the standard output the control flow of the passed methods. The output format is the dot format<SUP><A NAME="text4" HREF="#note4">1</A></SUP>. The passed methods should follow the format for method signatures as presented in chapter <A HREF="#ch:programming-assembler-language">4</A>. As an example, printing the control flow for the <TT>toString</TT> method is done by the following command line:</P><DIV CLASS="center"> <TT>barista flow &#X2019;java.lang.Object.toString():java.lang.String&#X2019;</TT></DIV><P>It is important to enclose the signature of the method inside quotes, as otherwise the shell whould interpret the parentheses.<BR>
 
 The <TT>flow</TT> subcommand recognizes the following parameters:
 </P><UL CLASS="itemize"><LI CLASS="li-itemize">
@@ -303,8 +309,8 @@ The source files used by the Barista assembler are line-oriented (this means tha
 <H5 CLASS="paragraph"><!--SEC ANCHOR -->Assembler directives</H5><!--SEC END --><P> are introduced by the <TT>.</TT> (dot) character followed by a non-empty sequence of lowercase letters or underscores <I>e.g.&#XA0;</I><TT>.class</TT>.</P><!--TOC paragraph Element attributes-->
 <H5 CLASS="paragraph"><!--SEC ANCHOR -->Element attributes</H5><!--SEC END --><P> are introduced by the <TT>@</TT> (at) character followed by a non-empty capitalized sequence of letters <I>e.g.&#XA0;</I><TT>@ConstantValue</TT>.</P><!--TOC paragraph Labels-->
 <H5 CLASS="paragraph"><!--SEC ANCHOR -->Labels</H5><!--SEC END --><P> are non-empty sequences of letters and digits beginning with a letter and ending with a colon <I>e.g.&#XA0;</I><TT>aLabel3:</TT>.</P><!--TOC paragraph Integer constants-->
-<H5 CLASS="paragraph"><!--SEC ANCHOR -->Integer constants</H5><!--SEC END --><P> follow the Objective Caml conventions and thus support decimal notation (<I>e.g.&#XA0;</I><TT>15</TT>), hexadecimal notation (<I>e.g.&#XA0;</I><TT>0x0F</TT>), octal notation (<I>e.g.&#XA0;</I><TT>0o17</TT>) and binary notation (<I>e.g.&#XA0;</I><TT>0b1111</TT>). All notations support embedded underscore characters used for increased readability (such underscore characters are ignored). Integer constants can also be defined using the character notation (<I>e.g.&#XA0;</I><TT>&#X2019;a&#X2019;</TT>); this notation supports escaped sequence for ASCII characters (<I>e.g.&#XA0;</I><TT>&#X2019;\t&#X2019;</TT>, <TT>&#X2019;\n&#X2019;</TT>, or <TT>&#X2019;\\&#X2019;</TT>) as well as for Unicode character in short (<I>e.g.&#XA0;</I><TT>&#X2019;\u1234&#X2019;</TT>) and long formats (<I>e.g.&#XA0;</I><TT>&#X2019;\U12345678&#X2019;</TT>).</P><!--TOC paragraph Floating-point constants-->
-<H5 CLASS="paragraph"><!--SEC ANCHOR -->Floating-point constants</H5><!--SEC END --><P> follow the Objective Caml conventions and thus consist of three part: an integral part, a decimal part and an optional exponent part (<I>e.g.&#XA0;</I><TT>-1.234e+2</TT>). As for integer constants, embedded underscore characters can be used for readability.</P><!--TOC paragraph String constants-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Integer constants</H5><!--SEC END --><P> follow the OCaml conventions and thus support decimal notation (<I>e.g.&#XA0;</I><TT>15</TT>), hexadecimal notation (<I>e.g.&#XA0;</I><TT>0x0F</TT>), octal notation (<I>e.g.&#XA0;</I><TT>0o17</TT>) and binary notation (<I>e.g.&#XA0;</I><TT>0b1111</TT>). All notations support embedded underscore characters used for increased readability (such underscore characters are ignored). Integer constants can also be defined using the character notation (<I>e.g.&#XA0;</I><TT>&#X2019;a&#X2019;</TT>); this notation supports escaped sequence for ASCII characters (<I>e.g.&#XA0;</I><TT>&#X2019;\t&#X2019;</TT>, <TT>&#X2019;\n&#X2019;</TT>, or <TT>&#X2019;\\&#X2019;</TT>) as well as for Unicode character in short (<I>e.g.&#XA0;</I><TT>&#X2019;\u1234&#X2019;</TT>) and long formats (<I>e.g.&#XA0;</I><TT>&#X2019;\U12345678&#X2019;</TT>).</P><!--TOC paragraph Floating-point constants-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Floating-point constants</H5><!--SEC END --><P> follow the OCaml conventions and thus consist of three part: an integral part, a decimal part and an optional exponent part (<I>e.g.&#XA0;</I><TT>-1.234e+2</TT>). As for integer constants, embedded underscore characters can be used for readability.</P><!--TOC paragraph String constants-->
 <H5 CLASS="paragraph"><!--SEC ANCHOR -->String constants</H5><!--SEC END --><P> are presented between <TT>"</TT> quotes, and support the escaped sequences presented for integer character constants <I>e.g.&#XA0;</I><TT>"abc\tdef"</TT>.</P><!--TOC paragraph Class names-->
 <H5 CLASS="paragraph"><!--SEC ANCHOR -->Class names</H5><!--SEC END --><P> should be given in <I>external</I> format, that is using dots between packages/classes and dollars between inner classes (<I>e.g.&#XA0;</I><TT>pack.Cls$Inn</TT> for an inner-class <I>Inn</I> of a class named <I>Cls</I> in package <I>pack</I>).</P><!--TOC paragraph Primitive names-->
 <H5 CLASS="paragraph"><!--SEC ANCHOR -->Primitive names</H5><!--SEC END --><P> should appear as they would be in a Java<SUP>&#X2122;</SUP> source file (<I>e.g.&#XA0;</I><TT>boolean</TT>).</P><!--TOC paragraph Array types-->
@@ -538,8 +544,8 @@ end:
 </DD><DT CLASS="dt-thefootnotes"><A NAME="note6" HREF="#text6">2</A></DT><DD CLASS="dd-thefootnotes">These indexes do not need to be successive, they are only used to sort the values in order to produce the array.
 </DD></DL>
 <!--END NOTES-->
-<!--TOC chapter Using Barista as an Objective Caml library-->
-<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc55">Chapter&#XA0;5</A>&#XA0;&#XA0;Using Barista as an Objective Caml library</H1><!--SEC END --><P>
+<!--TOC chapter Using Barista as an OCaml library-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc55">Chapter&#XA0;5</A>&#XA0;&#XA0;Using Barista as an OCaml library</H1><!--SEC END --><P>
 <A NAME="ch:using-ocaml-library"></A></P><P>This chapter sheds light on the way the Barista library is organized, and its main modules. First, it explain how to compile a Barista-based application. Then, the library contents is explored. Finally, a complete example demonstrates a practical use of the library.</P><!--TOC section Compilation-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc56">5.1</A>&#XA0;&#XA0;Compilation</H2><!--SEC END --><P>
 In order to use Barista as a library, it is sufficient to link the program with either <TT>baristaLibrary.cma</TT> (bytecode version), <TT>baristaLibrary.cmxa</TT> (native version), or <TT>baristaLibrary.cmja</TT> (Java<SUP>&#X2122;</SUP>-compiled version). These libraries are crafted in such a way that there is only one top-level module called <TT>BaristaLibrary</TT> that contains all the modules described by the <TT>ocamldoc</TT>-generated documentation.<BR>
@@ -626,7 +632,7 @@ Additionally, other modules provide types representing the class file elements. 
 </LI><LI CLASS="li-itemize"><TT>FlowPrinter</TT> providing the function called by the <TT>flow</TT> subcommand.
 </LI></UL><!--TOC section Complete example-->
 <H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc62">5.3</A>&#XA0;&#XA0;Complete example</H2><!--SEC END --><P>
-Code sample&#XA0;<A HREF="#embedding-barista">5.1</A> shows an example of an Objective Caml program using Barista to produce a file named <TT>Hello.class</TT> containing the definition of a class named <TT>example.Hello</TT>. This class contains only a <TT>main</TT> method that prints &#X201C;hello.&#X201D; on the standard output.<BR>
+Code sample&#XA0;<A HREF="#embedding-barista">5.1</A> shows an example of an OCaml program using Barista to produce a file named <TT>Hello.class</TT> containing the definition of a class named <TT>example.Hello</TT>. This class contains only a <TT>main</TT> method that prints &#X201C;hello.&#X201D; on the standard output.<BR>
 
 Here are the key points of this example, in the order they appear in the source file:
 </P><UL CLASS="itemize"><LI CLASS="li-itemize">
@@ -639,7 +645,7 @@ first, the Barista library and its <TT>Utils</TT> is open (the latter is especia
 </LI><LI CLASS="li-itemize">at this point, it is possible to build an actual class definition from flags, name, parent class, parent interfaces, embedded fields, embedded methods, and attributes;
 </LI><LI CLASS="li-itemize">finally, the class definition is converted into a class file that is written to the file <TT>&#X2018;&#X2018;Hello.class&#X2019;&#X2019;</TT>.
 </LI></UL><BLOCKQUOTE CLASS="figure">
-<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 5.1: <A NAME="embedding-barista"></A>Using Barista to produce a class file from an Objective Caml program.</TD></TR>
+<DIV CLASS="caption"><TABLE CELLSPACING=6 CELLPADDING=0><TR><TD VALIGN=top ALIGN=left>Code sample 5.1: <A NAME="embedding-barista"></A>Using Barista to produce a class file from an OCaml program.</TD></TR>
 </TABLE></DIV>
 <PRE CLASS="verbatim">
 open BaristaLibrary
@@ -3766,7 +3772,75 @@ Hyperlinks allow navigation to the first appendix.<BR>
 
 
 
-</P><!--CUT END -->
+</P><!--TOC chapter Syntax extension-->
+<H1 CLASS="chapter"><!--SEC ANCHOR --><A NAME="htoc66">Appendix&#XA0;D</A>&#XA0;&#XA0;Syntax extension</H1><!--SEC END --><P>
+This appendix presents the syntax extension used throughout the Barista project. The OCaml syntax is extended along two dimensions:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+support for Unicode constants&#XA0;;
+</LI><LI CLASS="li-itemize">support for an <I>exception pattern</I> (<I>pattern</I> being used with the same meaning as by the famous <I>Gang of Four</I>).
+</LI></UL><!--TOC section Unicode constants-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc67">D.1</A>&#XA0;&#XA0;Unicode constants</H2><!--SEC END --><P>
+The syntax extension provides two literal notations that can be used either as expression or pattern&#XA0;:
+</P><UL CLASS="itemize"><LI CLASS="li-itemize">
+<CODE>@"str"</CODE> for a UTF8 string&#XA0;;
+</LI><LI CLASS="li-itemize"><CODE>@'c'</CODE> for an Unicode character.
+</LI></UL><P>
+The first notation is expanded to <CODE>Utils.UTF8.of_string</CODE>, while the second is expanded to <CODE>Utils.UChar.of_char</CODE>. When used as a pattern, the first notation uses <CODE>Utils.UTF8.equal</CODE> to compare values, while the second one uses <CODE>Utils.UChar.equal</CODE>.</P><!--TOC paragraph Limitation:-->
+<H5 CLASS="paragraph"><!--SEC ANCHOR -->Limitation:</H5><!--SEC END --><P> the pattern notation can only be used for a simple pattern, but not for a composed pattern (whether in a bare tuple, or inside a constructor). However, the pattern notation can be used in conjonction with a <CODE>when</CODE> clause.</P><!--TOC section Exception pattern-->
+<H2 CLASS="section"><!--SEC ANCHOR --><A NAME="htoc68">D.2</A>&#XA0;&#XA0;Exception pattern</H2><!--SEC END --><P>
+The <I>exception pattern</I> is the factorization of the following code, used to define an exception per module:
+</P><PRE CLASS="verbatim">type error =
+  | ...
+
+exception Exception of error
+
+let fail e = raise (Exception e)
+
+let string_of_error = function
+  | ...
+
+let () =
+  Printexc.register_printer
+    (function
+      | Exception e -&gt; Some (string_of_error e)
+      | _ -&gt; None)
+</PRE><!--TOC paragraph -->
+<H5 CLASS="paragraph"><!--SEC ANCHOR --></H5><!--SEC END --><P>
+The syntax extension avoid duplucation of constructor declarations (marked by <CODE>...</CODE> ellipsis in the code above) through the following notation:
+</P><PRE CLASS="verbatim">BARISTA_ERROR =
+| O -&gt; "o"
+| A of (x : int) -&gt; Printf.sprintf "%d" x
+| B of (y : float) * (z : string) * (t : char)-&gt; Printf.sprintf "%f %S %C" y z t
+</PRE><P>that will be expanded to:
+</P><PRE CLASS="verbatim">type error = | O | A of int | B of float * string * char
+
+exception Exception of error
+  
+let fail e = raise (Exception e)
+  
+let string_of_error e =
+  match e with
+  | O -&gt; "o"
+  | A x -&gt; Printf.sprintf "%d" x
+  | B ((y, z, t)) -&gt; Printf.sprintf "%f %S %C" y z t
+  
+let () =
+  Printexc.register_printer
+    (function | Exception e -&gt; Some (string_of_error e) | _ -&gt; None)
+</PRE><!--TOC paragraph -->
+<H5 CLASS="paragraph"><!--SEC ANCHOR --></H5><!--SEC END --><P>
+A similar notation is available in module interfaces, without the names of the constructors components:
+</P><PRE CLASS="verbatim">BARISTA_ERROR =
+| O
+| A of int
+| B of float * string * char
+</PRE><P>will be expanded to:
+</P><PRE CLASS="verbatim">type error = | O | A of int | B of float * string * char
+
+exception Exception of error
+  
+val string_of_error : error -&gt; string
+</PRE><!--CUT END -->
 <!--HTMLFOOT-->
 <!--ENDHTML-->
 <!--FOOTER-->

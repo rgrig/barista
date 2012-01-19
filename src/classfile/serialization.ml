@@ -21,26 +21,10 @@ open Utils
 
 (* Exception *)
 
-type error =
-  | Invalid_magic of u2
-  | Invalid_version of u2
-  | Invalid_stream
-  | Array_type_waited
-  | Unknown_reference
-  | Invalid_class_flags of s1
-  | Missing_read_function
-  | Missing_write_function
-  | Missing_field of UTF8.t
-  | Invalid_field_type of UTF8.t
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_magic x ->
+BARISTA_ERROR =
+  | Invalid_magic of (x : u2) ->
       Printf.sprintf "invalid magic (%d)" (x :> int)
-  | Invalid_version x ->
+  | Invalid_version of (x : u2) ->
       Printf.sprintf "invalid version (%d)" (x :> int)
   | Invalid_stream ->
       "invalid stream"
@@ -48,22 +32,16 @@ let string_of_error = function
       "array type waited"
   | Unknown_reference ->
       "unknown reference"
-  | Invalid_class_flags x ->
+  | Invalid_class_flags of (x : s1) ->
       Printf.sprintf "invalid class flags (%d)" (x :> int)
   | Missing_read_function ->
       "missing read function"
   | Missing_write_function ->
       "missing write function"
-  | Missing_field x ->
+  | Missing_field of (x : UTF8.t) ->
       Printf.sprintf "missing value for field %S" (UTF8.to_string_noerr x)
-  | Invalid_field_type x ->
+  | Invalid_field_type of (x : UTF8.t) ->
       Printf.sprintf "invalid type for field %S" (UTF8.to_string_noerr x)
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Protocol constants *)
@@ -166,7 +144,7 @@ and field_value =
 let new_descriptor () =
   { desc_flags = s1 0;
     desc_serial_version_uid = s8 0L;
-    desc_class_name = UTF8.of_string "<dummy>";
+    desc_class_name = @"<dummy>";
     desc_class_annotation = [];
     desc_super_class_desc = None;
     desc_fields = [];
@@ -188,7 +166,7 @@ let make_descriptor class_name serial_uid annot fields super ext methods =
 let make_proxy_descriptor interfaces annot super =
   { desc_flags = s1 0;
     desc_serial_version_uid = s8 0L;
-    desc_class_name = UTF8.of_string "";
+    desc_class_name = @"";
     desc_class_annotation = annot;
     desc_super_class_desc = super;
     desc_fields = [];
@@ -484,6 +462,9 @@ let encode os l =
   OutputStream.write_u2 os (u2 stream_version);
   write_contents os (Hashtbl.create 17) l
 
+let encode_one os x =
+  encode os [x]
+
 let rec read_contents is seen acc =
   let add_elem x =
     let idx = Int32.add (Int32.of_int (Hashtbl.length seen)) base_wire_handle in
@@ -630,7 +611,7 @@ let rec read_contents is seen acc =
         end else if tag = tc_classdesc then begin
           (* newClassDesc *)
           let class_name = read_utf () in
-          let class_name = UTF8.replace (UChar.of_char '.') (UChar.of_char '/') class_name in
+          let class_name = UTF8.replace @'.' @'/' class_name in
           let serial_version_uid = InputStream.read_s8 is in
           let desc = new_descriptor () in
           let res = add_elem (Class_desc desc) in
@@ -730,3 +711,64 @@ let decode is =
   let version = InputStream.read_u2 is in
   if (version :> int) <> stream_version then fail (Invalid_version version);
   read_contents is (Hashtbl.create 17) []
+
+
+(* Helper functions *)
+
+let rec descriptor_of_definition loader definition =
+  let name = Name.external_utf8_for_class definition.ClassDefinition.name in
+  let serial =
+    let candidates =
+      List.filter
+        (fun f ->
+          (UTF8.equal @"serialVersionUID" (Name.utf8_for_field f.Field.name))
+            && (List.mem `Private f.Field.flags)
+            && (List.mem `Static f.Field.flags)
+            && (List.mem `Final f.Field.flags)
+            && (f.Field.descriptor = `Long))
+        definition.ClassDefinition.fields in
+    let candidates =
+      List.map
+        (fun f ->
+          List.filter
+            (function
+              | `ConstantValue (Attribute.Long_value _) -> true
+              | _ -> false)
+            f.Field.attributes)
+        candidates in
+    let candidates = List.concat candidates in
+    match candidates with
+    | (`ConstantValue (Attribute.Long_value x)) :: _ -> s8 x
+    | _ -> s8 0L in
+  let fields =
+    List.map
+      (fun f -> f.Field.descriptor, f.Field.name)
+      definition.ClassDefinition.fields in
+  let super = match definition.ClassDefinition.extends with
+  | Some cn ->
+      let parent =
+        ClassLoader.find_class
+          loader
+          (Name.external_utf8_for_class cn) in
+      Some (descriptor_of_definition loader parent)
+  | None -> None in
+  let ext =
+    List.exists
+      (fun x ->
+        UTF8.equal
+          @"java.io.Externalizable"
+          (Name.external_utf8_for_class x))
+      definition.ClassDefinition.implements in
+  make_descriptor name serial [] fields super ext None
+
+let instance_of_function desc annot f =
+  let l =
+    List.map
+      (fun (_, x) ->
+        let name = Name.make_for_field x in
+        name, f name)
+      desc.desc_fields in
+  make_instance desc l annot
+
+let object_value_of_function desc annot f =
+  Instance (instance_of_function desc annot f)

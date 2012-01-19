@@ -129,7 +129,7 @@ type for_module =
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_class_flags of t option
   | Invalid_inner_class_flags of t option
   | Invalid_field_flags of t option
@@ -140,12 +140,6 @@ type error =
   | Invalid_module_flags of t option
   | Several_visibility_flags
   | Unknown_flag of string
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Functions} *)

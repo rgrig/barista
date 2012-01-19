@@ -34,7 +34,7 @@ type bytes = string
 (** A bare alias for [string],
     used to underline its use as an array of bytes. *)
 
-type error =
+BARISTA_ERROR =
   | Unable_to_convert_to_modified_utf8 of t
   | Unable_to_convert_from_modified_utf8 of modified
   | Unable_to_convert_to_utf8 of string
@@ -42,10 +42,6 @@ type error =
   | Invalid_index of int * int
   | Index_out_of_bounds of int * int
   | Invalid_escaped_string of t
-
-exception Exception of error
-
-val string_of_error : error -> string
 
 val make : UCharImpl.t list -> t
 (** Constructs a UTF8 string from a list of Unicode characters. *)

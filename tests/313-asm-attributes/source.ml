@@ -39,6 +39,7 @@ let () =
     Attribute.local_index = u2 0;
   } in
   let main = compile_method
+      ~version:Version.Java_1_6
       ~meth_attributes:[`Deprecated;
 			`Exceptions [(utf8_for_class "java.io.IOException");
 				     (utf8_for_class "java.lang.RuntimeException")]]

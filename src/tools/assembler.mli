@@ -74,6 +74,7 @@ type error =
   | ByteCode_error of ByteCode.error
   | Annotation_error of Annotation.error
   | AccessFlag_error of AccessFlag.error
+  | LdcConstraint_error of LdcConstraint.error
   | ConstantPool_error of ConstantPool.error
   | Signature_error of Signature.error
   | Descriptor_error of Descriptor.error

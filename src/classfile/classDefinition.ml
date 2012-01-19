@@ -35,27 +35,11 @@ type t = {
 
 (* Exception *)
 
-type error =
-  | Invalid_class_name
-  | Bootstrap_methods_defined_twice
-  | Too_many of string
-  | Version_error of Version.error
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_class_name -> "invalid class name"
   | Bootstrap_methods_defined_twice -> "bootstrap methods defined twice"
-  | Too_many s -> "too many " ^ s
-  | Version_error e -> Version.string_of_error e
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+  | Too_many of (s : string) -> Printf.sprintf "too many %s" s
+  | Version_error of (e : Version.error) -> Version.string_of_error e
 
 
 (* Traversal *)
@@ -115,6 +99,27 @@ let version_check_iterator v =
       check_attribute (a :> Attribute.t)
   end
 
+let ldc_constrains_iterator set =
+  object (self)
+    inherit Traversal.default_class_definition_iterator
+    method private code attrs =
+      try
+        let attrs = (attrs :> Attribute.t list) in
+        let instructions = (Attribute.extract_code attrs).Attribute.code in
+        List.iter
+          (function
+            | Instruction.LDC x -> (LdcConstraint.add x set)
+            | _ -> ())
+          instructions
+      with Not_found -> ()
+    method! regular_method rm =
+      self#code rm.Method.attributes
+    method! constructor_method cm =
+      self#code cm.Method.cstr_attributes
+    method! initializer_method im =
+      self#code im.Method.init_attributes
+  end
+
 
 (* Conversion functions *)
 
@@ -170,7 +175,12 @@ let encode ?(version=Version.default) cd =
     iter (version_check_iterator version) cd
   with Version.Exception e -> fail (Version_error e));
   let major, minor = Version.major_minor_of_version version in
-  let pool = ConstantPool.make_extendable () in
+  let ldc_constraints = LdcConstraint.make () in
+  let pool =
+    try
+      iter (ldc_constrains_iterator ldc_constraints) cd;
+      LdcConstraint.encode ldc_constraints
+    with _ -> fail (Too_many "ldc constraints") in
   let this_index = ConstantPool.add_class pool cd.name in
   let super_index = match cd.extends with
   | Some n -> ConstantPool.add_class pool n

@@ -71,14 +71,16 @@ and throws_signature =
 
 (** {6 Exception} *)
 
-type error =
-  | Invalid_signature
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
+BARISTA_ERROR =
+  | Invalid_signature_type_header of Utils.UChar.t
+  | Invalid_signature_primitive_character of Utils.UChar.t
+  | Invalid_signature_type of Descriptor.java_type
+  | Invalid_class_signature of Utils.UTF8.t
+  | Invalid_field_signature of Utils.UTF8.t
+  | Invalid_method_signature of Utils.UTF8.t
+  | Extra_elements_after_class_signature of Utils.UTF8.t
+  | Extra_elements_after_field_signature of Utils.UTF8.t
+  | Extra_elements_after_method_signature of Utils.UTF8.t
 
 
 (** {6 Conversion functions} *)

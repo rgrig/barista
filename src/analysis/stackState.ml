@@ -33,58 +33,33 @@ type t = {
 
 (* Exception *)
 
-type error =
-  | Unsupported_instruction of string
-  | Empty_stack
-  | Invalid_local_index of Utils.u2 * int
-  | Invalid_stack_top of Attribute.verification_type_info * Attribute.verification_type_info
-  | Invalid_local_contents of u2 * Attribute.verification_type_info * Attribute.verification_type_info
-  | Reference_waited of Attribute.verification_type_info
-  | Array_waited
-  | Category1_waited
-  | Category2_waited
-  | Different_stack_sizes of int * int
-  | Invalid_primitive_array_type
-  | Empty_frame_list
-  | Different_frames of Utils.u2
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Unsupported_instruction x ->
+BARISTA_ERROR =
+  | Unsupported_instruction of (x : string) ->
       Printf.sprintf "unsupported instruction: %S" x
   | Empty_stack -> "empty stack"
-  | Invalid_local_index (i, l) ->
+  | Invalid_local_index of (i : u2) * (l : int) ->
       Printf.sprintf "invalid local index (%d, length %d)" (i :> int) l
-  | Invalid_stack_top (w, f) ->
+  | Invalid_stack_top of (w : Attribute.verification_type_info) * (f : Attribute.verification_type_info) ->
       Printf.sprintf "invalid stack top: %S waited but %S found"
         (Attribute.string_of_verification_type_info w)
         (Attribute.string_of_verification_type_info f)
-  | Invalid_local_contents (i, w, f) ->
+  | Invalid_local_contents of (i : u2) * (w : Attribute.verification_type_info) * (f : Attribute.verification_type_info) ->
       Printf.sprintf "invalid local contents at index %d: %S waited but %S found" 
         (i :> int)
         (Attribute.string_of_verification_type_info w)
         (Attribute.string_of_verification_type_info f)
-  | Reference_waited f ->
+  | Reference_waited of (f : Attribute.verification_type_info) ->
       Printf.sprintf "reference waited but %S found"
         (Attribute.string_of_verification_type_info f)
   | Array_waited -> "array waited"
   | Category1_waited -> "category1 waited"
   | Category2_waited -> "category2 waited"
-  | Different_stack_sizes (sz1, sz2) ->
+  | Different_stack_sizes of (sz1 : int) * (sz2 : int) ->
       Printf.sprintf "different stack sizes (%d and %d)" sz1 sz2
   | Invalid_primitive_array_type -> "invalid primitive array type"
   | Empty_frame_list -> "empty frame list"
-  | Different_frames ofs ->
+  | Different_frames of (ofs : u2) ->
       Printf.sprintf "different frames (at offset %d)" (ofs :> int)
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Construction *)
@@ -92,13 +67,13 @@ let () =
 let make_empty () =
   { locals = [||]; stack = []; }
 
-let java_lang_String = Name.make_for_class_from_external (UTF8.of_string "java.lang.String")
+let java_lang_String = Name.make_for_class_from_external @"java.lang.String"
 
-let java_lang_Class = Name.make_for_class_from_external (UTF8.of_string "java.lang.Class")
+let java_lang_Class = Name.make_for_class_from_external @"java.lang.Class"
 
-let java_lang_invoke_MethodType = Name.make_for_class_from_external (UTF8.of_string "java.lang.invoke.MethodType")
+let java_lang_invoke_MethodType = Name.make_for_class_from_external @"java.lang.invoke.MethodType"
 
-let java_lang_invoke_MethodHandle = Name.make_for_class_from_external (UTF8.of_string "java.lang.invoke.MethodHandle")
+let java_lang_invoke_MethodHandle = Name.make_for_class_from_external @"java.lang.invoke.MethodHandle"
 
 let verification_type_info_of_constant_descriptor = function
   | `Int _ -> Attribute.Integer_variable_info
@@ -1322,7 +1297,7 @@ type instance =
   [ `Array_type of Descriptor.array_type
   | `Class_or_interface of Name.for_class ]
 
-let java_lang_Object_name = Name.make_for_class_from_external (UTF8.of_string "java.lang.Object")
+let java_lang_Object_name = Name.make_for_class_from_external @"java.lang.Object"
 
 let java_lang_Object = `Class_or_interface java_lang_Object_name
 
@@ -1378,7 +1353,7 @@ let unify_to_closest_common_parent cl l =
     hd :: tl in
   let rec common_parent l = function
   | hd :: tl -> if List.exists (UTF8.equal hd) l then hd else common_parent l tl
-  | [] -> UTF8.of_string "java/lang/Object" in
+  | [] -> @"java/lang/Object" in
   let utccp x y =
     let parents_x = parents x in
     let parents_y = parents y in
@@ -1399,7 +1374,7 @@ let unify_to_parent_list l =
     hd :: tl in
   let rec common_parent l = function
   | hd :: tl -> if List.exists (UTF8.equal hd) l then hd else common_parent l tl
-  | [] -> UTF8.of_string "java/lang/Object" in
+  | [] -> @"java/lang/Object" in
   let utccp x y =
     let parents_x = parents x in
     let parents_y = parents y in

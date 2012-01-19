@@ -47,18 +47,12 @@ val is_valid_for_method : Utils.UTF8.t -> bool
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_class_name of Utils.UTF8.t
   | Invalid_field_name of Utils.UTF8.t
   | Invalid_method_name of Utils.UTF8.t
   | Invalid_package_name of Utils.UTF8.t
   | Invalid_module_name of Utils.UTF8.t
-
-exception Exception of error
-(** Raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Name types and conversion functions} *)

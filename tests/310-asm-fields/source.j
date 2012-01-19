@@ -27,7 +27,7 @@
 .field private static java.lang.String prefix
         @ConstantValue "prefix: "
 
-.method void <clinit>()
+.method static void <clinit>()
         ldc "state: "
         putstatic pack.Test.prefix:java.lang.String
         return

@@ -251,19 +251,13 @@ type instruction =
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_padding_byte
   | Unknown_opcode
   | Invalid_trailing_byte
   | Invalid_trailing_short
   | Internal
   | Invalid_switch_cases
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 I/O functions} *)

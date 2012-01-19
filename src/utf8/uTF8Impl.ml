@@ -16,53 +16,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-open CamomileLibrary
-
-type t = UTF8.t
+type t = CamomileLibrary.UTF8.t
 
 type modified = string
 
 type bytes = string
 
-type error =
-  | Unable_to_convert_to_modified_utf8 of t
-  | Unable_to_convert_from_modified_utf8 of modified
-  | Unable_to_convert_to_utf8 of string
-  | Unable_to_convert_from_utf8 of t
-  | Invalid_index of int * int
-  | Index_out_of_bounds of int * int
-  | Invalid_escaped_string of t
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Unable_to_convert_to_modified_utf8 s ->
+BARISTA_ERROR =
+  | Unable_to_convert_to_modified_utf8 of (s : t) ->
       Printf.sprintf "unable to convert to modified UTF8 (%S)" s
-  | Unable_to_convert_from_modified_utf8 s ->
+  | Unable_to_convert_from_modified_utf8 of (s : modified) ->
       Printf.sprintf "unable to convert from modified UTF8 (%S)" s
-  | Unable_to_convert_to_utf8 s ->
+  | Unable_to_convert_to_utf8 of (s : string) ->
       Printf.sprintf "unable to convert to UTF8 (%S)" s
-  | Unable_to_convert_from_utf8 s ->
+  | Unable_to_convert_from_utf8 of (s : t) ->
       Printf.sprintf "unable to convert from UTF8 (%S)" s
-  | Invalid_index (x, y) ->
+  | Invalid_index of (x : int) * (y : int) ->
       Printf.sprintf "invalid index (%d, %d)" x y
-  | Index_out_of_bounds (x, y) ->
+  | Index_out_of_bounds of (x : int) * (y : int) ->
       Printf.sprintf "index out of bounds (%d, %d)" x y
-  | Invalid_escaped_string s ->
+  | Invalid_escaped_string of (s : t) ->
       Printf.sprintf "invalid escaped string (%S)" s
 
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
-
 let make l =
-  let res = UTF8.Buf.create (List.length l) in
-  List.iter (fun x -> UTF8.Buf.add_char res (UCharImpl.to_camomile x)) l;
-  UTF8.Buf.contents res
+  let res = CamomileLibrary.UTF8.Buf.create (List.length l) in
+  List.iter
+    (fun x ->
+      CamomileLibrary.UTF8.Buf.add_char res (UCharImpl.to_camomile x))
+    l;
+  CamomileLibrary.UTF8.Buf.contents res
 
 let modified_of_bytes x = x
 
@@ -70,13 +52,13 @@ let bytes_of_modified x = x
 
 let to_modified u =
   try
-    UTF8.validate u;
-    let b = Buffer.create (UTF8.length u) in
-    UTF8.iter
+    CamomileLibrary.UTF8.validate u;
+    let b = Buffer.create (CamomileLibrary.UTF8.length u) in
+    CamomileLibrary.UTF8.iter
       (fun ch ->
         let add_char x =
           Buffer.add_char b (char_of_int x) in
-        let code = UChar.uint_code ch in
+        let code = CamomileLibrary.UChar.uint_code ch in
         if (code >= 0x0001) && (code <= 0x007F) then
           add_char code
         else if (code = 0x0000) || ((code >= 0x0080) && (code <= 0x07FF)) then begin
@@ -102,9 +84,9 @@ let of_modified m =
   let (+=) r n = r := !r + n in
   try
     let len = String.length m in
-    let b = UTF8.Buf.create len in
+    let b = CamomileLibrary.UTF8.Buf.create len in
     let add_char x =
-      UTF8.Buf.add_char b (UChar.chr x) in
+      CamomileLibrary.UTF8.Buf.add_char b (CamomileLibrary.UChar.chr x) in
     let i = ref 0 in
     while !i < len do
       let code = int_of_char m.[!i] in
@@ -148,15 +130,17 @@ let of_modified m =
         add_char v
       end
     done;
-    let res = UTF8.Buf.contents b in
-    UTF8.validate res;
+    let res = CamomileLibrary.UTF8.Buf.contents b in
+    CamomileLibrary.UTF8.validate res;
     res
   with _ -> fail (Unable_to_convert_from_modified_utf8 m)
 
 let to_string s =
   try
     let res = Buffer.create (String.length s) in
-    UTF8.iter (fun x -> Buffer.add_char res (UChar.char_of x)) s;
+    CamomileLibrary.UTF8.iter
+      (fun x ->
+        Buffer.add_char res (CamomileLibrary.UChar.char_of x)) s;
     Buffer.contents res
   with _ -> fail (Unable_to_convert_from_utf8 s)
 
@@ -168,7 +152,9 @@ let to_string_noerr s =
 let of_string s =
   try
     let len = String.length s in
-    UTF8.init len (fun i -> UChar.of_char s.[i])
+    CamomileLibrary.UTF8.init
+      len
+      (fun i -> CamomileLibrary.UChar.of_char s.[i])
   with _ -> fail (Unable_to_convert_to_utf8 s)
 
 let to_bytes s =
@@ -179,98 +165,103 @@ let of_bytes b =
 
 let of_char ch =
   try
-    let res = UTF8.Buf.create 4 in
-    UTF8.Buf.add_char res (UCharImpl.to_camomile (UCharImpl.of_char ch));
-    UTF8.Buf.contents res
+    let res = CamomileLibrary.UTF8.Buf.create 4 in
+    CamomileLibrary.UTF8.Buf.add_char
+      res
+      (UCharImpl.to_camomile (UCharImpl.of_char ch));
+    CamomileLibrary.UTF8.Buf.contents res
   with _ -> fail (Unable_to_convert_to_utf8 (Char.escaped ch))
 
 let of_uchar ch =
-  UTF8.init 1 (fun _ -> UCharImpl.to_camomile ch)
+  CamomileLibrary.UTF8.init 1 (fun _ -> UCharImpl.to_camomile ch)
 
-let length = UTF8.length
+let length = CamomileLibrary.UTF8.length
 
 let get s i =
   try
-    UCharImpl.of_camomile (UTF8.get s i)
+    UCharImpl.of_camomile (CamomileLibrary.UTF8.get s i)
   with _ -> fail (Invalid_index (i, length s))
 
 let equal x y =
-  (x == y) || ((UTF8.compare x y) = 0)
+  (x == y) || ((CamomileLibrary.UTF8.compare x y) = 0)
 
 let compare x y =
   if x == y then
     0
   else
-    UTF8.compare x y
+    CamomileLibrary.UTF8.compare x y
 
 let gen_index_from update_utf8_index update_int_index =
   fun s i c ->
     let c = UCharImpl.to_camomile c in
-    let idx = ref (UTF8.move s (UTF8.first s) i) in
+    let idx = ref (CamomileLibrary.UTF8.move s (CamomileLibrary.UTF8.first s) i) in
     let res = ref i in
-    while (not (UTF8.out_of_range s !idx))
-        && (not (UChar.eq c (UTF8.look s !idx))) do
+    while (not (CamomileLibrary.UTF8.out_of_range s !idx))
+        && (not (CamomileLibrary.UChar.eq c (CamomileLibrary.UTF8.look s !idx))) do
       idx := update_utf8_index s !idx;
       update_int_index res
     done;
-    if UTF8.out_of_range s !idx then
+    if CamomileLibrary.UTF8.out_of_range s !idx then
       raise Not_found
     else
       !res
 
-let index_from = gen_index_from UTF8.next incr
+let index_from = gen_index_from CamomileLibrary.UTF8.next incr
 
-let rindex_from = gen_index_from UTF8.prev decr
+let rindex_from = gen_index_from CamomileLibrary.UTF8.prev decr
 
 let substring s first last =
   let len = max 0 (last - first + 1) in
   try
-    let res = UTF8.Buf.create len in
-    let idx = ref (UTF8.move s (UTF8.first s) first) in
+    let res = CamomileLibrary.UTF8.Buf.create len in
+    let idx = ref (CamomileLibrary.UTF8.move s (CamomileLibrary.UTF8.first s) first) in
     let i = ref 0 in
     while !i < len do
-      if UTF8.out_of_range s !idx then fail (Index_out_of_bounds (!idx, len));
-      UTF8.Buf.add_char res (UTF8.look s !idx);
-      idx := UTF8.next s !idx;
+      if CamomileLibrary.UTF8.out_of_range s !idx then
+        fail (Index_out_of_bounds (!idx, len));
+      CamomileLibrary.UTF8.Buf.add_char res (CamomileLibrary.UTF8.look s !idx);
+      idx := CamomileLibrary.UTF8.next s !idx;
       incr i
     done;
-    UTF8.Buf.contents res
+    CamomileLibrary.UTF8.Buf.contents res
   with _ -> fail (Index_out_of_bounds (0, len))
 
 let (++) x y =
-  let res = UTF8.Buf.create ((UTF8.length x) + (UTF8.length y)) in
-  UTF8.Buf.add_string res x;
-  UTF8.Buf.add_string res y;
-  UTF8.Buf.contents res
+  let res =
+    CamomileLibrary.UTF8.Buf.create
+      ((CamomileLibrary.UTF8.length x) + (CamomileLibrary.UTF8.length y)) in
+  CamomileLibrary.UTF8.Buf.add_string res x;
+  CamomileLibrary.UTF8.Buf.add_string res y;
+  CamomileLibrary.UTF8.Buf.contents res
 
 let concat l =
   let len =
     List.fold_left
-      (fun acc elem -> acc + (UTF8.length elem))
+      (fun acc elem -> acc + (CamomileLibrary.UTF8.length elem))
       0
       l in
-  let res = UTF8.Buf.create len in
-  List.iter (UTF8.Buf.add_string res) l;
-  UTF8.Buf.contents res
+  let res = CamomileLibrary.UTF8.Buf.create len in
+  List.iter (CamomileLibrary.UTF8.Buf.add_string res) l;
+  CamomileLibrary.UTF8.Buf.contents res
 
 let concat_sep sep l =
-  let sep_len = UTF8.length sep in
+  let sep_len = CamomileLibrary.UTF8.length sep in
   let len =
     List.fold_left
-      (fun acc elem -> acc + sep_len + (UTF8.length elem))
+      (fun acc elem -> acc + sep_len + (CamomileLibrary.UTF8.length elem))
       0
       l in
-  let res = UTF8.Buf.create (len - sep_len) in
+  let res = CamomileLibrary.UTF8.Buf.create (len - sep_len) in
   (match l with
   | hd :: tl ->
-      UTF8.Buf.add_string res hd;
+      CamomileLibrary.UTF8.Buf.add_string res hd;
       List.iter
         (fun x ->
-          UTF8.Buf.add_string res sep;
-          UTF8.Buf.add_string res x)
+          CamomileLibrary.UTF8.Buf.add_string res sep;
+          CamomileLibrary.UTF8.Buf.add_string res x)
         tl
   | [] -> ());
-  UTF8.Buf.contents res
+  CamomileLibrary.UTF8.Buf.contents res
 
 let concat_sep_map sep f l =
   let l' = List.map f l in
@@ -279,16 +270,16 @@ let concat_sep_map sep f l =
 let replace c1 c2 s =
   let c1 = UCharImpl.to_camomile c1 in
   let c2 = UCharImpl.to_camomile c2 in
-  let res = UTF8.Buf.create (UTF8.length s) in
-  UTF8.iter
+  let res = CamomileLibrary.UTF8.Buf.create (CamomileLibrary.UTF8.length s) in
+  CamomileLibrary.UTF8.iter
     (fun x ->
-      UTF8.Buf.add_char
+      CamomileLibrary.UTF8.Buf.add_char
         res
-        (if UChar.eq x c1 then
+        (if CamomileLibrary.UChar.eq x c1 then
           c2
         else
           x)) s;
-  UTF8.Buf.contents res
+  CamomileLibrary.UTF8.Buf.contents res
 
 let contains c s =
   try
@@ -298,18 +289,18 @@ let contains c s =
 
 let split c s =
   let res = ref [] in
-  let curr = UTF8.Buf.create (UTF8.length s) in
+  let curr = CamomileLibrary.UTF8.Buf.create (CamomileLibrary.UTF8.length s) in
   let c = UCharImpl.to_camomile c in
-  UTF8.iter
+  CamomileLibrary.UTF8.iter
     (fun x ->
-      if UChar.eq c x then begin
-        res := (UTF8.Buf.contents curr) :: !res;
-        UTF8.Buf.clear curr
+      if CamomileLibrary.UChar.eq c x then begin
+        res := (CamomileLibrary.UTF8.Buf.contents curr) :: !res;
+        CamomileLibrary.UTF8.Buf.clear curr
       end else
-        UTF8.Buf.add_char curr x)
+        CamomileLibrary.UTF8.Buf.add_char curr x)
     s;
-  let last = UTF8.Buf.contents curr in
-  if UTF8.length last > 0 then
+  let last = CamomileLibrary.UTF8.Buf.contents curr in
+  if CamomileLibrary.UTF8.length last > 0 then
     res := last :: !res;
   List.rev !res
 
@@ -327,20 +318,20 @@ let lowercase_t = UCharImpl.of_char 't'
 
 let lowercase_u = UCharImpl.of_char 'u'
 
-let new_line = UChar.of_char '\n'
+let new_line = CamomileLibrary.UChar.of_char '\n'
 
-let tabulation = UChar.of_char '\t'
+let tabulation = CamomileLibrary.UChar.of_char '\t'
 
 let escape_delim delim s =
-  let res = UTF8.Buf.create ((UTF8.length s) * 2) in
+  let res = CamomileLibrary.UTF8.Buf.create ((CamomileLibrary.UTF8.length s) * 2) in
   let add_char x =
-    UTF8.Buf.add_char res (UCharImpl.to_camomile x) in
+    CamomileLibrary.UTF8.Buf.add_char res (UCharImpl.to_camomile x) in
   let add_string x =
-    UTF8.Buf.add_string res (of_string x) in
+    CamomileLibrary.UTF8.Buf.add_string res (of_string x) in
   add_char delim;
-  UTF8.iter
+  CamomileLibrary.UTF8.iter
     (fun c ->
-      let code = UChar.uint_code c in
+      let code = CamomileLibrary.UChar.uint_code c in
       if code > 0x7F || code < 0 then
         let code'1 = code land 0x0000FFFF in (* from Camomile's UPervasives module *)
         let code'2 = code lsr 16 in
@@ -374,7 +365,7 @@ let escape_delim delim s =
               add_char (UCharImpl.of_char (Char.chr (48 + cc mod 10))))
     s;
   add_char delim;
-  UTF8.Buf.contents res
+  CamomileLibrary.UTF8.Buf.contents res
 
 let escape = escape_delim double_quote
 
@@ -382,47 +373,47 @@ let escape_char c =
   escape_delim simple_quote (of_uchar c)
 
 let unescape s =
-  let len = UTF8.length s in
+  let len = CamomileLibrary.UTF8.length s in
   let double_quote' = UCharImpl.to_camomile double_quote in
   let back_slash' = UCharImpl.to_camomile back_slash in
   if (len < 2)
-  || (not (UChar.eq (UTF8.get s 0) double_quote'))
-  || (not (UChar.eq (UTF8.get s (pred len)) double_quote')) then
+  || (not (CamomileLibrary.UChar.eq (CamomileLibrary.UTF8.get s 0) double_quote'))
+  || (not (CamomileLibrary.UChar.eq (CamomileLibrary.UTF8.get s (pred len)) double_quote')) then
     fail (Invalid_escaped_string s)
   else
-    let res = UTF8.Buf.create len in
-    let idx = ref (UTF8.nth s 1) in
-    let last = UTF8.last s in
+    let res = CamomileLibrary.UTF8.Buf.create len in
+    let idx = ref (CamomileLibrary.UTF8.nth s 1) in
+    let last = CamomileLibrary.UTF8.last s in
     let read_digit hex =
-      if UTF8.compare_index s !idx last >= 0 then
+      if CamomileLibrary.UTF8.compare_index s !idx last >= 0 then
         fail (Invalid_escaped_string s)
       else
-        let d = Char.uppercase (UCharImpl.to_char (UCharImpl.of_camomile (UTF8.look s !idx))) in
+        let d = Char.uppercase (UCharImpl.to_char (UCharImpl.of_camomile (CamomileLibrary.UTF8.look s !idx))) in
         if (d >= '0' && d <= '9') then
           (Char.code d) - (Char.code '0')
         else if (hex && (d >= 'A' && d <= 'F')) then
           (Char.code d) - (Char.code 'A')
         else fail (Invalid_escaped_string s) in
-    while UTF8.compare_index s !idx last < 0 do
-      let c = UTF8.look s !idx in
+    while CamomileLibrary.UTF8.compare_index s !idx last < 0 do
+      let c = CamomileLibrary.UTF8.look s !idx in
       if UCharImpl.equal back_slash (UCharImpl.of_camomile c) then begin
-        idx := UTF8.next s !idx;
-        if UTF8.compare_index s !idx last >= 0 then
+        idx := CamomileLibrary.UTF8.next s !idx;
+        if CamomileLibrary.UTF8.compare_index s !idx last >= 0 then
           fail (Invalid_escaped_string s)
         else
-          let c' = UCharImpl.of_camomile (UTF8.look s !idx) in
+          let c' = UCharImpl.of_camomile (CamomileLibrary.UTF8.look s !idx) in
           if UCharImpl.equal double_quote c' then begin
-            UTF8.Buf.add_char res double_quote';
-            idx := UTF8.next s !idx
+            CamomileLibrary.UTF8.Buf.add_char res double_quote';
+            idx := CamomileLibrary.UTF8.next s !idx
           end else if UCharImpl.equal back_slash c' then begin
-            UTF8.Buf.add_char res back_slash';
-            idx := UTF8.next s !idx
+            CamomileLibrary.UTF8.Buf.add_char res back_slash';
+            idx := CamomileLibrary.UTF8.next s !idx
           end else if UCharImpl.equal lowercase_n c' then begin
-            UTF8.Buf.add_char res new_line;
-            idx := UTF8.next s !idx
+            CamomileLibrary.UTF8.Buf.add_char res new_line;
+            idx := CamomileLibrary.UTF8.next s !idx
           end else if UCharImpl.equal lowercase_t c' then begin
-            UTF8.Buf.add_char res tabulation;
-            idx := UTF8.next s !idx
+            CamomileLibrary.UTF8.Buf.add_char res tabulation;
+            idx := CamomileLibrary.UTF8.next s !idx
           end else if UCharImpl.equal lowercase_u c' then
             let digit'1 = read_digit true in
             let digit'2 = read_digit true in
@@ -433,7 +424,7 @@ let unescape s =
                 + (digit'2 lsl 8)
                 + (digit'3 lsl 4)
                 + digit'4 in
-            UTF8.Buf.add_char res (UChar.chr_of_uint code)
+            CamomileLibrary.UTF8.Buf.add_char res (CamomileLibrary.UChar.chr_of_uint code)
           else if UCharImpl.equal (UCharImpl.of_char 'U') c' then
             let digit'1 = read_digit true in
             let digit'2 = read_digit true in
@@ -452,24 +443,24 @@ let unescape s =
                 + (digit'6 lsl 8)
                 + (digit'7 lsl 4)
                 + digit'8 in
-            UTF8.Buf.add_char res (UChar.chr_of_uint code)
+            CamomileLibrary.UTF8.Buf.add_char res (CamomileLibrary.UChar.chr_of_uint code)
           else (* digits *)
             let digit'1 = Char.code (UCharImpl.to_char c') in
-            idx := UTF8.next s !idx;
+            idx := CamomileLibrary.UTF8.next s !idx;
             let digit'2 = read_digit false in
             let digit'3 = read_digit false in
             let code =
               ((digit'1 - 48) * 100)
                 + ((digit'2 - 48) * 10)
                 + (digit'3 - 48) in
-            UTF8.Buf.add_char res (UCharImpl.to_camomile (UCharImpl.of_char (Char.chr code)))
+            CamomileLibrary.UTF8.Buf.add_char res (UCharImpl.to_camomile (UCharImpl.of_char (Char.chr code)))
       end else begin
-        UTF8.Buf.add_char res c;
-        idx := UTF8.next s !idx
+        CamomileLibrary.UTF8.Buf.add_char res c;
+        idx := CamomileLibrary.UTF8.next s !idx
       end
     done;
-    UTF8.Buf.contents res
+    CamomileLibrary.UTF8.Buf.contents res
 
-external to_camomile : t -> UTF8.t = "%identity"
+external to_camomile : t -> CamomileLibrary.UTF8.t = "%identity"
 
-external of_camomile : UTF8.t -> t = "%identity"
+external of_camomile : CamomileLibrary.UTF8.t -> t = "%identity"

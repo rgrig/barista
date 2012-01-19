@@ -16,11 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-open CamomileLibrary
+module Encoding = CamomileLibrary.CharEncoding.Configure (CamomileLibraryDefault.Config)
 
-module Encoding = CharEncoding.Configure (CamomileLibraryDefault.Config)
-
-module UTF8Line = ULine.Make (UTF8)
+module UTF8Line = CamomileLibrary.ULine.Make (CamomileLibrary.UTF8)
 
 type t = UTF8Line.output_line
 

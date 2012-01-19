@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-.class public final pack.Test
+.class public final super pack.Test
 .extends java.lang.Object
         @SourceFile "<<Filename>>"
         @Signature "<A:Ljava/lang/Number;>Ljava/lang/Object;"

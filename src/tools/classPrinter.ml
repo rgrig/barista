@@ -22,61 +22,61 @@ open Consts
 
 (* Constants *)
 
-let opening_bracket = UTF8.of_string "<"
+let opening_bracket = @"<"
 
-let comma_space = UTF8.of_string ", "
+let comma_space = @", "
 
-let closing_bracket = UTF8.of_string ">"
+let closing_bracket = @">"
 
-let closing_bracket_space = UTF8.of_string "> "
+let closing_bracket_space = @"> "
 
-let class' = UTF8.of_string "class "
+let class' = @"class "
 
-let interface = UTF8.of_string "interface "
+let interface = @"interface "
 
-let extends = UTF8.of_string " extends "
+let extends = @" extends "
 
-let implements = UTF8.of_string " implements "
+let implements = @" implements "
 
-let throws = UTF8.of_string " throws "
+let throws = @" throws "
 
-let space_and_space = UTF8.of_string " & "
+let space_and_space = @" & "
 
-let array_suffix = UTF8.of_string "[]"
+let array_suffix = @"[]"
 
-let wildcard = UTF8.of_string "?"
+let wildcard = @"?"
 
-let wildcard_extends = UTF8.of_string "? extends "
+let wildcard_extends = @"? extends "
 
-let wildcard_super = UTF8.of_string "? super "
+let wildcard_super = @"? super "
 
-let true_string = UTF8.of_string "true"
+let true_string = @"true"
 
-let false_string = UTF8.of_string "false"
+let false_string = @"false"
 
-let dot_string = UTF8.of_string "."
+let dot_string = @"."
 
-let equal = UTF8.of_string "="
+let equal = @"="
 
-let tab = UTF8.of_string "  "
+let tab = @"  "
 
-let opening_square_bracket = UTF8.of_string "["
+let opening_square_bracket = @"["
 
-let closing_square_bracket = UTF8.of_string "]"
+let closing_square_bracket = @"]"
 
-let at_string = UTF8.of_string "@"
+let at_string = @"@"
 
-let opening_parenthesis = UTF8.of_string "("
+let opening_parenthesis = @"("
 
-let closing_parenthesis = UTF8.of_string ")"
+let closing_parenthesis = @")"
 
-let semi_colon = UTF8.of_string ";"
+let semi_colon = @";"
 
-let opening_curly_bracket = UTF8.of_string " {"
+let opening_curly_bracket = @" {"
 
-let closing_curly_bracket = UTF8.of_string "}"
+let closing_curly_bracket = @"}"
 
-let static_block = UTF8.of_string ""
+let static_block = @""
 
 
 (* Functions *)
@@ -247,7 +247,7 @@ let add_field buffer f =
     UTF8Buffer.add_string buffer (utf8_of_field_type_signature fts)
   with Not_found ->
     UTF8Buffer.add_string buffer (Descriptor.external_utf8_of_java_type (f.Field.descriptor :> Descriptor.java_type)));
-  UTF8Buffer.add_char buffer (UChar.of_char ' ');
+  UTF8Buffer.add_char buffer @' ';
   UTF8Buffer.add_string buffer (Name.utf8_for_field f.Field.name);
   UTF8Buffer.add_endline buffer semi_colon
 
@@ -277,7 +277,7 @@ let add_method buffer class_name m =
   try
     let fts = Attribute.extract_method_signature attrs in
     if fts.Signature.formal_type_params <> [] then begin
-      UTF8Buffer.add_char buffer (UChar.of_char '<');
+      UTF8Buffer.add_char buffer @'<';
       UTF8Buffer.add_string
         buffer
         (UTF8.concat_sep_map
@@ -292,17 +292,17 @@ let add_method buffer class_name m =
       UTF8Buffer.add_string buffer class_name
     else begin
       UTF8Buffer.add_string buffer (utf8_of_type_signature fts.Signature.return);
-      UTF8Buffer.add_char buffer (UChar.of_char ' ');
+      UTF8Buffer.add_char buffer @' ';
       UTF8Buffer.add_string buffer name
     end;
-    UTF8Buffer.add_char buffer (UChar.of_char '(');
+    UTF8Buffer.add_char buffer @'(';
     UTF8Buffer.add_string
       buffer
       (UTF8.concat_sep_map
          comma_space
          utf8_of_type_signature
          fts.Signature.types);
-    UTF8Buffer.add_char buffer (UChar.of_char ')');
+    UTF8Buffer.add_char buffer @')';
     if fts.Signature.throws_signatures <> [] then begin
       UTF8Buffer.add_string buffer throws;
       UTF8Buffer.add_string
@@ -321,17 +321,17 @@ let add_method buffer class_name m =
       UTF8Buffer.add_string buffer class_name
     else begin
       UTF8Buffer.add_string buffer (Descriptor.external_utf8_of_java_type return);
-      UTF8Buffer.add_char buffer (UChar.of_char ' ');
+      UTF8Buffer.add_char buffer @' ';
       UTF8Buffer.add_string buffer name
     end;
-    UTF8Buffer.add_char buffer (UChar.of_char '(');
+    UTF8Buffer.add_char buffer @'(';
     UTF8Buffer.add_string
       buffer
       (UTF8.concat_sep_map
          comma_space
          Descriptor.external_utf8_of_java_type
          (params :> Descriptor.java_type list));
-    UTF8Buffer.add_char buffer (UChar.of_char ')');
+    UTF8Buffer.add_char buffer @')';
     (try
       let thrown = Attribute.extract_exceptions (attrs :> Attribute.t list) in
       UTF8Buffer.add_string buffer throws;

@@ -29,7 +29,7 @@ type t =
   | Java_1_4 (** J2SE 1.4 (circa 2002). *)
   | Java_1_5 (** J2SE 5.0 (circa 2004). *)
   | Java_1_6 (** Java SE 6 (circa 2006). *)
-  | Java_1_7 (** Java SE 7 (in DP - circa 2011?). *)
+  | Java_1_7 (** Java SE 7 (circa 2011). *)
   | Java_1_8 (** Java SE 8 (to be released). *)
 (* The type representing the various Java versions. *)
 
@@ -37,7 +37,7 @@ val all : t list
 (** The list of versions, in ascending order. *)
 
 val default : t
-(** The default version used by the library (currently [Java_1_6]). *)
+(** The default version used by the library (currently [Java_1_7]). *)
 
 val to_string : t -> string
 (** Converts the passed version into a string. *)
@@ -64,16 +64,10 @@ val empty_bounds : bounds -> bool
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_version
   | Unsupported_feature of (Utils.u2 * Utils.u2) * string
   | Deprecated_feature of (Utils.u2 * Utils.u2) * string
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Constants} *)

@@ -23,63 +23,63 @@ open Consts
 
 (* Constants *)
 
-let dot_class = UTF8.of_string ".class "
+let dot_class = @".class "
 
-let dot_method = UTF8.of_string ".method "
+let dot_method = @".method "
 
-let dot_field = UTF8.of_string ".field "
+let dot_field = @".field "
 
-let dot_implements = UTF8.of_string ".implements "
+let dot_implements = @".implements "
 
-let dot_extends = UTF8.of_string ".extends "
+let dot_extends = @".extends "
 
-let space = UTF8.of_string " "
+let space = @" "
 
-let tab = UTF8.of_string "  "
+let tab = @"  "
 
-let colon = UTF8.of_string ":"
+let colon = @":"
 
-let comma = UTF8.of_string ","
+let comma = @","
 
-let dot = UTF8.of_string "."
+let dot = @"."
 
-let opening_parenthesis = UTF8.of_string "("
+let opening_parenthesis = @"("
 
-let closing_parenthesis = UTF8.of_string ")"
+let closing_parenthesis = @")"
 
-let tilde = UTF8.of_string " ~ "
+let tilde = @" ~ "
 
-let zero = UTF8.of_string "0"
+let zero = @"0"
 
-let wide = UTF8.of_string "wide "
+let wide = @"wide "
 
-let at_constant_value = UTF8.of_string "@ConstantValue "
+let at_constant_value = @"@ConstantValue "
 
-let at_module = UTF8.of_string "@Module "
+let at_module = @"@Module "
 
-let at_unknown = UTF8.of_string "@Unknown "
+let at_unknown = @"@Unknown "
 
-let at_exceptions = UTF8.of_string "@Exceptions "
+let at_exceptions = @"@Exceptions "
 
-let at_inner_class = UTF8.of_string "@InnerClass "
+let at_inner_class = @"@InnerClass "
 
-let at_enclosing_method = UTF8.of_string "@EnclosingMethod "
+let at_enclosing_method = @"@EnclosingMethod "
 
-let at_synthetic = UTF8.of_string "@Synthetic"
+let at_synthetic = @"@Synthetic"
 
-let at_signature = UTF8.of_string "@Signature "
+let at_signature = @"@Signature "
 
-let at_source_file = UTF8.of_string "@SourceFile "
+let at_source_file = @"@SourceFile "
 
-let at_source_debug_extension = UTF8.of_string "@SourceDebugExtension "
+let at_source_debug_extension = @"@SourceDebugExtension "
 
-let at_deprecated = UTF8.of_string "@Deprecated"
+let at_deprecated = @"@Deprecated"
 
-let at_runtime_visible_annotations = UTF8.of_string "@RuntimeVisibleAnnotations "
+let at_runtime_visible_annotations = @"@RuntimeVisibleAnnotations "
 
-let at_runtime_invisible_annotations = UTF8.of_string "@RuntimeInvisibleAnnotations "
+let at_runtime_invisible_annotations = @"@RuntimeInvisibleAnnotations "
 
-let at_annotation_default = UTF8.of_string "@AnnotationDefault"
+let at_annotation_default = @"@AnnotationDefault"
 
 let class_constructor_name = Name.make_for_method class_constructor
 
@@ -127,9 +127,9 @@ let extract_code_attributes l =
 let rec annotation_value_list prefix = function
   | Annotation.Boolean_value b ->
       if b then
-        [prefix ++ (UTF8.of_string " boolean 1")]
+        [prefix ++ @" boolean 1"]
       else
-        [prefix ++ (UTF8.of_string " boolean 0")]
+        [prefix ++ @" boolean 0"]
   | Annotation.Byte_value b ->
       [prefix ++ (UTF8.of_string (Printf.sprintf " byte %d" b))]
   | Annotation.Char_value c ->
@@ -145,17 +145,17 @@ let rec annotation_value_list prefix = function
   | Annotation.Short_value s ->
       [prefix ++ (UTF8.of_string (Printf.sprintf " short %d" s))]
   | Annotation.String_value s ->
-      [prefix ++ (UTF8.of_string " string ") ++ (UTF8.escape s)]
+      [prefix ++ @" string " ++ (UTF8.escape s)]
   | Annotation.Enum_value (cn, fn) ->
       [prefix
-         ++ (UTF8.of_string " enum ")
+         ++ @" enum "
          ++ (Name.external_utf8_for_class cn)
          ++ space
          ++ (Name.utf8_for_field fn)]
   | Annotation.Class_value cn ->
-      [prefix ++ (UTF8.of_string " class ") ++ (Name.external_utf8_for_class cn)]
+      [prefix ++ @" class " ++ (Name.external_utf8_for_class cn)]
   | Annotation.Annotation_value a ->
-      let prefix' = prefix ++ (UTF8.of_string " annotation") in
+      let prefix' = prefix ++ @" annotation" in
       annotation_list prefix' a
   | Annotation.Array_value l ->
       let idx = ref 0 in
@@ -280,31 +280,31 @@ let add_attribute buffer a =
                  ++ (utf8_of_method_call mn d)) in
           let add_method_handle = function
             | `getField (cn, fn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "getField%");
+                UTF8Buffer.add_string buffer @"getField%";
                 add_field (cn, fn, d)
             | `getStatic (cn, fn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "getStatic%");
+                UTF8Buffer.add_string buffer @"getStatic%";
                 add_field (cn, fn, d)
             | `putField (cn, fn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "putField%");
+                UTF8Buffer.add_string buffer @"putField%";
                 add_field (cn, fn, d)
             | `putStatic (cn, fn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "putStatic%");
+                UTF8Buffer.add_string buffer @"putStatic%";
                 add_field (cn, fn, d)
             | `invokeVirtual (cn, mn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "invokeVirtual%");
+                UTF8Buffer.add_string buffer @"invokeVirtual%";
                 add_method (cn, mn, d)
             | `invokeStatic (cn, mn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "invokeStatic%");
+                UTF8Buffer.add_string buffer @"invokeStatic%";
                 add_method (cn, mn, d)
             | `invokeSpecial (cn, mn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "invokeSpecial%");
+                UTF8Buffer.add_string buffer @"invokeSpecial%";
                 add_method (cn, mn, d)
             | `newInvokeSpecial (cn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "newInvokeSpecial%");
+                UTF8Buffer.add_string buffer @"newInvokeSpecial%";
                 add_method (cn, (Name.make_for_method class_constructor), (d, `Class cn))
             | `invokeInterface (cn, mn, d) ->
-                UTF8Buffer.add_string buffer (UTF8.of_string "invokeInterface%");
+                UTF8Buffer.add_string buffer @"invokeInterface%";
                 add_method (cn, mn, d) in
           let add_method_type (params, return) =
             UTF8Buffer.add_string
@@ -344,16 +344,16 @@ let add_attribute buffer a =
                     | `Class cn ->
                         UTF8Buffer.add_string buffer (Name.external_utf8_for_class cn)
                     | `Integer i ->
-                        UTF8Buffer.add_string buffer (UTF8.of_string "int ");
+                        UTF8Buffer.add_string buffer @"int ";
                         UTF8Buffer.add_string buffer (UTF8.of_string (Int32.to_string i))
                     | `Long l ->
-                        UTF8Buffer.add_string buffer (UTF8.of_string "long ");
+                        UTF8Buffer.add_string buffer @"long ";
                         UTF8Buffer.add_string buffer (UTF8.of_string (Int64.to_string l))
                     | `Float f ->
-                        UTF8Buffer.add_string buffer (UTF8.of_string "float ");
+                        UTF8Buffer.add_string buffer @"float ";
                         UTF8Buffer.add_string buffer (UTF8.of_string (string_of_float f))
                     | `Double d ->
-                        UTF8Buffer.add_string buffer (UTF8.of_string "double ");
+                        UTF8Buffer.add_string buffer @"double ";
                         UTF8Buffer.add_string buffer (UTF8.of_string (string_of_float d))
                     | `MethodHandle mh ->
                         add_method_handle mh
@@ -414,13 +414,13 @@ let add_attribute buffer a =
             | None -> empty_utf8))
         cv.Attribute.exception_table;
       let utf8_of_type = function
-        | Attribute.Top_variable_info -> UTF8.of_string "top"
-        | Attribute.Integer_variable_info -> UTF8.of_string "int"
-        | Attribute.Float_variable_info -> UTF8.of_string "float"
-        | Attribute.Long_variable_info -> UTF8.of_string "long"
-        | Attribute.Double_variable_info -> UTF8.of_string "double"
-        | Attribute.Null_variable_info -> UTF8.of_string "null"
-        | Attribute.Uninitialized_this_variable_info -> UTF8.of_string "uninit_this"
+        | Attribute.Top_variable_info -> @"top"
+        | Attribute.Integer_variable_info -> @"int"
+        | Attribute.Float_variable_info -> @"float"
+        | Attribute.Long_variable_info -> @"long"
+        | Attribute.Double_variable_info -> @"double"
+        | Attribute.Null_variable_info -> @"null"
+        | Attribute.Uninitialized_this_variable_info -> @"uninit_this"
         | Attribute.Object_variable_info (`Class_or_interface n) -> Name.external_utf8_for_class n
         | Attribute.Object_variable_info (`Array_type at) -> Descriptor.external_utf8_of_java_type (at :> Descriptor.java_type)
         | Attribute.Uninitialized_variable_info ofs -> UTF8.of_string (Printf.sprintf "uninit code%08d:" (ofs :> int)) in
@@ -504,7 +504,7 @@ let add_attribute buffer a =
           l in
       UTF8Buffer.add_endline
         buffer
-        (UTF8.concat_sep (UTF8.of_string "\n  ") l')
+        (UTF8.concat_sep @"\n  " l')
   | `EnclosingMethod { Attribute.innermost_class; enclosing_method } ->
       UTF8Buffer.add_string buffer at_enclosing_method;
       UTF8Buffer.add_string buffer (Name.external_utf8_for_class innermost_class);
@@ -541,13 +541,13 @@ let add_attribute buffer a =
           (List.map
              (annotation_list at_runtime_visible_annotations)
              l) in
-      UTF8Buffer.add_endline buffer (UTF8.concat_sep (UTF8.of_string "\n  ") l')
+      UTF8Buffer.add_endline buffer (UTF8.concat_sep @"\n  " l')
   | `RuntimeInvisibleAnnotations l ->
       let l' = List.flatten
           (List.map
              (annotation_list at_runtime_invisible_annotations)
              l) in
-      UTF8Buffer.add_endline buffer (UTF8.concat_sep (UTF8.of_string "\n  ") l')
+      UTF8Buffer.add_endline buffer (UTF8.concat_sep @"\n  " l')
   | `RuntimeVisibleParameterAnnotations l ->
       let no = ref 0 in
       List.iter
@@ -556,7 +556,7 @@ let add_attribute buffer a =
               (List.map
                  (annotation_list (UTF8.of_string ((if !no = 0 then "" else "  ") ^ "@RuntimeVisibleParameterAnnotations " ^ (string_of_int !no))))
                  x) in
-          UTF8Buffer.add_endline buffer (UTF8.concat_sep (UTF8.of_string "\n  ") l');
+          UTF8Buffer.add_endline buffer (UTF8.concat_sep @"\n  " l');
           incr no)
         l
   | `RuntimeInvisibleParameterAnnotations l ->
@@ -567,14 +567,14 @@ let add_attribute buffer a =
               (List.map
                  (annotation_list (UTF8.of_string ((if !no = 0 then "" else "  ") ^ "@RuntimeInvisibleParameterAnnotations " ^ (string_of_int !no))))
                  x) in
-          UTF8Buffer.add_endline buffer (UTF8.concat_sep (UTF8.of_string "\n  ") l');
+          UTF8Buffer.add_endline buffer (UTF8.concat_sep @"\n  " l');
           incr no)
         l
   | `RuntimeVisibleTypeAnnotations _ -> ()
   | `RuntimeInvisibleTypeAnnotations _ -> ()
   | `AnnotationDefault ad ->
       let l = annotation_value_list at_annotation_default ad in
-      UTF8Buffer.add_endline buffer (UTF8.concat_sep (UTF8.of_string "\n  ") l)
+      UTF8Buffer.add_endline buffer (UTF8.concat_sep @"\n  " l)
   | `StackMapTable _ -> ()
   | `BootstrapMethods _ -> ()
   | `Module (mn, mv) ->

@@ -61,23 +61,7 @@ type array_type =
 
 (* Exception *)
 
-type error =
-  | Invalid_class_name
-  | Invalid_array_element_type
-  | Array_with_too_many_dimensions
-  | Invalid_descriptor_string
-  | Empty_descriptor_string
-  | Invalid_field_type
-  | Invalid_local_variable_type
-  | Invalid_method_descriptor
-  | Invalid_method_parameter_type
-  | Void_not_allowed
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_class_name -> "invalid class name"
   | Invalid_array_element_type -> "invalid array element type (void)"
   | Array_with_too_many_dimensions -> "array with more than 255 dimensions"
@@ -88,12 +72,6 @@ let string_of_error = function
   | Invalid_method_descriptor -> "invalid method descriptor"
   | Invalid_method_parameter_type -> "invalid parameter type (void)"
   | Void_not_allowed -> "void is not allowed here"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Utility functions *)
@@ -203,38 +181,36 @@ let java_type_of_internal_utf8 s =
 
 let internal_utf8_of_java_type =
   let rec uojt n = function
-    | `Boolean -> UTF8.of_string "Z"
-    | `Byte -> UTF8.of_string "B"
-    | `Char -> UTF8.of_string "C"
-    | `Double -> UTF8.of_string "D"
-    | `Float -> UTF8.of_string "F"
-    | `Int -> UTF8.of_string "I"
-    | `Long -> UTF8.of_string "J"
-    | `Short -> UTF8.of_string "S"
-    | `Void -> UTF8.of_string "V"
+    | `Boolean -> @"Z"
+    | `Byte -> @"B"
+    | `Char -> @"C"
+    | `Double -> @"D"
+    | `Float -> @"F"
+    | `Int -> @"I"
+    | `Long -> @"J"
+    | `Short -> @"S"
+    | `Void -> @"V"
     | `Class c ->
-        (UTF8.of_string "L")
-          ++ (Name.internal_utf8_for_class c)
-          ++ (UTF8.of_string ";")
+        @"L" ++ (Name.internal_utf8_for_class c) ++ @";"
     | `Array jt ->
         if n < 255 then
-          (UTF8.of_string "[") ++ (uojt (succ n) (jt :> java_type))
+          @"[" ++ (uojt (succ n) (jt :> java_type))
         else
           fail Array_with_too_many_dimensions
   in uojt 0
 
 let rec external_utf8_of_java_type = function
-  | `Boolean -> UTF8.of_string "boolean"
-  | `Byte -> UTF8.of_string "byte"
-  | `Char -> UTF8.of_string "char"
-  | `Double -> UTF8.of_string "double"
-  | `Float -> UTF8.of_string "float"
-  | `Int -> UTF8.of_string "int"
-  | `Long -> UTF8.of_string "long"
-  | `Short -> UTF8.of_string "short"
-  | `Void -> UTF8.of_string "void"
+  | `Boolean -> @"boolean"
+  | `Byte -> @"byte"
+  | `Char -> @"char"
+  | `Double -> @"double"
+  | `Float -> @"float"
+  | `Int -> @"int"
+  | `Long -> @"long"
+  | `Short -> @"short"
+  | `Void -> @"void"
   | `Class n -> Name.external_utf8_for_class n
-  | `Array jt -> (external_utf8_of_java_type (jt :> java_type)) ++ (UTF8.of_string "[]")
+  | `Array jt -> (external_utf8_of_java_type (jt :> java_type)) ++ @"[]"
 
 let java_type_of_external_utf8 s =
   let rec make_array n x =
@@ -356,9 +332,9 @@ let method_of_utf8 str =
     fail Invalid_method_descriptor
 
 let utf8_of_method (params, return) =
-  (UTF8.of_string "(")
+  @"("
     ++ (UTF8.concat (List.map utf8_of_parameter params))
-    ++ (UTF8.of_string ")")
+    ++ @")"
     ++ (internal_utf8_of_java_type return)
 
 let equal_for_method (xp, xr) (yp, yr) =

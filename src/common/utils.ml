@@ -248,3 +248,37 @@ let rec list_equal ?(eq = (=)) l1 l2 =
   | (_ :: _), [] -> false
   | [], (_ :: _) -> false
   | [], [] -> true)
+
+let string_replace o n s =
+  let res = String.copy s in
+  let len = String.length res in
+  for i = 0 to pred len do
+    if res.[i] = o then res.[i] <- n
+  done;
+  res
+
+let string_split seps s =
+  let idx = ref 0 in
+  let len = String.length s in
+  let buff = Buffer.create len in
+  let res = ref [] in
+  let in_sep = ref false in
+  while !idx < len do
+    if !in_sep then begin
+      if not (String.contains seps s.[!idx]) then begin
+        Buffer.add_char buff s.[!idx];
+        in_sep := false
+      end
+    end else begin
+      if String.contains seps s.[!idx] then begin
+        res := (Buffer.contents buff) :: !res;
+        Buffer.clear buff;
+        in_sep := true
+      end else
+        Buffer.add_char buff s.[!idx]
+    end;
+    incr idx
+  done;
+  let last = Buffer.contents buff in
+  if last <> "" then res := last :: !res;
+  List.rev !res

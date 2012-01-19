@@ -106,7 +106,7 @@ and extended_info = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_tag of Utils.UChar.t
   | Inconsistent_primitive_value
   | Invalid_string_value of Utils.u2
@@ -116,12 +116,6 @@ type error =
   | Invalid_element_name of Utils.u2
   | Invalid_list_length of int
   | Invalid_target of int
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 I/O functions} *)

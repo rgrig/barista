@@ -16,46 +16,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-open CamomileLibrary
-
-type error =
-  | End_of_lexer
-  | Invalid_consume of char * char
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | End_of_lexer -> "end of lexer"
-  | Invalid_consume (w, f) -> Printf.sprintf "invalid consume (%C waited but %C found)" w f
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+  | Invalid_consume of (w : char) * (f : char) -> Printf.sprintf "invalid consume (%C waited but %C found)" w f
 
 class t s =
   let s = UTF8Impl.to_camomile s in
   object (self)
 
-    val mutable next = UTF8.first s
+    val mutable next = CamomileLibrary.UTF8.first s
 
     method is_available =
-      not (UTF8.out_of_range s next)
+      not (CamomileLibrary.UTF8.out_of_range s next)
 
     method private check_available =
-      if UTF8.out_of_range s next then
+      if CamomileLibrary.UTF8.out_of_range s next then
         fail End_of_lexer
 
     method peek =
       self#check_available;
-      UCharImpl.of_camomile (UTF8.look s next)
+      UCharImpl.of_camomile (CamomileLibrary.UTF8.look s next)
 
     method look_ahead_list l =
       self#check_available;
-      let next_char = UCharImpl.of_camomile (UTF8.look s next) in
+      let next_char = UCharImpl.of_camomile (CamomileLibrary.UTF8.look s next) in
       List.exists (UCharImpl.equal next_char) l
 
     method look_ahead ch =
@@ -63,8 +47,8 @@ class t s =
 
     method consume_char =
       self#check_available;
-      let res = UTF8.look s next in
-      next <- UTF8.next s next;
+      let res = CamomileLibrary.UTF8.look s next in
+      next <- CamomileLibrary.UTF8.next s next;
       UCharImpl.of_camomile res
 
     method consume =
@@ -78,14 +62,22 @@ class t s =
         fail (Invalid_consume (ch, next_char))
 
     method consume_until_list l =
-      let b = UTF8.Buf.create 256 in
+      let b = CamomileLibrary.UTF8.Buf.create 256 in
       while not (self#look_ahead_list l) do
-        UTF8.Buf.add_char b (UTF8.look s next);
-        next <- UTF8.next s next
+        CamomileLibrary.UTF8.Buf.add_char b (CamomileLibrary.UTF8.look s next);
+        next <- CamomileLibrary.UTF8.next s next
       done;
-      UTF8Impl.of_camomile (UTF8.Buf.contents b)
+      UTF8Impl.of_camomile (CamomileLibrary.UTF8.Buf.contents b)
 
     method consume_until ch =
       self#consume_until_list [ch]
+
+    method consume_all =
+      let b = CamomileLibrary.UTF8.Buf.create 256 in
+      while self#is_available do
+        CamomileLibrary.UTF8.Buf.add_char b (CamomileLibrary.UTF8.look s next);
+        next <- CamomileLibrary.UTF8.next s next
+      done;
+      UTF8Impl.of_camomile (CamomileLibrary.UTF8.Buf.contents b)
 
   end

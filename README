@@ -1,6 +1,4 @@
-This is a fork. The original README follows.
-
 Barista is both a library for Java class file construction and a Java [dis]assembler.
 Barista is Copyright (C) 2007-2011 Xavier Clerc and released under the LGPL v3.
 The official website of Barista is <http://barista.x9c.fr>.
-Version 2.0-alpha.
+Version 2.0-alpha2.

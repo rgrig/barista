@@ -16,6 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
+
+open Utils
+
 (* Types *)
 
 type entry =
@@ -27,35 +30,16 @@ type t = entry list
 
 (* Exception *)
 
-type error =
-  | Unable_to_open_archive of string
-  | Does_not_exist of string
-  | Class_not_found of string
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Unable_to_open_archive s ->
+BARISTA_ERROR =
+  | Unable_to_open_archive of (s : string) ->
       Printf.sprintf "unable to open archive %S" s
-  | Does_not_exist s ->
+  | Does_not_exist of (s : string) ->
       Printf.sprintf "%S does not exist" s
-  | Class_not_found s ->
+  | Class_not_found of (s : string) ->
       Printf.sprintf "class %S not found" s
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Constructor *)
-
-let colon = Str.regexp (Str.quote ":")
-
-let dot = Str.regexp (Str.quote ".")
 
 let make_entry s =
   try
@@ -74,12 +58,7 @@ let map_elements l =
   List.map make_entry l
 
 let make_of_string ?(separator=":") s =
-  let sep =
-    if separator = ":" then
-      colon
-    else
-      Str.regexp (Str.quote separator) in
-  let l = Str.split sep s in
+  let l = string_split separator s in
   map_elements l
 
 let make_of_list l =
@@ -126,7 +105,7 @@ let search_stream cp s =
   search ()
 
 let open_stream cp s =
-  let s' = (Str.global_replace dot "/" s) ^ ".class" in
+  let s' = (string_replace '.' '/' s) ^ ".class" in
   try
     search_stream cp s'
   with _ -> fail (Class_not_found s)

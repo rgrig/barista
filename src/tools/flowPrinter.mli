@@ -18,16 +18,10 @@
 
 (** Printing of method control flow. *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_desciptor of Utils.UTF8.t
   | Method_not_found
   | Method_has_no_code
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 val print_to_buffer : Utils.UTF8Buffer.t -> ClassLoader.t -> Utils.UTF8.t -> unit
 (** [print_to_stream buff cl cn] appends to the passed buffer [buff] the

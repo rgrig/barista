@@ -76,18 +76,12 @@ val nb_args_of_switch_kind : switch_kind -> int
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Unsupported_instruction of string
   | Vertex_not_in_graph
   | Invalid_switch_edge
   | Empty_graph
   | Cannot_remove_root
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Flow information for instructions} *)

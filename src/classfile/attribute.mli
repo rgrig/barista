@@ -33,7 +33,7 @@ type info = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_code_attribute
   | Invalid_code_length
   | Defined_twice of string
@@ -61,12 +61,6 @@ type error =
   | Invalid_module
   | Invalid_module_dependency_kind
   | Missing_module_attribute
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 I/O functions} *)

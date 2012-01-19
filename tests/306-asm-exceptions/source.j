@@ -74,46 +74,46 @@ end:
         return
         .catch try: catch: catch:
 
-.method private static void finally()
-try:
-        aconst_null
-        invokevirtual java.lang.Object.toString():java.lang.String
-        jsr sub:
-        return
-finally:
-        jsr sub:
-        return
-sub:
-        astore_1
-        getstatic java.lang.System.out:java.io.PrintStream
-        ldc "finally"
-        invokevirtual java.io.PrintStream.println(java.lang.String):void
-        ret 1
-        return
-        .catch try: finally: finally:
+#.method private static void finally()
+#try:
+#        aconst_null
+#        invokevirtual java.lang.Object.toString():java.lang.String
+#        jsr sub:
+#        return
+#finally:
+#        jsr sub:
+#        return
+#sub:
+#        astore_1
+#        getstatic java.lang.System.out:java.io.PrintStream
+#        ldc "finally"
+#        invokevirtual java.io.PrintStream.println(java.lang.String):void
+#        ret 1
+#        return
+#        .catch try: finally: finally:
 
-.method private static void finally_w()
-try:
-        aconst_null
-        invokevirtual java.lang.Object.toString():java.lang.String
-        jsr_w sub:
-        return
-finally:
-        jsr_w sub:
-        return
-sub:
-        astore_1
-        getstatic java.lang.System.out:java.io.PrintStream
-        ldc "finally"
-        invokevirtual java.io.PrintStream.println(java.lang.String):void
-        ret 1
-        return
-        .catch try: finally: finally:
+#.method private static void finally_w()
+#try:
+#        aconst_null
+#        invokevirtual java.lang.Object.toString():java.lang.String
+#        jsr_w sub:
+#        return
+#finally:
+#        jsr_w sub:
+#        return
+#sub:
+#        astore_1
+#        getstatic java.lang.System.out:java.io.PrintStream
+#        ldc "finally"
+#        invokevirtual java.io.PrintStream.println(java.lang.String):void
+#        ret 1
+#        return
+#        .catch try: finally: finally:
 
 .method public static void main(java.lang.String[])
         invokestatic pack.Test.catch():void
         invokestatic pack.Test.catch_npe():void
         invokestatic pack.Test.throw():void
-        invokestatic pack.Test.finally():void
-        invokestatic pack.Test.finally_w():void
+#        invokestatic pack.Test.finally():void
+#        invokestatic pack.Test.finally_w():void
         return

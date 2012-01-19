@@ -22,15 +22,15 @@
 (** {6 Base types and function} *)
 
 type method_handle =
-  [ `getField of ConstantPool.field_reference
-  | `getStatic of ConstantPool.field_reference
-  | `putField of ConstantPool.field_reference
-  | `putStatic of ConstantPool.field_reference
-  | `invokeVirtual of ConstantPool.method_reference
-  | `invokeStatic of ConstantPool.method_reference
-  | `invokeSpecial of ConstantPool.method_reference
-  | `newInvokeSpecial of ConstantPool.constructor_reference
-  | `invokeInterface of ConstantPool.method_reference ]
+  [ `getField of Reference.for_field
+  | `getStatic of Reference.for_field
+  | `putField of Reference.for_field
+  | `putStatic of Reference.for_field
+  | `invokeVirtual of Reference.for_method
+  | `invokeStatic of Reference.for_method
+  | `invokeSpecial of Reference.for_method
+  | `newInvokeSpecial of Reference.for_constructor
+  | `invokeInterface of Reference.for_method ]
 (** The type for bootstrap methods used by {i invokedynamic} instructions. *)
 
 val equal_method_handle : method_handle -> method_handle -> bool
@@ -63,14 +63,8 @@ val equal_method_specifier : method_specifier -> method_specifier -> bool
 type methods = method_specifier ExtendableArray.t
 (** The type of information to be actually stored in a class file. *)
 
-type error =
+BARISTA_ERROR =
   | Too_large of int
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 val make_methods : unit -> methods
 (** Constructs an empty array of method specifiers. *)

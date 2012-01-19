@@ -89,6 +89,7 @@ let () =
                    ([(`Class (utf8_for_class "java.lang.String"))],
                     `Void));
     RETURN ] in
+(*
   let finally_instructions = [
     ACONST_NULL;
     INVOKEVIRTUAL ((`Class_or_interface (utf8_for_class "java.lang.Object")),
@@ -129,20 +130,25 @@ let () =
                     `Void));
     RET (u1 1);
     RETURN ] in
+*)
   let instructions = [
     INVOKESTATIC ((utf8_for_class "pack.Test"), (utf8_for_method "catch"), ([], `Void));
     INVOKESTATIC ((utf8_for_class "pack.Test"), (utf8_for_method "catch_npe"), ([], `Void));
     INVOKESTATIC ((utf8_for_class "pack.Test"), (utf8_for_method "throw"), ([], `Void));
+(*
     INVOKESTATIC ((utf8_for_class "pack.Test"), (utf8_for_method "finally"), ([], `Void));
     INVOKESTATIC ((utf8_for_class "pack.Test"), (utf8_for_method "finally_w"), ([], `Void));
+*)
     RETURN ] in
   let catch = compile_method
+      ~version:Version.Java_1_5
       ~qualifiers:[`Public; `Static]
       ~name:"catch"
       ~signature:([], `Void)
       ~exceptions_table:(mk_table [(u2 0, u2 15, u2 15, None)])
       catch_instructions in
   let catch_npe = compile_method
+      ~version:Version.Java_1_5
       ~qualifiers:[`Private; `Static]
       ~name:"catch_npe"
       ~signature:([], `Void)
@@ -150,23 +156,28 @@ let () =
 			           (u2 0, u2 9, u2 14, Some (utf8_for_class "java.lang.ArrayIndexOutOfBoundsException"))])
       catch_npe_instructions in
   let throw = compile_method
+      ~version:Version.Java_1_5
       ~qualifiers:[`Private; `Static]
       ~name:"throw"
       ~signature:([], `Void)
       ~exceptions_table:(mk_table [(u2 0, u2 13, u2 13, None)])
       throw_instructions in
+(*
   let finally = compile_method
+      ~version:Version.Java_1_5
       ~qualifiers:[`Private; `Static]
       ~name:"finally"
       ~signature:([], `Void)
       ~exceptions_table:(mk_table [(u2 0, u2 8, u2 8, None)])
       finally_instructions in
   let finally_w = compile_method
+      ~version:Version.Java_1_5
       ~qualifiers:[`Private; `Static]
       ~name:"finally_w"
       ~signature:([], `Void)
       ~exceptions_table:(mk_table [(u2 0, u2 10, u2 10, None)])
       finally_w_instructions in
-  let main = compile_method instructions in
-  let cls = compile_class ~version:Version.Java_1_5 [catch; catch_npe; throw; finally; finally_w; main] in
+*)
+  let main = compile_method ~version:Version.Java_1_5 instructions in
+  let cls = compile_class ~version:Version.Java_1_5 [catch; catch_npe; throw; (*finally; finally_w;*) main] in
   ClassFile.write cls (OutputStream.make_of_channel (open_out "pack/Test.class"))

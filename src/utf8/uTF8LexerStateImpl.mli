@@ -22,16 +22,9 @@
     {b One is advised to use the [Utils.lexer_state] class instead of this one.} *)
 
 
-type error =
+BARISTA_ERROR =
   | End_of_lexer
   | Invalid_consume of char * char
-
-exception Exception of error
-(** Exception to be thrown when a try is made to consume an invalid
-    character from a lexer or when end of lexer is unexpectedly reached. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 class t : UTF8Impl.t -> object
 
@@ -78,6 +71,9 @@ class t : UTF8Impl.t -> object
           read from the lexer and then returns the string of consumed
           characters (the passed character is not consumed).
           Raises [Exception] if end of string is encountered. *)
+
+  method consume_all : UTF8Impl.t
+      (** Consumes all remaining characters. *)
 
 end
 (** This class encapsulates the state of a lexer over the UTF8 string that

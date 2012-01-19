@@ -58,19 +58,13 @@ type t = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_magic_number of Utils.u4
   | Unsupported_version of Utils.u2 * Utils.u2
   | Invalid_this
   | Invalid_super
   | Invalid_super_interface
   | Invalid_parent_interface
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 I/O functions} *)

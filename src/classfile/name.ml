@@ -45,34 +45,17 @@ let is_valid_for_method s =
 
 (* Exception *)
 
-type error =
-  | Invalid_class_name of UTF8.t
-  | Invalid_field_name of UTF8.t
-  | Invalid_method_name of UTF8.t
-  | Invalid_package_name of UTF8.t
-  | Invalid_module_name of UTF8.t
+let string_of_error_kind_name kind name =
+  Printf.sprintf "invalid %s name (%S)"
+    kind
+    (UTF8.to_string_noerr name)
 
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error e =
-  let soe kind name =
-    Printf.sprintf "invalid %s name (%S)"
-      kind
-      (UTF8.to_string_noerr name) in
-  match e with
-  | Invalid_class_name n -> soe "class" n
-  | Invalid_field_name n -> soe "field" n
-  | Invalid_method_name n -> soe "method" n
-  | Invalid_package_name n -> soe "package" n
-  | Invalid_module_name n -> soe "module" n
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+BARISTA_ERROR =
+  | Invalid_class_name of (n : UTF8.t) -> string_of_error_kind_name "class" n
+  | Invalid_field_name of (n : UTF8.t) -> string_of_error_kind_name "field" n
+  | Invalid_method_name of (n : UTF8.t) -> string_of_error_kind_name "method" n
+  | Invalid_package_name of (n : UTF8.t) -> string_of_error_kind_name "package" n
+  | Invalid_module_name of (n : UTF8.t) -> string_of_error_kind_name "module" n
 
 
 (* Name types and conversion functions *)

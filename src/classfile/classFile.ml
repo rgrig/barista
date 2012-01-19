@@ -44,33 +44,15 @@ type t = {
 
 (* Exception *)
 
-type error =
-  | Invalid_magic_number of u4
-  | Unsupported_version of u2 * u2
-  | Invalid_this
-  | Invalid_super
-  | Invalid_super_interface
-  | Invalid_parent_interface
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_magic_number m ->
+BARISTA_ERROR =
+  | Invalid_magic_number of (m : u4) ->
       Printf.sprintf "invalid magic number (0x%08LX instead of 0x%08LX)" (m :> int64) magic_number
-  | Unsupported_version (mj, mn) ->
+  | Unsupported_version of (mj : u2) * (mn : u2) ->
       Printf.sprintf "unsupported class file version %d.%d" (mj :> int) (mn :> int)
   | Invalid_this -> "invalid 'this' entry for class"
   | Invalid_super -> "invalid 'super' entry for class"
   | Invalid_super_interface -> "invalid 'super' entry for interface"
   | Invalid_parent_interface -> "invalid parent interface"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* I/O functions *)

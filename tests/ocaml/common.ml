@@ -27,7 +27,32 @@ let utf8_for_method x = Name.make_for_method (utf8 x)
 let class_String = `Class (utf8_for_class "java.lang.String")
 let class_PrintStream = `Class (utf8_for_class "java.io.PrintStream")
 
+let loader = ClassLoader.make (ClassPath.make ())
+
+let generate_stack_map_if_needed version class_name init_state instructions exception_table code_attrs =
+  let rec contains_stack_map (l : Attribute.code_attribute list) =
+    match l with
+    | (`StackMapTable _) :: _ -> true
+    | _ :: tl -> contains_stack_map tl
+    | [] -> false in
+  if not (contains_stack_map code_attrs) && (version >= Version.Java_1_7) then begin
+    let graph =
+      ControlFlow.graph_of_instructions
+        instructions
+        exception_table in
+    let _, _, stack_map_frame =
+      Code.compute_stack_infos
+        (StackState.unify_to_closest_common_parent loader
+           [class_name, Some (utf8_for_class "java.lang.Object")])
+        graph
+        init_state in
+    (`StackMapTable stack_map_frame) :: code_attrs
+  end else
+    code_attrs
+
 let compile_method
+    ?(version = Version.default)
+    ?(class_name = utf8_for_class "pack.Test")
     ?(qualifiers = [`Public; `Static])
     ?(name = "main")
     ?(signature = ([`Array (`Class (utf8_for_class "java.lang.String"))], `Void))
@@ -37,14 +62,27 @@ let compile_method
     ?(code_attributes = [])
     ?(meth_attributes = [])
     instructions =
+  let open Method in
+  let init_state =
+    let m = Regular { flags = qualifiers;
+                      name = utf8_for_method name;
+                      descriptor = signature;
+                      attributes = []; } in
+    StackState.make_of_method class_name m in
   let code = {
     Attribute.max_stack = max_stack;
     Attribute.max_locals = max_locals;
     Attribute.code = instructions;
     Attribute.exception_table = exceptions_table;
-    Attribute.attributes = code_attributes;
+    Attribute.attributes =
+    generate_stack_map_if_needed
+      version
+      class_name
+      init_state
+      instructions
+      exceptions_table
+      code_attributes;
   } in
-  let open Method in
   Regular { flags = qualifiers;
             name = utf8_for_method name;
             descriptor = signature;
@@ -89,7 +127,7 @@ let compile_initializer
                 init_attributes = [`Code code] }
 
 let compile_class
-    ?(version = Version.Java_1_6)
+    ?(version = Version.default)
     ?(qualifiers = [`Public; `Super; `Final])
     ?(name = "pack.Test")
     ?(parent = Some (utf8_for_class "java.lang.Object"))

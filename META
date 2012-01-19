@@ -1,6 +1,6 @@
 description="Java class file manipulation"
-requires="bigarray,camomile,str,unix,zip"
-version="2.0-alpha"
+requires="bigarray,camomile,unix,zip"
+version="2.0-alpha2"
 
 archive(byte)="baristaLibrary.cma"
 archive(native)="baristaLibrary.cmxa"

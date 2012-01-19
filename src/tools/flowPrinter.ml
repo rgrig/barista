@@ -18,26 +18,11 @@
 
 open Utils
 
-type error =
-  | Invalid_desciptor of UTF8.t
-  | Method_not_found
-  | Method_has_no_code
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_desciptor s ->
+BARISTA_ERROR =
+  | Invalid_desciptor of (s : UTF8.t) ->
       Printf.sprintf "invalid method descriptor %S" (UTF8.to_string_noerr s)
   | Method_not_found -> "method not found"
   | Method_has_no_code -> "method has no code"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 let print_to_buffer buffer ld s =
   let class_name, method_name, (method_params, method_ret) =

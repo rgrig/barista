@@ -18,7 +18,6 @@
 
 
 open Utils
-open Command
 
 let names = [ "flow" ]
 
@@ -38,18 +37,18 @@ let latex_description =
   "It is important to enclose the signature of the method inside quotes, " ^
   "as otherwise the shell whould interpret the parentheses."
 
-type parameters = base_parameters
+type parameters = Command.base_parameters
 
-let make_parameters () = make_base_parameters "flow"
+let make_parameters () = Command.make_base_parameters "flow"
 
 let run params =
-  let methods = List.rev params.elements in
-  let print_header = make_header_printer (List.length methods) in
-  let class_loader = ClassLoader.make params.class_path in
+  let methods = List.rev params.Command.elements in
+  let print_header = Command.make_header_printer (List.length methods) in
+  let class_loader = ClassLoader.make params.Command.class_path in
   List.iter
     (fun clas ->
       print_header clas;
       let clas = UTF8.of_string clas in
       FlowPrinter.print class_loader clas)
     methods;
-  ClassPath.close params.class_path
+  ClassPath.close params.Command.class_path

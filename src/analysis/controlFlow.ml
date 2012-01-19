@@ -116,30 +116,13 @@ let nb_args_of_switch_kind = function
 
 (* Exception *)
 
-type error =
-  | Unsupported_instruction of string
-  | Vertex_not_in_graph
-  | Invalid_switch_edge
-  | Empty_graph
-  | Cannot_remove_root
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Unsupported_instruction x ->
+BARISTA_ERROR =
+  | Unsupported_instruction of (x : string) ->
       Printf.sprintf "unsupported instruction: %S" x
   | Vertex_not_in_graph -> "vertex is not in graph"
   | Invalid_switch_edge -> "invalid vertex edge"
   | Empty_graph -> "empty graph"
   | Cannot_remove_root -> "cannot remove root"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Flow information for instructions *)

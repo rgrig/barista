@@ -30,27 +30,11 @@ type t = {
 
 (* Exception *)
 
-type error =
-  | End_of_input_stream
-  | Unable_to_read_data
-  | Unable_to_close_stream
-  | Data_is_too_large
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | End_of_input_stream -> "end of input stream"
   | Unable_to_read_data -> "unable to read data"
   | Unable_to_close_stream -> "unable to close stream"
   | Data_is_too_large -> "data is too large"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Constructors *)
@@ -177,6 +161,42 @@ let make_of_channel ch =
 
 let make_of_descr d =
   make_of_channel (Unix.in_channel_of_descr d)
+
+let default_read_bytes read_byte =
+  fun nb ->
+    let res = String.create nb in
+    for i = 0 to pred nb do
+      res.[i] <- Char.chr (read_byte ())
+    done;
+    res
+
+let default_read_bytes_into read_byte =
+  fun nb dst idx ->
+    for i = 0 to pred nb do
+      dst.[idx + i] <- Char.chr (read_byte ())
+    done
+
+let default_read_available_bytes read_byte =
+  fun nb dst idx ->
+    let res = ref nb in
+    try
+      for i = 0 to pred nb do
+        let byte = try read_byte () with _ -> res := i; raise End_of_file in
+        dst.[idx + i] <- Char.chr byte
+      done;
+      !res
+    with End_of_file -> !res
+
+let make ~read_byte
+    ?(read_bytes = default_read_bytes read_byte)
+    ?(read_bytes_into = default_read_bytes_into read_byte)
+    ?(read_available_bytes = default_read_available_bytes read_byte)
+    ~close =
+  { read_u1 = read_byte;
+    read_bytes = read_bytes;
+    read_bytes_into = read_bytes_into;
+    read_available_bytes = read_available_bytes;
+    close = close; }
 
 
 (* Functions *)

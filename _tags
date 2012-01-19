@@ -21,8 +21,9 @@ true: -traverse
 <src/**>: include
 
 # Options
-<src/**>: use_bigarray, use_camomile, use_str, use_unix, use_zip
+<src/**>: use_bigarray, use_camomile, use_unix, use_zip
 <src/**> and not "src/driver/barista.ml": for-pack(BaristaLibrary)
+<**/*.ml{,i}>: pp(camlp4of ../syntax/_build/src/barista_pp.cmo)
 <**/*.ml{,i}>: warnings
 
 # Generation of version file

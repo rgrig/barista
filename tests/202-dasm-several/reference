@@ -518,7 +518,7 @@
   code00000004: ifnonnull code00000044:
   @LineNumberTable 588
   code00000007: aload_0
-  code00000008: invokespecial java.lang.Throwable.getStackTraceDepth():int
+  code00000008: invokevirtual java.lang.Throwable.getStackTraceDepth():int
   code00000011: istore_1
   @LineNumberTable 589
   code00000012: aload_0
@@ -537,7 +537,7 @@
   code00000031: iload_2
   code00000032: aload_0
   code00000033: iload_2
-  code00000034: invokespecial java.lang.Throwable.getStackTraceElement(int):java.lang.StackTraceElement
+  code00000034: invokevirtual java.lang.Throwable.getStackTraceElement(int):java.lang.StackTraceElement
   code00000037: aastore
   @LineNumberTable 590
   code00000038: iinc 2 1
@@ -551,14 +551,14 @@
   @Exceptions java.io.IOException
   .max_stack 1
   .max_locals 2
-  @LineNumberTable 647
+  @LineNumberTable 651
   code00000000: aload_0
   code00000001: invokespecial java.lang.Throwable.getOurStackTrace():java.lang.StackTraceElement[]
   code00000004: pop
-  @LineNumberTable 648
+  @LineNumberTable 652
   code00000005: aload_1
   code00000006: invokevirtual java.io.ObjectOutputStream.defaultWriteObject():void
-  @LineNumberTable 649
+  @LineNumberTable 653
   code00000009: return
 
 .method private void printStackTraceAsCause(java.io.PrintStream,java.lang.StackTraceElement[])
@@ -775,7 +775,7 @@
   @LineNumberTable 546
   code00000176: return
 
-.method private native int getStackTraceDepth()
+.method native int getStackTraceDepth()
 
-.method private native java.lang.StackTraceElement getStackTraceElement(int)
+.method native java.lang.StackTraceElement getStackTraceElement(int)
 

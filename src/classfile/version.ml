@@ -44,7 +44,7 @@ let all = [
   Java_1_8
 ]
 
-let default = Java_1_6
+let default = Java_1_7
 
 let to_string = function
   | Java_1_0 -> "1.0"
@@ -83,27 +83,18 @@ let empty_bounds b =
 
 (* Exception *)
 
-type error =
-  | Invalid_version
-  | Unsupported_feature of (u2 * u2) * string
-  | Deprecated_feature of (u2 * u2) * string
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_version -> "invalid version"
-  | Unsupported_feature ((mj, mn), f) ->
-      Printf.sprintf "%s is not supported by class file version %d.%d" f (mj :> int) (mn :> int)
-  | Deprecated_feature ((mj, mn), f) ->
-      Printf.sprintf "%s is deprecated after class file version %d.%d" f (mj :> int) (mn :> int)
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+  | Unsupported_feature of (v : u2 * u2) * (f : string) ->
+      Printf.sprintf "%s is not supported by class file version %d.%d"
+        f
+        ((fst v) :> int)
+        ((snd v) :> int)
+  | Deprecated_feature of (v : u2 * u2) * (f : string) ->
+      Printf.sprintf "%s is deprecated after class file version %d.%d"
+        f
+        ((fst v) :> int)
+        ((snd v) :> int)
 
 
 (* Constants *)

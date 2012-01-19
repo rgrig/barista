@@ -46,53 +46,28 @@ type token =
 
 (* Exception *)
 
-type error =
-  | Invalid_label of UTF8.t
-  | Invalid_directive of UTF8.t
-  | Invalid_attribute of UTF8.t
-  | Invalid_string of UTF8.t
-  | Invalid_character of UChar.t
-  | Invalid_float of string
-  | Invalid_integer of string
-  | Invalid_method_handle of UTF8.t
-  | Invalid_token
-  | Name_error of Name.error
-  | Descriptor_error of Descriptor.error
-  | UChar_error of UChar.error
-  | UTF8_error of UTF8.error
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_label s ->
+BARISTA_ERROR =
+  | Invalid_label of (s : UTF8.t) ->
       Printf.sprintf "invalid label %S" (UTF8.to_string_noerr s)
-  | Invalid_directive s ->
+  | Invalid_directive of (s : UTF8.t) ->
       Printf.sprintf "invalid directive %S" (UTF8.to_string_noerr s)
-  | Invalid_attribute s ->
+  | Invalid_attribute of (s : UTF8.t) ->
       Printf.sprintf "invalid attribute %S" (UTF8.to_string_noerr s)
-  | Invalid_string s ->
+  | Invalid_string of (s : UTF8.t) ->
       Printf.sprintf "invalid string %S" (UTF8.to_string_noerr s)
-  | Invalid_character s ->
+  | Invalid_character of (s : UChar.t) ->
       Printf.sprintf "invalid character %C" (UChar.to_char_noerr s)
-  | Invalid_float s ->
+  | Invalid_float of (s : string) ->
       Printf.sprintf "invalid float constant %S" s
-  | Invalid_integer s ->
+  | Invalid_integer of (s : string) ->
       Printf.sprintf "invalid integer constant %S" s
-  | Invalid_method_handle s ->
+  | Invalid_method_handle of (s : UTF8.t) ->
       Printf.sprintf "invalid method handle %S" (UTF8.to_string_noerr s)
   | Invalid_token -> "invalid token"
-  | Name_error e -> Name.string_of_error e
-  | Descriptor_error e -> Descriptor.string_of_error e
-  | UChar_error e -> UChar.string_of_error e
-  | UTF8_error e -> UTF8.string_of_error e
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+  | Name_error of (e : Name.error) -> Name.string_of_error e
+  | Descriptor_error of (e : Descriptor.error) -> Descriptor.string_of_error e
+  | UChar_error of (e : UChar.error) -> UChar.string_of_error e
+  | UTF8_error of (e : UTF8.error) -> UTF8.string_of_error e
 
 
 (* Lexing funtion *)
@@ -228,9 +203,9 @@ let tokens_of_line l =
         fail (Invalid_string (UTF8Buffer.contents buf))
       else
          String (UTF8.unescape (UTF8Buffer.contents buf))
-    end else if state#look_ahead (UChar.of_char '\'') then begin
+    end else if state#look_ahead @'\'' then begin
       let prev = ref state#consume_char in
-      while not (state#look_ahead (UChar.of_char '\'') && not (UChar.equal !prev back_slash)) do
+      while not (state#look_ahead @'\'' && not (UChar.equal !prev back_slash)) do
         let curr = state#consume_char in
         UTF8Buffer.add_char buf curr;
         prev :=
@@ -242,7 +217,7 @@ let tokens_of_line l =
       state#consume;
       if state#is_available && not (state#look_ahead_list [space; tabulation; sharp]) then
         fail (Invalid_character state#peek);
-      let s = UTF8.unescape ((UTF8.of_string "\"") ++ (UTF8Buffer.contents buf) ++ (UTF8.of_string "\"")) in
+      let s = UTF8.unescape ( @"\"" ++ (UTF8Buffer.contents buf) ++ @"\"" ) in
       if (UTF8.length s) <> 1 then
         fail (Invalid_character (UTF8.get s 0))
       else
@@ -261,11 +236,11 @@ let tokens_of_line l =
         try
           Int (Int64.of_string number)
         with _ -> fail (Invalid_integer number)
-    end else if state#look_ahead (UChar.of_char '=') then begin
+    end else if state#look_ahead @'=' then begin
       state#consume;
       state#consume_only greater_than;
       Arrow
-    end else if state#look_ahead (UChar.of_char '~') then begin
+    end else if state#look_ahead @'~' then begin
       state#consume;
       Tilde
     end else begin

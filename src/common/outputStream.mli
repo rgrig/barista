@@ -29,15 +29,9 @@ type t
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Unable_to_write_data
   | Unable_to_close_stream
-
-exception Exception of error
-(** Raised when an attempt made to write data fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Constructors} *)
@@ -50,6 +44,17 @@ val make_of_channel : out_channel -> t
 
 val make_of_descr : Unix.file_descr -> t
 (** Creates an input stream whose source is a file descriptor. *)
+
+val make : write_byte:(int -> unit) ->
+  ?write_bytes:(string -> int -> int -> unit) ->
+  flush:(unit -> unit) ->
+  close:(unit -> unit) -> t
+(** Creates an output stream from passed functions:
+    - [write] is used to write one byte (see [Pervasives.output_byte]);
+    - [write_bytes src pos len] (optional) is used to write [len] bytes from
+      [src], starting at index [idx];
+    - [flush] is used to flush the stream;
+    - [close] is used to close the stream. *)
 
 
 (** {6 Functions} *)

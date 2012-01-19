@@ -32,7 +32,7 @@ compile: FORCE
 
 run: FORCE
 	@$(RUN_PROG) ./prog.$(PROG_EXT)
-	@$(JAVAP) -verbose $(CLASS_NAME) > result
+	@$(JAVAP) -cp . -verbose $(CLASS_NAME) | grep -v 'Last modified' > result
 
 diff: FORCE
 	@diff -q result reference

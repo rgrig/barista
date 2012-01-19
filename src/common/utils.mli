@@ -198,3 +198,11 @@ val switch : ('a -> 'a -> bool) -> ('a * ('a -> 'b)) list -> ('a -> 'b) -> 'a ->
 val list_equal : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 (** Equality over lists, [eq] (defaulting to [(=)]) being the predicate
     used to compare list elements. *)
+
+val string_replace : char -> char -> string -> string
+(** [string_replace o n s] returns a new string where every occurrence of [o]
+    is replaced by [n]. *)
+
+val string_split : string -> string -> string list
+(** [string_split seps s] returns a list of substrings of [s] separeted by
+    contiguous substrings of elements from [seps]. *)

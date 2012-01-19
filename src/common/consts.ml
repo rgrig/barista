@@ -28,57 +28,57 @@ let magic_number = 0x0CAFEBABEL
 
 (* Attribute-related strings *)
 
-let attr_annotation_default = UTF8.of_string "AnnotationDefault"
+let attr_annotation_default = @"AnnotationDefault"
 
-let attr_bootstrap_methods = UTF8.of_string "BootstrapMethods"
+let attr_bootstrap_methods = @"BootstrapMethods"
 
-let attr_code = UTF8.of_string "Code"
+let attr_code = @"Code"
 
-let attr_constant_value = UTF8.of_string "ConstantValue"
+let attr_constant_value = @"ConstantValue"
 
-let attr_deprecated = UTF8.of_string "Deprecated"
+let attr_deprecated = @"Deprecated"
 
-let attr_enclosing_method = UTF8.of_string "EnclosingMethod"
+let attr_enclosing_method = @"EnclosingMethod"
 
-let attr_exceptions = UTF8.of_string "Exceptions"
+let attr_exceptions = @"Exceptions"
 
-let attr_inner_classes = UTF8.of_string "InnerClasses"
+let attr_inner_classes = @"InnerClasses"
 
-let attr_line_number_table = UTF8.of_string "LineNumberTable"
+let attr_line_number_table = @"LineNumberTable"
 
-let attr_local_variable_table = UTF8.of_string "LocalVariableTable"
+let attr_local_variable_table = @"LocalVariableTable"
 
-let attr_local_variable_type_table = UTF8.of_string "LocalVariableTypeTable"
+let attr_local_variable_type_table = @"LocalVariableTypeTable"
 
-let attr_module = UTF8.of_string "Module"
+let attr_module = @"Module"
 
-let attr_module_requires = UTF8.of_string "ModuleRequires"
+let attr_module_requires = @"ModuleRequires"
 
-let attr_module_permits = UTF8.of_string "ModulePermits"
+let attr_module_permits = @"ModulePermits"
 
-let attr_module_provides = UTF8.of_string "ModuleProvides"
+let attr_module_provides = @"ModuleProvides"
 
-let attr_runtime_invisible_annotations = UTF8.of_string "RuntimeInvisibleAnnotations"
+let attr_runtime_invisible_annotations = @"RuntimeInvisibleAnnotations"
 
-let attr_runtime_invisible_parameter_annotations = UTF8.of_string "RuntimeInvisibleParameterAnnotations"
+let attr_runtime_invisible_parameter_annotations = @"RuntimeInvisibleParameterAnnotations"
 
-let attr_runtime_invisible_type_annotations = UTF8.of_string "RuntimeInvisibleTypeAnnotations"
+let attr_runtime_invisible_type_annotations = @"RuntimeInvisibleTypeAnnotations"
 
-let attr_runtime_visible_annotations = UTF8.of_string "RuntimeVisibleAnnotations"
+let attr_runtime_visible_annotations = @"RuntimeVisibleAnnotations"
 
-let attr_runtime_visible_parameter_annotations = UTF8.of_string "RuntimeVisibleParameterAnnotations"
+let attr_runtime_visible_parameter_annotations = @"RuntimeVisibleParameterAnnotations"
 
-let attr_runtime_visible_type_annotations = UTF8.of_string "RuntimeVisibleTypeAnnotations"
+let attr_runtime_visible_type_annotations = @"RuntimeVisibleTypeAnnotations"
 
-let attr_signature = UTF8.of_string "Signature"
+let attr_signature = @"Signature"
 
-let attr_source_debug_extension = UTF8.of_string "SourceDebugExtension"
+let attr_source_debug_extension = @"SourceDebugExtension"
 
-let attr_source_file = UTF8.of_string "SourceFile"
+let attr_source_file = @"SourceFile"
 
-let attr_stack_map_table = UTF8.of_string "StackMapTable"
+let attr_stack_map_table = @"StackMapTable"
 
-let attr_synthetic = UTF8.of_string "Synthetic"
+let attr_synthetic = @"Synthetic"
 
 let attr_all = [ attr_annotation_default;
                  attr_bootstrap_methods;
@@ -109,100 +109,99 @@ let attr_all = [ attr_annotation_default;
 
 (* Miscellaneous strings *)
 
-let class_constructor = UTF8.of_string "<init>"
+let class_constructor = @"<init>"
 
-let class_initializer = UTF8.of_string "<clinit>"
+let class_initializer = @"<clinit>"
 
-let empty_utf8 = UTF8.of_string ""
+let empty_utf8 = @""
 
-let java_lang_Object = UTF8.of_string "java/lang/Object"
+let java_lang_Object = @"java/lang/Object"
 
 
 (* Character constants *)
 
 (* Capital letters *)
 
-let capital_b = UChar.of_char 'B'
+let capital_b = @'B'
 
-let capital_c = UChar.of_char 'C'
+let capital_c = @'C'
 
-let capital_d = UChar.of_char 'D'
+let capital_d = @'D'
 
-let capital_f = UChar.of_char 'F'
+let capital_f = @'F'
 
-let capital_i = UChar.of_char 'I'
+let capital_i = @'I'
 
-let capital_j = UChar.of_char 'J'
+let capital_j = @'J'
 
-let capital_l = UChar.of_char 'L'
+let capital_l = @'L'
 
-let capital_s = UChar.of_char 'S'
+let capital_s = @'S'
 
-let capital_t = UChar.of_char 'T'
+let capital_t = @'T'
 
-let capital_v = UChar.of_char 'V'
+let capital_v = @'V'
 
-let capital_z = UChar.of_char 'Z'
+let capital_z = @'Z'
 
 (* Small letters *)
 
-let small_c = UChar.of_char 'c'
+let small_c = @'c'
 
-let small_e = UChar.of_char 'e'
+let small_e = @'e'
 
-let small_s = UChar.of_char 's'
+let small_s = @'s'
 
 (* Digits *)
 
-let digits = List.map UChar.of_char ['0'; '1'; '2'; '3'; '4';
-                                     '5'; '6'; '7'; '8'; '9'  ]
+let digits = [ @'0'; @'1'; @'2'; @'3'; @'4'; @'5'; @'6'; @'7'; @'8'; @'9' ]
 
 (* Special characters *)
 
-let at_character = UChar.of_char '@'
+let at_character = @'@'
 
-let back_slash = UChar.of_char '\\'
+let back_slash = @'\\'
 
-let circonflex = UChar.of_char '^'
+let circonflex = @'^'
 
-let closing_parenthesis = UChar.of_char ')'
+let closing_parenthesis = @')'
 
-let closing_square_bracket = UChar.of_char ']'
+let closing_square_bracket = @']'
 
-let colon = UChar.of_char ':'
+let colon = @':'
 
-let comma = UChar.of_char ','
+let comma = @','
 
-let dollar = UChar.of_char '$'
+let dollar = @'$'
 
-let dot = UChar.of_char '.'
+let dot = @'.'
 
-let greater_than = UChar.of_char '>'
+let greater_than = @'>'
 
-let lower_than = UChar.of_char '<'
+let lower_than = @'<'
 
-let minus = UChar.of_char '-'
+let minus = @'-'
 
-let opening_parenthesis = UChar.of_char '('
+let opening_parenthesis = @'('
 
-let opening_square_bracket = UChar.of_char '['
+let opening_square_bracket = @'['
 
-let plus = UChar.of_char '+'
+let plus = @'+'
 
-let quote = UChar.of_char '"'
+let quote = @'"'
 
-let semi_colon = UChar.of_char ';'
+let semi_colon = @';'
 
-let sharp = UChar.of_char '#'
+let sharp = @'#'
 
-let slash = UChar.of_char '/'
+let slash = @'/'
 
-let space = UChar.of_char ' '
+let space = @' '
 
-let star = UChar.of_char '*'
+let star = @'*'
 
-let tabulation = UChar.of_char '\t'
+let tabulation = @'\t'
 
-let underscore = UChar.of_char '_'
+let underscore = @'_'
 
-let percentage = UChar.of_char '%'
+let percentage = @'%'

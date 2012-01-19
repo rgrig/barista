@@ -244,38 +244,7 @@ type t =
 
 (* Exception *)
 
-type error =
-  | Invalid_pool_element
-  | Invalid_field
-  | Invalid_dynamic_method
-  | Invalid_interface_method
-  | Invalid_method
-  | Invalid_parameter
-  | Invalid_primitive_type
-  | Invalid_switch_cases
-  | Invalid_pool_index
-  | Invalid_pool_entry
-  | Invalid_primitive_array_type
-  | Invalid_index
-  | Invalid_array_element
-  | Invalid_class_name
-  | Invalid_unsigned_byte
-  | Invalid_byte
-  | Invalid_unsigned_short
-  | Invalid_signed_short
-  | Invalid_signed_long
-  | Invalid_short_offset
-  | Invalid_long_offset
-  | Invalid_number_of_arguments
-  | Unknown_instruction
-  | Invalid_method_handle
-  | Too_many_bootstrap_specifiers
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_pool_element -> "invalid pool element"
   | Invalid_field -> "invalid field"
   | Invalid_dynamic_method -> "invalid dynamic method"
@@ -301,12 +270,6 @@ let string_of_error = function
   | Unknown_instruction -> "unknown instruction"
   | Invalid_method_handle -> "invalid method handle"
   | Too_many_bootstrap_specifiers -> "too many bootstrap specifiers"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Conversion functions *)
@@ -373,23 +336,23 @@ let decode bsi cpool i =
     | _ -> fail Invalid_primitive_array_type in
   let get_method_handle kind idx =
     match kind, (get_entry idx) with
-    | ConstantPool.REF_getField, ConstantPool.Fieldref (fc, nt) ->
+    | Reference.REF_getField, ConstantPool.Fieldref (fc, nt) ->
       `getField (get_field_ref fc nt)
-    | ConstantPool.REF_getStatic, ConstantPool.Fieldref (fc, nt) ->
+    | Reference.REF_getStatic, ConstantPool.Fieldref (fc, nt) ->
       `getStatic (get_field_ref fc nt)
-    | ConstantPool.REF_putField, ConstantPool.Fieldref (fc, nt) ->
+    | Reference.REF_putField, ConstantPool.Fieldref (fc, nt) ->
       `putField (get_field_ref fc nt)
-    | ConstantPool.REF_putStatic, ConstantPool.Fieldref (fc, nt) ->
+    | Reference.REF_putStatic, ConstantPool.Fieldref (fc, nt) ->
       `putStatic (get_field_ref fc nt)
-    | ConstantPool.REF_invokeVirtual, ConstantPool.Methodref (mc, mt) ->
+    | Reference.REF_invokeVirtual, ConstantPool.Methodref (mc, mt) ->
       `invokeVirtual (get_method_ref mc mt)
-    | ConstantPool.REF_invokeStatic, ConstantPool.Methodref (mc, mt) ->
+    | Reference.REF_invokeStatic, ConstantPool.Methodref (mc, mt) ->
       `invokeStatic (get_method_ref mc mt)
-    | ConstantPool.REF_invokeSpecial, ConstantPool.Methodref (mc, mt) ->
+    | Reference.REF_invokeSpecial, ConstantPool.Methodref (mc, mt) ->
       `invokeSpecial (get_method_ref mc mt)
-    | ConstantPool.REF_newInvokeSpecial, ConstantPool.Methodref (mc, mt) ->
+    | Reference.REF_newInvokeSpecial, ConstantPool.Methodref (mc, mt) ->
       `newInvokeSpecial (get_special_ref mc mt)
-    | ConstantPool.REF_invokeInterface, ConstantPool.Methodref (mc, mt) ->
+    | Reference.REF_invokeInterface, ConstantPool.Methodref (mc, mt) ->
       `invokeInterface (get_method_ref mc mt)
     | _ -> fail Invalid_method_handle in
   match i with
@@ -622,15 +585,15 @@ let encode bsm cpool i =
     | `Long -> 11
     | _ -> fail Invalid_primitive_array_type in
   let reference = function
-    | `getField x -> ConstantPool.Reference_getField x
-    | `getStatic x -> ConstantPool.Reference_getStatic x
-    | `putField x -> ConstantPool.Reference_putField x
-    | `putStatic x -> ConstantPool.Reference_putStatic x
-    | `invokeVirtual x -> ConstantPool.Reference_invokeVirtual x
-    | `invokeStatic x -> ConstantPool.Reference_invokeStatic x
-    | `invokeSpecial x -> ConstantPool.Reference_invokeSpecial x
-    | `newInvokeSpecial x -> ConstantPool.Reference_newInvokeSpecial x
-    | `invokeInterface x -> ConstantPool.Reference_invokeInterface x in
+    | `getField x -> Reference.GetField x
+    | `getStatic x -> Reference.GetStatic x
+    | `putField x -> Reference.PutField x
+    | `putStatic x -> Reference.PutStatic x
+    | `invokeVirtual x -> Reference.InvokeVirtual x
+    | `invokeStatic x -> Reference.InvokeStatic x
+    | `invokeSpecial x -> Reference.InvokeSpecial x
+    | `newInvokeSpecial x -> Reference.NewInvokeSpecial x
+    | `invokeInterface x -> Reference.InvokeInterface x in
   match i with
   | AALOAD -> ByteCode.AALOAD
   | AASTORE -> ByteCode.AASTORE
@@ -1343,19 +1306,19 @@ let compile ofs wide mnemo params param_tail =
 
 let decompile ofs i =
   let rec utf8_of_java_type = function
-    | `Boolean -> UTF8.of_string "boolean"
-    | `Byte -> UTF8.of_string "byte"
-    | `Char -> UTF8.of_string "char"
-    | `Double -> UTF8.of_string "double"
-    | `Float -> UTF8.of_string "float"
-    | `Int -> UTF8.of_string "int"
-    | `Long -> UTF8.of_string "long"
-    | `Short -> UTF8.of_string "short"
-    | `Void -> UTF8.of_string "void"
+    | `Boolean -> @"boolean"
+    | `Byte -> @"byte"
+    | `Char -> @"char"
+    | `Double -> @"double"
+    | `Float -> @"float"
+    | `Int -> @"int"
+    | `Long -> @"long"
+    | `Short -> @"short"
+    | `Void -> @"void"
     | `Class c -> Name.external_utf8_for_class c
-    | `Array jt -> (utf8_of_java_type jt) ++ UTF8.of_string "[]" in
+    | `Array jt -> (utf8_of_java_type jt) ++ @"[]" in
   let utf8_of_array_type = function
-    | `Array jt -> (utf8_of_java_type jt) ++ UTF8.of_string "[]" in
+    | `Array jt -> (utf8_of_java_type jt) ++ @"[]" in
   match i with
   | AALOAD -> 1, false, "aaload", [], No_tail
   | AASTORE -> 1, false, "aastore", [], No_tail

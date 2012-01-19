@@ -24,15 +24,9 @@ type t
 (** Represents a class loader, that is barely a map from names
     (in external form) to their definitions. *)
 
-type error =
+BARISTA_ERROR =
   | Unable_to_load of Utils.UTF8.t * string
   | Already_defined of Utils.UTF8.t
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 val make : ClassPath.t -> t
 (** Constructs a class loader from a class path that will be used to load

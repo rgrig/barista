@@ -44,6 +44,7 @@ let () =
 		((utf8 "b"), (Annotation.Float_value 3.14));		
 		((utf8 "a"), (Annotation.String_value (utf8 "xyz")))]) in
   let main = compile_method
+      ~version:Version.Java_1_6
       ~meth_attributes:[`RuntimeVisibleAnnotations [annot; depr]]
       instructions in
   let cs = Signature.class_signature_of_utf8 (utf8 "<A:Ljava/lang/Number;>Ljava/lang/Object;") in

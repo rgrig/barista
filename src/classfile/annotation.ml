@@ -92,46 +92,25 @@ and extended_info = {
 
 (* Exception *)
 
-type error =
-  | Invalid_tag of UChar.t
-  | Inconsistent_primitive_value
-  | Invalid_string_value of u2
-  | Invalid_enum_value of u2 * u2
-  | Invalid_class_value of u2
-  | Invalid_annotation_type_value of u2
-  | Invalid_element_name of u2
-  | Invalid_list_length of int
-  | Invalid_target of int
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_tag x ->
+BARISTA_ERROR =
+  | Invalid_tag of (x : UChar.t) ->
       Printf.sprintf "invalid tag (%C)" (UChar.to_char_noerr x)
   | Inconsistent_primitive_value ->
       "inconsistent primitive value"
-  | Invalid_string_value x ->
+  | Invalid_string_value of (x : u2) ->
       Printf.sprintf "invalid string value (index %d)" (x :> int)
-  | Invalid_enum_value (x, y) ->
+  | Invalid_enum_value of (x : u2) * (y : u2) ->
       Printf.sprintf "invalid enum value (indexes %d and %d)" (x :> int) (y :> int)
-  | Invalid_class_value x ->
+  | Invalid_class_value of (x : u2) ->
       Printf.sprintf "invalid class value (index %d)" (x :> int)
-  | Invalid_annotation_type_value x ->
+  | Invalid_annotation_type_value of (x : u2) ->
       Printf.sprintf "invalid annotation type value (index %d)" (x :> int)
-  | Invalid_element_name x ->
+  | Invalid_element_name of (x : u2) ->
       Printf.sprintf "invalid element name (index %d)" (x :> int)
-  | Invalid_list_length x ->
+  | Invalid_list_length of (x : int) ->
       Printf.sprintf "invalid list length (%d)" x
-  | Invalid_target x ->
+  | Invalid_target of (x : int) ->
       Printf.sprintf "invalid target (0x%02x)" x
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* I/O functions *)

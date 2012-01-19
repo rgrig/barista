@@ -32,28 +32,13 @@ type info = {
 
 (* Exception *)
 
-type error =
-  | Invalid_name of UTF8.t
-  | Invalid_name_value of u2
-  | Invalid_descriptor_value of u2
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_name n ->
+BARISTA_ERROR =
+  | Invalid_name of (n : UTF8.t) ->
       Printf.sprintf "invalid name %S" (UTF8.to_string_noerr n)
-  | Invalid_name_value i ->
+  | Invalid_name_value of (i : u2) ->
       Printf.sprintf "invalid name value (at index %d)" (i :> int)
-  | Invalid_descriptor_value i ->
+  | Invalid_descriptor_value of (i : u2) ->
       Printf.sprintf "invalid descriptor value (at index %d)" (i :> int)
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* I/O functions *)

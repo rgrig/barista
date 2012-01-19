@@ -21,48 +21,6 @@
 
 (** {6 Types} *)
 
-type field_reference = Name.for_class * Name.for_field * Descriptor.for_field
-(** Type for references to a field (class name, field name, and field descriptor). *)
-
-type method_reference = Name.for_class * Name.for_method * Descriptor.for_method
-(** Type for references to a method (class name, method name, and method descriptor). *)
-
-type constructor_reference = Name.for_class * (Descriptor.for_parameter list)
-(** Type for references to a constructor (class name, and parameter list). *)
-
-type reference =
-  | Reference_getField of field_reference
-    (** Reference equivalent to a 'getField' call. *)
-  | Reference_getStatic of field_reference
-    (** Reference equivalent to a 'getStatic' call. *)
-  | Reference_putField of field_reference
-     (** Reference equivalent to a 'putField' call. *)
-  | Reference_putStatic of field_reference
-    (** Reference equivalent to a 'putStatic' call. *)
-  | Reference_invokeVirtual of method_reference
-    (** Reference equivalent to a 'invokeVirtual' call. *)
-  | Reference_invokeStatic of method_reference
-    (** Reference equivalent to a 'invokeStatic' call. *)
-  | Reference_invokeSpecial of method_reference
-    (** Reference equivalent to a 'invokeSpecial' call. *)
-  | Reference_newInvokeSpecial of constructor_reference
-    (** Reference equivalent to a 'newInvokeSpecial' call. *)
-  | Reference_invokeInterface of method_reference
-    (** Reference equivalent to a 'invokeInterface' call. *)
-(** Type for references to an element from a method handle. *)
-
-type reference_kind =
-  | REF_getField (** Reference equivalent to a 'getField' call. *)
-  | REF_getStatic (** Reference equivalent to a 'getStatic' call. *)
-  | REF_putField (** Reference equivalent to a 'putField' call. *)
-  | REF_putStatic (** Reference equivalent to a 'putStatic' call. *)
-  | REF_invokeVirtual (** Reference equivalent to a 'invokeVirtual' call. *)
-  | REF_invokeStatic (** Reference equivalent to a 'invokeStatic' call. *)
-  | REF_invokeSpecial (** Reference equivalent to a 'invokeSpecial' call. *)
-  | REF_newInvokeSpecial (** Reference equivalent to a 'newInvokeSpecial' call. *)
-  | REF_invokeInterface (** Reference equivalent to a 'invokeInterface' call. *)
-(** Type for reference kinds to an element from a method handle. *)
-
 type element =
   | Class of Utils.u2
     (** name index (UTF8 element: class name in internal format) *)
@@ -84,7 +42,7 @@ type element =
     (** name index (UTF8 element: "<init>", "<clinit>" or unqualified field / method name),
         descriptor index (Utf8 element: field / method descriptor) *)
   | UTF8 of Utils.UTF8.t (** value (in "normal" format) *)
-  | MethodHandle of reference_kind * Utils.u2 (** reference kind, reference index *)
+  | MethodHandle of Reference.kind * Utils.u2 (** reference kind, reference index *)
   | MethodType of Utils.u2 (** type index *)
   | InvokeDynamic of Utils.u2 * Utils.u2
     (** index into "BootstrapMethods" attribute, name and type index *)
@@ -120,8 +78,7 @@ type t
 
 (** {6 Exception} *)
 
-type error =
-  | Invalid_reference_kind of Utils.u1
+BARISTA_ERROR =
   | Invalid_tag of Utils.u1
   | Too_large of int
   | Invalid_reference
@@ -133,16 +90,10 @@ type error =
   | Malformed_InterfaceMethodRef_entry of Utils.u2 * Utils.u2
   | Malformed_String_entry of Utils.u2
   | Malformed_NameAndType_entry of Utils.u2 * Utils.u2
-  | Malformed_MethodHandle_entry of reference_kind * Utils.u2
+  | Malformed_MethodHandle_entry of Reference.kind * Utils.u2
   | Malformed_MethodType_entry of Utils.u2
   | Malformed_InvokeDynamic_entry of Utils.u2 * Utils.u2
   | Malformed_ModuleId_entry of Utils.u2 * Utils.u2
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 I/O functions} *)
@@ -208,6 +159,10 @@ val make_extendable : unit -> extendable
 val make_extendable_from_pool : t -> extendable
 (** Builds an extendable pool from a {i classic} one.
     Raises [Exception] if the passed pool is too large. *)
+
+val make_extendable_from_array : element array -> extendable
+(** Builds an extendable pool from an array of elements.
+    Raises [Exception] if the passed array is too large. *)
 
 val get_extendable_entry : extendable -> Utils.u2 -> element
 (** [get_extendable_entry pool index] returns the entry at [index] in
@@ -287,7 +242,7 @@ val add_utf8 : extendable -> Utils.UTF8.t -> Utils.u2
     Returns index of existing or created entry.
     Raises [Exception] if the passed pool is too large. *)
 
-val add_method_handle : extendable -> reference -> Utils.u2
+val add_method_handle : extendable -> Reference.t -> Utils.u2
 (** [add_method_handle pool reference] augments [pool] with an handle to
     [reference].
     Returns index of existing or created entry.

@@ -62,7 +62,7 @@ type array_type =
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_class_name
   | Invalid_array_element_type
   | Array_with_too_many_dimensions
@@ -73,12 +73,6 @@ type error =
   | Invalid_method_descriptor
   | Invalid_method_parameter_type
   | Void_not_allowed
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Utility functions} *)

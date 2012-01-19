@@ -47,7 +47,7 @@ type token =
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_label of Utils.UTF8.t
   | Invalid_directive of Utils.UTF8.t
   | Invalid_attribute of Utils.UTF8.t
@@ -61,12 +61,6 @@ type error =
   | Descriptor_error of Descriptor.error
   | UChar_error of Utils.UChar.error
   | UTF8_error of Utils.UTF8.error
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Lexing funtion} *)

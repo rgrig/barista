@@ -31,51 +31,10 @@ type info = {
 
 (* Exception *)
 
-type error =
-  | Invalid_code_attribute
-  | Invalid_code_length
-  | Defined_twice of string
-  | Invalid_field_attribute
-  | Invalid_method_attribute
-  | Invalid_class_attribute
-  | Invalid_package_attribute
-  | Invalid_module_attribute
-  | Invalid_constant_value
-  | Invalid_enclosing_method
-  | Invalid_local_variable_table
-  | Invalid_local_variable_type_table
-  | Invalid_list_length
-  | Invalid_attribute_name_value
-  | Invalid_exception_name
-  | Invalid_exception
-  | Invalid_inner_class
-  | Invalid_outer_class
-  | Invalid_signature
-  | Invalid_source_file
-  | Invalid_stack_map_frame
-  | Invalid_stack_map_verification_type
-  | Invalid_bootstrap_method_handle
-  | Invalid_bootstrap_argument
-  | Invalid_module
-  | Invalid_module_dependency_kind
-  | Missing_module_attribute
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let fail_if b a x =
-  if !b then
-    fail (Defined_twice a)
-  else begin
-    b := true;
-    x
-  end
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_code_attribute -> "invalid code attribute"
   | Invalid_code_length -> "invalid code length"
-  | Defined_twice id -> id ^ " attribute defined twice"
+  | Defined_twice of (id : string) -> Printf.sprintf "%s attribute defined twice" id
   | Invalid_field_attribute -> "invalid field attribute"
   | Invalid_method_attribute -> "invalid method attribute"
   | Invalid_class_attribute -> "invalid class attribute"
@@ -101,11 +60,13 @@ let string_of_error = function
   | Invalid_module_dependency_kind -> "invalid module dependency kind"
   | Missing_module_attribute -> "missing module attribute"
 
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+let fail_if b a x =
+  if !b then
+    fail (Defined_twice a)
+  else begin
+    b := true;
+    x
+  end
 
 
 (* I/O functions *)
@@ -992,23 +953,23 @@ let rec decode element bsm pool i =
                 | _ -> fail err in
               let method_handle kind index =
                 match kind with
-                | ConstantPool.REF_getField ->
+                | Reference.REF_getField ->
                     `getField (get_field index)
-                | ConstantPool.REF_getStatic ->
+                | Reference.REF_getStatic ->
                     `getStatic (get_field index)
-                | ConstantPool.REF_putField ->
+                | Reference.REF_putField ->
                     `putField (get_field index)
-                | ConstantPool.REF_putStatic ->
+                | Reference.REF_putStatic ->
                     `putStatic (get_field index)
-                | ConstantPool.REF_invokeVirtual ->
+                | Reference.REF_invokeVirtual ->
                     `invokeVirtual (get_method index)
-                | ConstantPool.REF_invokeStatic ->
+                | Reference.REF_invokeStatic ->
                     `invokeStatic (get_method index)
-                | ConstantPool.REF_invokeSpecial ->
+                | Reference.REF_invokeSpecial ->
                     `invokeSpecial (get_method index)
-                | ConstantPool.REF_newInvokeSpecial ->
+                | Reference.REF_newInvokeSpecial ->
                     `newInvokeSpecial (get_constructor index)
-                | ConstantPool.REF_invokeInterface ->
+                | Reference.REF_invokeInterface ->
                     `invokeInterface (get_method index) in
               let method_index = InputStream.read_u2 st in
               let method_ref =
@@ -1348,15 +1309,15 @@ let rec encode bsm pool a =
         st
         (fun st (method_ref, args) ->
           let reference = function
-          | `getField x -> ConstantPool.Reference_getField x
-          | `getStatic x -> ConstantPool.Reference_getStatic x
-          | `putField x -> ConstantPool.Reference_putField x
-          | `putStatic x -> ConstantPool.Reference_putStatic x
-          | `invokeVirtual x -> ConstantPool.Reference_invokeVirtual x
-          | `invokeStatic x -> ConstantPool.Reference_invokeStatic x
-          | `invokeSpecial x -> ConstantPool.Reference_invokeSpecial x
-          | `newInvokeSpecial x -> ConstantPool.Reference_newInvokeSpecial x
-          | `invokeInterface x -> ConstantPool.Reference_invokeInterface x in
+          | `getField x -> Reference.GetField x
+          | `getStatic x -> Reference.GetStatic x
+          | `putField x -> Reference.PutField x
+          | `putStatic x -> Reference.PutStatic x
+          | `invokeVirtual x -> Reference.InvokeVirtual x
+          | `invokeStatic x -> Reference.InvokeStatic x
+          | `invokeSpecial x -> Reference.InvokeSpecial x
+          | `newInvokeSpecial x -> Reference.NewInvokeSpecial x
+          | `invokeInterface x -> Reference.InvokeInterface x in
           let idx = ConstantPool.add_method_handle pool (reference method_ref) in
           OutputStream.write_u2 st idx;
           OutputStream.write_elements

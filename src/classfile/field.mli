@@ -36,16 +36,10 @@ type info = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_name of Utils.UTF8.t
   | Invalid_name_value of Utils.u2
   | Invalid_descriptor_value of Utils.u2
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 I/O functions} *)

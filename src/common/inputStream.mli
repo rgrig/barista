@@ -29,18 +29,11 @@ type t
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | End_of_input_stream
   | Unable_to_read_data
   | Unable_to_close_stream
   | Data_is_too_large
-
-exception Exception of error
-(** Raised when an attempt is made to read data after end of stream has been
-    reached. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Constructors} *)
@@ -56,6 +49,21 @@ val make_of_channel : in_channel -> t
 
 val make_of_descr : Unix.file_descr -> t
 (** Creates an input stream whose source is a file descriptor. *)
+
+val make : read_byte:(unit -> int) ->
+    ?read_bytes:(int -> string) ->
+    ?read_bytes_into:(int -> string -> int -> unit) ->
+    ?read_available_bytes:(int -> string -> int -> int) ->
+    close:(unit -> unit) -> t
+(** Creates an input stream from passed functions:
+    - [read_byte] is used to read one byte (see [Pervasives.input_byte]);
+    - [read_bytes nb] (optional) is used to read [nb] bytes;
+    - [read_bytes_into nb dst idx] (optional) is used to read [nb] bytes and
+      store them into [dst], starting at index [idx];
+    - [read_available_bytes nb dst idx] (optional) is similar to
+      [read_bytes_into] except that it should not fail if reaching end of file,
+      and should return the number of bytes actually read;
+    - [close] is used to close the stream. *)
 
 
 (** {6 Functions} *)

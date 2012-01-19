@@ -142,45 +142,23 @@ type for_module =
 
 (* Exception *)
 
-type error =
-  | Invalid_class_flags of t option
-  | Invalid_inner_class_flags of t option
-  | Invalid_field_flags of t option
-  | Invalid_method_flags of t option
-  | Invalid_constructor_flags of t option
-  | Invalid_initializer_flags of t option
-  | Invalid_package_flags of t option
-  | Invalid_module_flags of t option
-  | Several_visibility_flags
-  | Unknown_flag of string
+let string_of_error_kind kind = function
+  | Some x ->
+      Printf.sprintf "invalid flags for %s (%S)" kind (to_string x)
+  | None ->
+      Printf.sprintf "invalid flags for %s (invalid list)" kind
 
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error e =
-  let soe kind = function
-    | Some x ->
-        Printf.sprintf "invalid flags for %s (%S)" kind (to_string x)
-    | None ->
-        Printf.sprintf "invalid flags for %s (invalid list)" kind in
-  match e with
-  | Invalid_class_flags f -> soe "class" f
-  | Invalid_inner_class_flags f -> soe "inner class" f
-  | Invalid_field_flags f -> soe "field" f
-  | Invalid_method_flags f -> soe "method" f
-  | Invalid_constructor_flags f -> soe "constructor" f
-  | Invalid_initializer_flags f -> soe "initializer" f
-  | Invalid_package_flags f -> soe "package" f
-  | Invalid_module_flags f -> soe "module" f
+BARISTA_ERROR =
+  | Invalid_class_flags of (f : t option) -> string_of_error_kind "class" f
+  | Invalid_inner_class_flags of (f : t option) -> string_of_error_kind "inner class" f
+  | Invalid_field_flags of (f : t option) -> string_of_error_kind "field" f
+  | Invalid_method_flags of (f : t option) -> string_of_error_kind "method" f
+  | Invalid_constructor_flags of (f : t option) -> string_of_error_kind "constructor" f
+  | Invalid_initializer_flags of (f : t option) -> string_of_error_kind "initializer" f
+  | Invalid_package_flags of (f : t option) -> string_of_error_kind "package" f
+  | Invalid_module_flags of (f : t option) -> string_of_error_kind "module" f
   | Several_visibility_flags -> "several visibility flags"
-  | Unknown_flag f -> Printf.sprintf "unknown flag %S" f
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+  | Unknown_flag of (f : string) -> Printf.sprintf "unknown flag %S" f
 
 
 (* Functions *)
@@ -509,9 +487,8 @@ let version_bounds = function
 
 let list_to_utf8 = function
   | (_ :: _) as l ->
-      let space = UTF8.of_char ' ' in
       (UTF8.concat_sep
-         space
+         @" "
          (List.map to_utf8 (List.sort compare l)))
-        ++ space
+        ++ @" "
   | [] -> empty_utf8

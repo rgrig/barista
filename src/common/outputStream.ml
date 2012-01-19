@@ -28,23 +28,9 @@ type t = {
 
 (* Exception *)
 
-type error =
-  | Unable_to_write_data
-  | Unable_to_close_stream
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Unable_to_write_data -> "unable to write data"
   | Unable_to_close_stream -> "unable to close stream"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Constructors *)
@@ -87,6 +73,21 @@ let make_of_channel ch =
 
 let make_of_descr d =
   make_of_channel (Unix.out_channel_of_descr d)
+
+let default_write_bytes write_byte =
+  fun s pos len ->
+    for i = 0 to pred len do
+      write_byte (Char.code s.[pos + i])
+    done
+
+let make ~write_byte
+    ?(write_bytes = default_write_bytes write_byte)
+    ~flush
+    ~close =
+  { write_u1 = write_byte;
+    write_bytes_from = write_bytes;
+    flush = flush;
+    close = close; }
 
 
 (* Functions *)

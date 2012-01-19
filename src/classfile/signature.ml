@@ -68,21 +68,26 @@ and throws_signature =
 
 (* Exception *)
 
-type error =
-  | Invalid_signature
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Invalid_signature -> "invalid signature"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
+BARISTA_ERROR =
+  | Invalid_signature_type_header of (c : UChar.t) ->
+      Printf.sprintf "invalid signature type header (%C)" (UChar.to_char_noerr c)
+  | Invalid_signature_primitive_character of (c : UChar.t) ->
+      Printf.sprintf "invalid signature primitive character (%C)" (UChar.to_char_noerr c)
+  | Invalid_signature_type of (t : Descriptor.java_type) ->
+      Printf.sprintf "invalid signature type (%s)"
+        (UTF8.to_string_noerr (Descriptor.external_utf8_of_java_type t))
+  | Invalid_class_signature of (s : UTF8.t) ->
+      Printf.sprintf "invalid class signature (%S)" (UTF8.to_string_noerr s)
+  | Invalid_field_signature of (s : UTF8.t) ->
+      Printf.sprintf "invalid field signature (%S)" (UTF8.to_string_noerr s)
+  | Invalid_method_signature of (s : UTF8.t) ->
+      Printf.sprintf "invalid method signature (%S)" (UTF8.to_string_noerr s)
+  | Extra_elements_after_class_signature of (s : UTF8.t) ->
+      Printf.sprintf "extra elements after class signature (%S)" (UTF8.to_string_noerr s)
+  | Extra_elements_after_field_signature of (s : UTF8.t) ->
+      Printf.sprintf "extra elements after field signature (%S)" (UTF8.to_string_noerr s)
+  | Extra_elements_after_method_signature of (s : UTF8.t) ->
+      Printf.sprintf "extra elements after method signature (%S)" (UTF8.to_string_noerr s)
 
 
 (* Conversion functions *)
@@ -137,7 +142,7 @@ and parse_field_type_signature ls =
       (fun _ -> Array_type_signature (parse_array_type_signature ls)) ;
       capital_t,
       (fun _ -> Type_variable_signature (parse_type_variable_signature ls)) ]
-    (fun _ -> fail Invalid_signature)
+    (fun ch -> fail (Invalid_signature_type_header ch))
     ls
 
 and parse_class_type_signature ls =
@@ -229,7 +234,7 @@ and parse_base_type ls =
       (fun _ -> ls#consume_only capital_s; `Short) ;
       capital_z,
       (fun _ -> ls#consume_only capital_z; `Boolean) ]
-    (fun _ -> fail Invalid_signature)
+    (fun ch -> fail (Invalid_signature_primitive_character ch))
     ls
 
 and parse_method_type_signature ls =
@@ -355,7 +360,7 @@ and dump_base_type buf = function
   | `Int -> UTF8Buffer.add_char buf capital_i
   | `Long -> UTF8Buffer.add_char buf capital_j
   | `Short -> UTF8Buffer.add_char buf capital_s
-  | _ -> fail Invalid_signature
+  | x -> fail (Invalid_signature_type x)
 
 and dump_method_type_signature buf mts =
   if mts.formal_type_params <> [] then begin
@@ -390,10 +395,10 @@ let class_signature_of_utf8 s =
     let ls = new lexer_state s in
     let res = parse_class_signature ls in
     if ls#is_available then
-      fail Invalid_signature
+      fail (Extra_elements_after_class_signature ls#consume_all)
     else
       res
-  with Lexer_state_exception _ -> fail Invalid_signature
+  with Lexer_state_exception _ -> fail (Invalid_class_signature s)
 
 let utf8_of_class_signature cs =
   let buf = UTF8Buffer.make () in
@@ -405,10 +410,10 @@ let field_type_signature_of_utf8 s =
     let ls = new lexer_state s in
     let res = parse_field_type_signature ls in
     if ls#is_available then
-      fail Invalid_signature
+      fail (Extra_elements_after_field_signature ls#consume_all)
     else
       res
-  with Lexer_state_exception _ -> fail Invalid_signature
+  with Lexer_state_exception _ -> fail (Invalid_field_signature s)
 
 let utf8_of_field_type_signature fts =
   let buf = UTF8Buffer.make () in
@@ -420,10 +425,10 @@ let method_signature_of_utf8 s =
     let ls = new lexer_state s in
     let res = parse_method_type_signature ls in
     if ls#is_available then
-      fail Invalid_signature
+      fail (Extra_elements_after_method_signature ls#consume_all)
     else
       res
-  with Lexer_state_exception _ -> fail Invalid_signature
+  with Lexer_state_exception _ -> fail (Invalid_method_signature s)
 
 let utf8_of_method_signature ms =
   let buf = UTF8Buffer.make () in

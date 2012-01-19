@@ -18,7 +18,6 @@
 
 
 open Utils
-open Command
 
 let names = [ "disassemble"; "dasm" ]
 
@@ -28,17 +27,17 @@ let latex_description =
   "Disassembles (\\ie decompiles) the passed \\java{} bytecode class " ^
   "files into assembler files."
 
-type parameters = base_parameters
+type parameters = Command.base_parameters
 
-let make_parameters () = make_base_parameters "disassemble"
+let make_parameters () = Command.make_base_parameters "disassemble"
 
 let run params =
-  let classes = List.rev params.elements in
-  let print_header = make_header_printer (List.length classes) in
+  let classes = List.rev params.Command.elements in
+  let print_header = Command.make_header_printer (List.length classes) in
   List.iter
     (fun clas ->
       print_header clas;
       let clas = UTF8.of_string clas in
-      Disassembler.disassemble params.class_path clas)
+      Disassembler.disassemble params.Command.class_path clas)
     classes;
-  ClassPath.close params.class_path
+  ClassPath.close params.Command.class_path

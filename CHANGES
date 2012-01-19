@@ -1,3 +1,16 @@
+Version 2.0-alpha2 (2011-12-21):
+--------------------------------
+  - move from Java 1.6 to Java 1.7 as default version
+  - syntax extension for 'exception pattern' (BARISTA_ERROR)
+  - syntax extension for Unicode literals (@"string" and @'c')
+  - InputStream.t and OutputStream.t can now be created from functions
+  - better error reporting when a signature is invalid
+  - helper functions for serialization
+  - minor refactoring of code (with small impact on API)
+  - removed dependency to 'Str' module
+  - bug #73: uniform handling of depencies
+  - bug #83: correct construction of constant pool w.r.t. LDC instructions
+
 Version 2.0-alpha (2011-07-15):
 -------------------------------
   - update for Objective Caml 3.12.1

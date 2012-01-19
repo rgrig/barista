@@ -22,16 +22,10 @@
 type t
 (** The type of class paths.*)
 
-type error =
+BARISTA_ERROR =
   | Unable_to_open_archive of string
   | Does_not_exist of string
   | Class_not_found of string
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 val make_of_string : ?separator:string -> string -> t
 (** Constructs a class path from a string, using the passed separator

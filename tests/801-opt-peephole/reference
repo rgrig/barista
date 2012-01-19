@@ -1,159 +1,157 @@
-public final class pack.Test extends java.lang.Object{
-public static void optimize_constants();
-  Code:
-   0:	dconst_0
-   1:	dconst_1
-   2:	dadd
-   3:	pop2
-   4:	fconst_0
-   5:	fconst_1
-   6:	fadd
-   7:	pop
-   8:	fconst_0
-   9:	fconst_1
-   10:	fadd
-   11:	pop
-   12:	iconst_0
-   13:	iconst_1
-   14:	iconst_2
-   15:	iconst_3
-   16:	iconst_4
-   17:	iconst_5
-   18:	iconst_m1
-   19:	bipush	55
-   21:	sipush	555
-   24:	iadd
-   25:	iadd
-   26:	iadd
-   27:	iadd
-   28:	iadd
-   29:	iadd
-   30:	iadd
-   31:	iadd
-   32:	pop
-   33:	iconst_0
-   34:	iconst_1
-   35:	iconst_2
-   36:	iconst_3
-   37:	iconst_4
-   38:	iconst_5
-   39:	iconst_m1
-   40:	bipush	55
-   42:	sipush	555
-   45:	iadd
-   46:	iadd
-   47:	iadd
-   48:	iadd
-   49:	iadd
-   50:	iadd
-   51:	iadd
-   52:	iadd
-   53:	pop
-   54:	lconst_0
-   55:	lconst_1
-   56:	ladd
-   57:	pop2
-   58:	return
+public final class pack.Test {
+  public static void optimize_constants();
+    Code:
+       0: dconst_0      
+       1: dconst_1      
+       2: dadd          
+       3: pop2          
+       4: fconst_0      
+       5: fconst_1      
+       6: fadd          
+       7: pop           
+       8: fconst_0      
+       9: fconst_1      
+      10: fadd          
+      11: pop           
+      12: iconst_0      
+      13: iconst_1      
+      14: iconst_2      
+      15: iconst_3      
+      16: iconst_4      
+      17: iconst_5      
+      18: iconst_m1     
+      19: bipush        55
+      21: sipush        555
+      24: iadd          
+      25: iadd          
+      26: iadd          
+      27: iadd          
+      28: iadd          
+      29: iadd          
+      30: iadd          
+      31: iadd          
+      32: pop           
+      33: iconst_0      
+      34: iconst_1      
+      35: iconst_2      
+      36: iconst_3      
+      37: iconst_4      
+      38: iconst_5      
+      39: iconst_m1     
+      40: bipush        55
+      42: sipush        555
+      45: iadd          
+      46: iadd          
+      47: iadd          
+      48: iadd          
+      49: iadd          
+      50: iadd          
+      51: iadd          
+      52: iadd          
+      53: pop           
+      54: lconst_0      
+      55: lconst_1      
+      56: ladd          
+      57: pop2          
+      58: return        
 
-public static void optimize_locals(double, float, int, long);
-  Code:
-   0:	dload_0
-   1:	d2i
-   2:	fload_2
-   3:	f2i
-   4:	iload_3
-   5:	lload	4
-   7:	l2i
-   8:	iadd
-   9:	iadd
-   10:	iadd
-   11:	return
+  public static void optimize_locals(double, float, int, long);
+    Code:
+       0: dload_0       
+       1: d2i           
+       2: fload_2       
+       3: f2i           
+       4: iload_3       
+       5: lload         4
+       7: l2i           
+       8: iadd          
+       9: iadd          
+      10: iadd          
+      11: return        
 
-public static void nop();
-  Code:
-   0:	return
+  public static void nop();
+    Code:
+       0: return        
 
-public static void unused();
-  Code:
-   0:	return
+  public static void unused();
+    Code:
+       0: return        
 
-public static void load_store(float, int);
-  Code:
-   0:	return
+  public static void load_store(float, int);
+    Code:
+       0: return        
 
-public static void store_store(float, int);
-  Code:
-   0:	fconst_0
-   1:	dup
-   2:	pop
-   3:	fstore_0
-   4:	iconst_0
-   5:	dup
-   6:	pop
-   7:	istore_1
-   8:	return
+  public static void store_store(float, int);
+    Code:
+       0: fconst_0      
+       1: dup           
+       2: pop           
+       3: fstore_0      
+       4: iconst_0      
+       5: dup           
+       6: pop           
+       7: istore_1      
+       8: return        
 
-public static void store_load(float, int);
-  Code:
-   0:	fconst_1
-   1:	dup
-   2:	fstore_0
-   3:	iconst_3
-   4:	dup
-   5:	istore_1
-   6:	return
+  public static void store_load(float, int);
+    Code:
+       0: fconst_1      
+       1: dup           
+       2: fstore_0      
+       3: iconst_3      
+       4: dup           
+       5: istore_1      
+       6: return        
 
-public static void constant_on_the_top(float, int);
-  Code:
-   0:	iload_1
-   1:	iconst_5
-   2:	iadd
-   3:	ldc	#18; //float 3.14f
-   5:	fload_0
-   6:	fadd
-   7:	return
+  public static void constant_on_the_top(float, int);
+    Code:
+       0: iload_1       
+       1: iconst_5      
+       2: iadd          
+       3: ldc           #1                  // float 3.14f
+       5: fload_0       
+       6: fadd          
+       7: return        
 
-public static void remove_neutral_elements(float, int);
-  Code:
-   0:	fload_0
-   1:	fconst_0
-   2:	fadd
-   3:	fconst_1
-   4:	fmul
-   5:	iload_1
-   6:	return
+  public static void remove_neutral_elements(float, int);
+    Code:
+       0: fload_0       
+       1: fconst_0      
+       2: fadd          
+       3: fconst_1      
+       4: fmul          
+       5: iload_1       
+       6: return        
 
-public static void absorbing_elements(int);
-  Code:
-   0:	iconst_0
-   1:	iload_0
-   2:	iconst_1
-   3:	irem
-   4:	return
+  public static void absorbing_elements(int);
+    Code:
+       0: iconst_0      
+       1: iload_0       
+       2: iconst_1      
+       3: irem          
+       4: return        
 
-public static void apply_stength_reduction(int);
-  Code:
-   0:	iload_0
-   1:	iconst_3
-   2:	ishl
-   3:	return
+  public static void apply_stength_reduction(int);
+    Code:
+       0: iload_0       
+       1: iconst_3      
+       2: ishl          
+       3: return        
 
-public static void remove_identity(int);
-  Code:
-   0:	iload_0
-   1:	ineg
-   2:	i2s
-   3:	return
+  public static void remove_identity(int);
+    Code:
+       0: iload_0       
+       1: ineg          
+       2: i2s           
+       3: return        
 
-public static void optimize_iinc(int);
-  Code:
-   0:	iinc	0, -3
-   3:	iinc	0, 2
-   6:	return
+  public static void optimize_iinc(int);
+    Code:
+       0: iinc          0, -3
+       3: iinc          0, 2
+       6: return        
 
-public static void main(java.lang.String[]);
-  Code:
-   0:	return
-
+  public static void main(java.lang.String[]);
+    Code:
+       0: return        
 }
-

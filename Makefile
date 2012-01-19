@@ -65,6 +65,7 @@ tests: FORCE
 	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) all && cd ..) || true
 
 clean: FORCE
+	cd syntax && $(MAKE) clean && cd ..
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) -clean
 	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) clean && cd ..) || true
 	rm -f $(MODULES_ODOCL) $(MODULES_MLPACK) $(PROJECT_NAME)Library.itarget
@@ -92,6 +93,7 @@ install: all
 	fi
 
 generate: FORCE
+	cd syntax && $(MAKE) clean && $(MAKE) compile && cd ..
 	echo '$(PROJECT_NAME)Library.cma' > $(PROJECT_NAME)Library.itarget
 	(test -x $(PATH_OCAML_PREFIX)/bin/ocamlopt && echo '$(PROJECT_NAME)Library.cmxa' >> $(PROJECT_NAME)Library.itarget) || true
 	(test -x $(PATH_OCAML_PREFIX)/bin/ocamljava && echo '$(PROJECT_NAME)Library.cmja' >> $(PROJECT_NAME)Library.itarget) || true

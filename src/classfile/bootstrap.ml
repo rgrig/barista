@@ -22,15 +22,15 @@ open Utils
 (* Base types and function *)
 
 type method_handle =
-  [ `getField of ConstantPool.field_reference
-  | `getStatic of ConstantPool.field_reference
-  | `putField of ConstantPool.field_reference
-  | `putStatic of ConstantPool.field_reference
-  | `invokeVirtual of ConstantPool.method_reference
-  | `invokeStatic of ConstantPool.method_reference
-  | `invokeSpecial of ConstantPool.method_reference
-  | `newInvokeSpecial of ConstantPool.constructor_reference
-  | `invokeInterface of ConstantPool.method_reference ]
+  [ `getField of Reference.for_field
+  | `getStatic of Reference.for_field
+  | `putField of Reference.for_field
+  | `putStatic of Reference.for_field
+  | `invokeVirtual of Reference.for_method
+  | `invokeStatic of Reference.for_method
+  | `invokeSpecial of Reference.for_method
+  | `newInvokeSpecial of Reference.for_constructor
+  | `invokeInterface of Reference.for_method ]
 
 let equal_method_handle x y =
   let eq_field_ref (cn1, fn1, fd1) (cn2, fn2, fd2) =
@@ -96,26 +96,13 @@ let equal_method_specifier (mh1, mal1) (mh2, mal2) =
 
 type methods = method_specifier ExtendableArray.t
 
-type error =
-  | Too_large of int
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Too_large x ->
+BARISTA_ERROR =
+  | Too_large of (x : int) ->
       Printf.sprintf "bootstrap array is too large (%d)" x
 
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
-
 let dummy_element =
-  `getField (Name.make_for_class_from_external (UTF8.of_string "dummy_package.DummyClass"),
-             Name.make_for_field (UTF8.of_string "dummyField"),
+  `getField (Name.make_for_class_from_external @"dummy_package.DummyClass",
+             Name.make_for_field @"dummyField",
              `Boolean),
   []
 

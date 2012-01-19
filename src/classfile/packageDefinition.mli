@@ -31,17 +31,11 @@ type t = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_package_name
   | Too_many of string
   | Version_error of Version.error
   | Invalid_package_definition
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Conversion functions} *)

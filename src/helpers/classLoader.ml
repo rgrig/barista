@@ -26,25 +26,11 @@ type t = {
     loaded_modules : ModuleDefinition.t UTF8Hashtbl.t;
   }
 
-type error =
-  | Unable_to_load of UTF8.t * string
-  | Already_defined of UTF8.t
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
-  | Unable_to_load (s, os) ->
+BARISTA_ERROR =
+  | Unable_to_load of (s : UTF8.t) * (os : string) ->
       Printf.sprintf "unable to load class %S (%s)" (UTF8.to_string_noerr s) os
-  | Already_defined s ->
+  | Already_defined of (s : UTF8.t) ->
       Printf.sprintf "class %S is already defined" (UTF8.to_string_noerr s)
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 let make cp =
   { class_path = cp;

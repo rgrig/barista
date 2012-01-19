@@ -22,7 +22,7 @@
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_magic of Utils.u2
   | Invalid_version of Utils.u2
   | Invalid_stream
@@ -33,12 +33,6 @@ type error =
   | Missing_write_function
   | Missing_field of Utils.UTF8.t
   | Invalid_field_type of Utils.UTF8.t
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Object values} *)
@@ -141,8 +135,29 @@ val encode : OutputStream.t -> object_value list -> unit
 (** [encode os l] writes the values from [l] onto [os].
     Raises [OutputStream.Exception] if an i/o error occurs. *)
 
+val encode_one : OutputStream.t -> object_value -> unit
+(** [encode_one os x] is a shorthand for [encode os [x]]. *)
+
 val decode : InputStream.t -> object_value list
 (** [decode is] returns the list of values read from [is].
     Raises [Exception] if data on the stream does not conform to the
     serialization protocol.
     Raises [OutputStream.Exception] if an i/o error occurs. *)
+
+
+(** {6 Helper functions} *)
+
+val descriptor_of_definition : ClassLoader.t -> ClassDefinition.t -> descriptor
+(** [descriptor_of_definition loader definition] constructs a new descriptor
+    for the class whose [definition] is passed, [loader] being used to
+    construct descriptors for parent classes.
+    Raises [ClassLoader.Exception] if a parent class cannot be found. *)
+
+val instance_of_function : descriptor -> object_value list -> (Name.for_field -> field_value) -> instance
+(** [instance_of_function desc annot f] constructs an instance associated with
+    descriptor [desc] and annotations [annot]. [f] is used to retrieve the
+    value of each field. *)
+
+val object_value_of_function : descriptor -> object_value list -> (Name.for_field -> field_value) -> object_value
+(** [object_value_of_function desc annot f] is a shorthand for
+    [Instance (instance_of_function desc annot f)]. *)

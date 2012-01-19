@@ -38,17 +38,11 @@ type t = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Invalid_class_name
   | Bootstrap_methods_defined_twice
   | Too_many of string
   | Version_error of Version.error
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Traversal} *)

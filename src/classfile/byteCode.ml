@@ -243,31 +243,13 @@ type instruction =
 
 (* Exception *)
 
-type error =
-  | Invalid_padding_byte
-  | Unknown_opcode
-  | Invalid_trailing_byte
-  | Invalid_trailing_short
-  | Internal
-  | Invalid_switch_cases
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_padding_byte -> "invalid padding byte"
   | Unknown_opcode -> "unknown opcode"
   | Invalid_trailing_byte -> "invalid trailing byte"
   | Invalid_trailing_short -> "invalid trailing short"
   | Internal -> "internal error"
   | Invalid_switch_cases -> "invalid number of switch cases"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* I/O functions *)

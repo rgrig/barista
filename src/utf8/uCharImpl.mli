@@ -25,13 +25,9 @@
 type t
 (** The type of Unicode characters. *)
 
-type error =
+BARISTA_ERROR =
   | Unrepresentable_character of t
   | Invalid_character_code of int
-
-exception Exception of error
-
-val string_of_error : error -> string
 
 val of_char : char -> t
 (** Conversion from standard character into Unicode character. *)

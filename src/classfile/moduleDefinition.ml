@@ -31,32 +31,16 @@ type t = {
 
 (* Exception *)
 
-type error =
-  | Invalid_module_name
-  | Too_many of string
-  | Version_error of Version.error
-  | Invalid_module_definition
-
-exception Exception of error
-
-let fail e = raise (Exception e)
-
-let string_of_error = function
+BARISTA_ERROR =
   | Invalid_module_name -> "invalid module name"
-  | Too_many s -> "too many " ^ s
-  | Version_error e -> Version.string_of_error e
+  | Too_many of (s : string) -> Printf.sprintf "too many %s" s
+  | Version_error of (e : Version.error) -> Version.string_of_error e
   | Invalid_module_definition -> "invalid module definition"
-
-let () =
-  Printexc.register_printer
-    (function
-      | Exception e -> Some (string_of_error e)
-      | _ -> None)
 
 
 (* Conversion functions *)
 
-let suffix = UTF8.of_string "/module-info"
+let suffix = @"/module-info"
 
 let suffix_length = UTF8.length suffix
 

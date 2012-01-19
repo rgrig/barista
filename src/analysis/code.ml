@@ -442,7 +442,7 @@ type mark = {
     mutable max_locals : int;
   }
 
-let java_lang_Throwable = Name.make_for_class_from_external (Utils.UTF8.of_string "java.lang.Throwable")
+let java_lang_Throwable = Name.make_for_class_from_external @"java.lang.Throwable"
 
 let update_state n s =
   let stack = ref s.StackState.stack in

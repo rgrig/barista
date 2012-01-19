@@ -1,70 +1,69 @@
-Compiled from "<<Filename>>"
-public final class pack.Test extends java.lang.Object
+Classfile /media/sf_Barista/tests/314-asm-annotations/pack/Test.class
+  MD5 checksum 9a698abbbf95039b869dee93792c0f9f
+  Compiled from "<<Filename>>"
+public final class pack.Test<A extends java.lang.Number> extends java.lang.Object
   SourceFile: "<<Filename>>"
-  Signature: length = 0x2
-   00 2A 
+  Signature: #42                          // <A:Ljava/lang/Number;>Ljava/lang/Object;
   minor version: 0
-  major version: 50
-  Constant pool:
-const #1 = Asciz	pack/Test;
-const #2 = class	#1;	//  pack/Test
-const #3 = Asciz	java/lang/Object;
-const #4 = class	#3;	//  java/lang/Object
-const #5 = Asciz	x;
-const #6 = Asciz	Ljava/lang/Number;;
-const #7 = Asciz	TA;;
-const #8 = Asciz	Signature;
-const #9 = Asciz	main;
-const #10 = Asciz	([Ljava/lang/String;)V;
-const #11 = Asciz	java/lang/System;
-const #12 = class	#11;	//  java/lang/System
-const #13 = Asciz	out;
-const #14 = Asciz	Ljava/io/PrintStream;;
-const #15 = NameAndType	#13:#14;//  out:Ljava/io/PrintStream;
-const #16 = Field	#12.#15;	//  java/lang/System.out:Ljava/io/PrintStream;
-const #17 = Asciz	hello\n...;
-const #18 = String	#17;	//  hello\n...
-const #19 = Asciz	java/io/PrintStream;
-const #20 = class	#19;	//  java/io/PrintStream
-const #21 = Asciz	println;
-const #22 = Asciz	(Ljava/lang/String;)V;
-const #23 = NameAndType	#21:#22;//  println:(Ljava/lang/String;)V
-const #24 = Method	#20.#23;	//  java/io/PrintStream.println:(Ljava/lang/String;)V
-const #25 = Asciz	Code;
-const #26 = Asciz	Lpack/MyAnnotation;;
-const #27 = Asciz	e;
-const #28 = Asciz	Lpack/MyAnnotation$E;;
-const #29 = Asciz	E3;
-const #30 = Asciz	c;
-const #31 = int	5;
-const #32 = int	7;
-const #33 = Asciz	b;
-const #34 = float	3.14f;
-const #35 = Asciz	a;
-const #36 = Asciz	xyz;
-const #37 = String	#36;	//  xyz
-const #38 = Asciz	Ljava/lang/Deprecated;;
-const #39 = Asciz	RuntimeVisibleAnnotations;
-const #40 = Asciz	<<Filename>>;
-const #41 = Asciz	SourceFile;
-const #42 = Asciz	<A:Ljava/lang/Number;>Ljava/lang/Object;;
-
+  major version: 51
+  flags: ACC_PUBLIC, ACC_FINAL, ACC_SUPER
+Constant pool:
+   #1 = String             #2             //  hello\n...
+   #2 = Utf8               hello\n...
+   #3 = Utf8               pack/Test
+   #4 = Class              #3             //  pack/Test
+   #5 = Utf8               java/lang/Object
+   #6 = Class              #5             //  java/lang/Object
+   #7 = Utf8               x
+   #8 = Utf8               Ljava/lang/Number;
+   #9 = Utf8               TA;
+  #10 = Utf8               Signature
+  #11 = Utf8               main
+  #12 = Utf8               ([Ljava/lang/String;)V
+  #13 = Utf8               java/lang/System
+  #14 = Class              #13            //  java/lang/System
+  #15 = Utf8               out
+  #16 = Utf8               Ljava/io/PrintStream;
+  #17 = NameAndType        #15:#16        //  out:Ljava/io/PrintStream;
+  #18 = Fieldref           #14.#17        //  java/lang/System.out:Ljava/io/PrintStream;
+  #19 = Utf8               java/io/PrintStream
+  #20 = Class              #19            //  java/io/PrintStream
+  #21 = Utf8               println
+  #22 = Utf8               (Ljava/lang/String;)V
+  #23 = NameAndType        #21:#22        //  println:(Ljava/lang/String;)V
+  #24 = Methodref          #20.#23        //  java/io/PrintStream.println:(Ljava/lang/String;)V
+  #25 = Utf8               Code
+  #26 = Utf8               Lpack/MyAnnotation;
+  #27 = Utf8               e
+  #28 = Utf8               Lpack/MyAnnotation$E;
+  #29 = Utf8               E3
+  #30 = Utf8               c
+  #31 = Integer            5
+  #32 = Integer            7
+  #33 = Utf8               b
+  #34 = Float              3.14f
+  #35 = Utf8               a
+  #36 = Utf8               xyz
+  #37 = String             #36            //  xyz
+  #38 = Utf8               Ljava/lang/Deprecated;
+  #39 = Utf8               RuntimeVisibleAnnotations
+  #40 = Utf8               <<Filename>>
+  #41 = Utf8               SourceFile
+  #42 = Utf8               <A:Ljava/lang/Number;>Ljava/lang/Object;
 {
-public java.lang.Number x;
-  Signature: length = 0x2
-   00 07 
+  public A x;
+    flags: ACC_PUBLIC
+    Signature: #9                           // TA;
 
-public static void main(java.lang.String[]);
-  Code:
-   Stack=4, Locals=4, Args_size=1
-   0:	getstatic	#16; //Field java/lang/System.out:Ljava/io/PrintStream;
-   3:	ldc	#18; //String hello\n...
-   5:	invokevirtual	#24; //Method java/io/PrintStream.println:(Ljava/lang/String;)V
-   8:	return
-  RuntimeVisibleAnnotations: length = 0x26
-   00 02 00 1A 00 04 00 1B 65 00 1C 00 1D 00 1E 5B
-   00 02 49 00 1F 49 00 20 00 21 46 00 22 00 23 73
-   00 25 00 26 00 00 
-
+  public static void main(java.lang.String[]);
+    flags: ACC_PUBLIC, ACC_STATIC
+    Code:
+      stack=4, locals=4, args_size=1
+         0: getstatic     #18                 // Field java/lang/System.out:Ljava/io/PrintStream;
+         3: ldc           #1                  // String hello\n...
+         5: invokevirtual #24                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+         8: return        
+    RuntimeVisibleAnnotations:
+      0: #26(#27=e#28.#29,#30=[I#31,I#32],#33=F#34,#35=s#37)
+      1: #38()
 }
-

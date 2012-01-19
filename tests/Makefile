@@ -19,7 +19,7 @@
 JAVA=java
 JAVAC=javac
 JAVAP=javap
-JAVA_VERSION=1.6
+JAVA_VERSION=1.7
 TEST_CLASSPATH=$(shell test -x /usr/libexec/java_home && echo ".:`/usr/libexec/java_home`/../Classes/classes.jar" || echo ".:$(CLASSPATH)")
 ANT=ant
 EXEC_PATH=../../_build/src/driver

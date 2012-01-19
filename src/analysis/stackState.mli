@@ -39,7 +39,7 @@ type t = {
 
 (** {6 Exception} *)
 
-type error =
+BARISTA_ERROR =
   | Unsupported_instruction of string
   | Empty_stack
   | Invalid_local_index of Utils.u2 * int
@@ -53,12 +53,6 @@ type error =
   | Invalid_primitive_array_type
   | Empty_frame_list
   | Different_frames of Utils.u2
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
 
 
 (** {6 Construction} *)

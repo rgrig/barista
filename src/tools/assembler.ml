@@ -78,6 +78,7 @@ type error =
   | ByteCode_error of ByteCode.error
   | Annotation_error of Annotation.error
   | AccessFlag_error of AccessFlag.error
+  | LdcConstraint_error of LdcConstraint.error
   | ConstantPool_error of ConstantPool.error
   | Signature_error of Signature.error
   | Descriptor_error of Descriptor.error
@@ -147,6 +148,7 @@ let string_of_error = function
   | ByteCode_error e -> ByteCode.string_of_error e
   | Annotation_error e -> Annotation.string_of_error e
   | AccessFlag_error e -> AccessFlag.string_of_error e
+  | LdcConstraint_error e -> LdcConstraint.string_of_error e
   | ConstantPool_error e -> ConstantPool.string_of_error e
   | Signature_error e -> Signature.string_of_error e
   | Descriptor_error e -> Descriptor.string_of_error e
@@ -196,8 +198,8 @@ let check_version_flags version l =
   | _ :: _ -> Version.check (Version.intersect_list bounds) version
   | [] -> ()
 
-let default_annotation_name = UTF8.of_string "defaultannotation.class"
-let default_annotation_property = Lexer.Identifier (UTF8.of_string "defaultannotation")
+let default_annotation_name = @"defaultannotation.class"
+let default_annotation_property = Lexer.Identifier @"defaultannotation"
 
 class assembler_state version compute_stacks optimize class_loader =
   object (self)
@@ -233,7 +235,7 @@ class assembler_state version compute_stacks optimize class_loader =
 
       (* Class data *)
     val mutable class_flags = []
-    val mutable class_name = Name.make_for_class_from_external (UTF8.of_string "pack.Class")
+    val mutable class_name = Name.make_for_class_from_external @"pack.Class"
     val mutable class_extends = None
     val mutable class_implements = []
     val mutable class_fields = []
@@ -331,7 +333,7 @@ class assembler_state version compute_stacks optimize class_loader =
           | Lexer.Int x, `Short -> Attribute.Short_value (Int64.to_int x)
           | Lexer.Int x, `Int -> Attribute.Integer_value (Int64.to_int32 x)
           | Lexer.String x, `Class c ->
-              if UTF8.equal (UTF8.of_string "java.lang.String") (Name.external_utf8_for_class c) then
+              if UTF8.equal @"java.lang.String" (Name.external_utf8_for_class c) then
                 Attribute.String_value x
               else
                 self#fail_err Invalid_constant_value
@@ -394,16 +396,16 @@ class assembler_state version compute_stacks optimize class_loader =
           | [_, (Lexer.Primitive_type `Short) :: (Lexer.Int s) :: []] ->
               Annotation.Short_value (Int64.to_int s)
           | [_, (Lexer.Identifier id) :: (Lexer.String s) :: []]
-            when UTF8.equal id (UTF8.of_string "string") ->
+            when UTF8.equal id @"string" ->
               Annotation.String_value s
           | [_, (Lexer.Identifier id) :: (Lexer.Class_name n) :: (Lexer.Identifier f) :: []]
-            when UTF8.equal id (UTF8.of_string "enum") ->
+            when UTF8.equal id @"enum" ->
               Annotation.Enum_value (n, (Name.make_for_field f))
           | [_, (Lexer.Identifier id) :: (Lexer.Class_name n) :: []]
-            when UTF8.equal id (UTF8.of_string "class") ->
+            when UTF8.equal id @"class" ->
               Annotation.Class_value n
           | list ->
-              if (List.for_all (function | _, (Lexer.Identifier id) :: _ when UTF8.equal id (UTF8.of_string "annotation") -> true | _ -> false) list) then
+              if (List.for_all (function | _, (Lexer.Identifier id) :: _ when UTF8.equal id @ "annotation" -> true | _ -> false) list) then
                 let pairs = UTF8Hashtbl.create 8 in
                 match list with
                 | (ln, (Lexer.Identifier _) :: (Lexer.Class_name cn) :: (Lexer.Identifier name) :: l)
@@ -1381,6 +1383,8 @@ let assemble ?(version=Version.default) ?(compute_stacks=false) ?(optimize=false
         raise (Exception (state#get_line, (Annotation_error e)))
     | AccessFlag.Exception e ->
         raise (Exception (state#get_line, (AccessFlag_error e)))
+    | LdcConstraint.Exception e ->
+        raise (Exception (state#get_line, (LdcConstraint_error e)))
     | ConstantPool.Exception e ->
         raise (Exception (state#get_line, (ConstantPool_error e)))
     | Signature.Exception e ->
