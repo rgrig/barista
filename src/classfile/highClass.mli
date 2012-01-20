@@ -305,6 +305,7 @@ module HighMethod : sig (* {{{ *)
     | Regular of regular
     | Constructor of constructor
     | Initializer of class_initializer
+    | Native of Method.info
 
 end (* }}} *)
 
@@ -333,13 +334,13 @@ end (* }}} *)
 module HighAttributeOps : sig (* {{{ *)
   val version_bounds : HighAttribute.t -> Version.bounds
 
-  val decode_class :  ConstantPool.t -> Attribute.info -> HighAttribute.for_class
-  val decode_field : ConstantPool.t -> Attribute.info -> HighAttribute.for_field
-  val decode_method : ConstantPool.t -> Attribute.info -> HighAttribute.for_method
+  val decode_for_class :  ConstantPool.t -> Attribute.info -> HighAttribute.for_class
+  val decode_for_field : ConstantPool.t -> Attribute.info -> HighAttribute.for_field
+  val decode_for_method : ConstantPool.t -> Attribute.info -> HighAttribute.for_method
 
-  val encode_class : ConstantPool.extendable -> HighAttribute.for_class -> Attribute.info
-  val encode_field : ConstantPool.extendable -> HighAttribute.for_field -> Attribute.info
-  val encode_method : HighMethod.t -> ConstantPool.extendable -> HighAttribute.for_method -> Attribute.info
+  val encode_for_class : ConstantPool.extendable -> HighAttribute.for_class -> Attribute.info
+  val encode_for_field : ConstantPool.extendable -> HighAttribute.for_field -> Attribute.info
+  val encode_for_method : HighMethod.t -> ConstantPool.extendable -> HighAttribute.for_method -> Attribute.info
 
 end (* }}} *)
 
