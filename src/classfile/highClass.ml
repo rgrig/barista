@@ -91,8 +91,14 @@ module HighInstruction = struct (* {{{ *)
   let invalid_label = -1L
 
   type iinc = { ii_var: int; ii_inc: int }
-  type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
-  type tableswitch = { ts_def: label; ts_low: int; ts_high: int; ts_ofss: label list }
+  type lookupswitch =
+    { ls_def: label
+    ; ls_branches: (int32 * label) list }
+  type tableswitch =
+    { ts_def: label
+    ; ts_low: int32
+    ; ts_high: int32
+    ; ts_ofss: label list }
 
   type instruction =
     | AALOAD
@@ -269,10 +275,15 @@ module HighInstruction = struct (* {{{ *)
     let hash = Hashtbl.hash
   end)
 
-  (* TODO(rgrig): Why is [s1_to_int x] any better than [(x : U.s1 :> int)] ? *)
   let s1_to_int (s : U.s1) = (s :> int)
   let s2_to_int (s : U.s2) = (s :> int)
-  let s4_to_int (s : U.s4) = ((Int32.to_int (s :> Int32.t)) :> int)
+  let s4_to_int (s : U.s4) =
+    let int_32 = (s :> int32) in
+    let int_nat = Int32.to_int int_32 in
+    if Int32.of_int int_nat <> int_32 then
+      assert false; (* We should be using int32 if this fails. *)
+    int_nat
+  let s4_to_int32 (s : U.s4) = (s :> int32)
 
   let u1_to_int (u : U.u1) = (u :> int)
   let u2_to_int (u : U.u2) = (u :> int)
@@ -284,7 +295,7 @@ module HighInstruction = struct (* {{{ *)
     let abs_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (Int32.to_int (s :> Int32.t)) in
 *)
     let rel_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (ofs + (s :> int)) in
-    let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + Int32.to_int (s :> Int32.t)) in
+    let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + s4_to_int s) in
     let entry = CP.get_entry pool in
     let utf8 = CP.get_utf8_entry pool in
     let get_class_or_array i =
@@ -523,7 +534,8 @@ module HighInstruction = struct (* {{{ *)
       | BC.LOOKUPSWITCH (p1, p2, p3) ->
         let keys, offsets = List.split p3 in
         let labels = List.map rel_l_ofs_to_lbl offsets in
-        let items = List.map s4_to_int keys in
+        let items = List.map s4_to_int32 keys in
+        (* TODO(rgrig): [p2] should not be in BC.LOOKUPSWITCH. *)
       (* bytecode parser should ensure this *)
         assert (s4_to_int p2 = List.length p3);
         LOOKUPSWITCH { ls_def = rel_l_ofs_to_lbl p1
@@ -557,12 +569,12 @@ module HighInstruction = struct (* {{{ *)
       | BC.SASTORE -> SASTORE
       | BC.SIPUSH p1 -> SIPUSH (s2_to_int p1)
       | BC.SWAP -> SWAP
-      | BC.TABLESWITCH (p1, p2, p3, p4) ->
+      | BC.TABLESWITCH (def, low, high, ofss) ->
         TABLESWITCH {
-          ts_def = rel_l_ofs_to_lbl p1;
-          ts_low = s4_to_int p2;
-          ts_high = s4_to_int p3;
-          ts_ofss = List.map rel_l_ofs_to_lbl p4 }
+          ts_def = rel_l_ofs_to_lbl def;
+          ts_low = s4_to_int32 low;
+          ts_high = s4_to_int32 high;
+          ts_ofss = List.map rel_l_ofs_to_lbl ofss }
       | BC.WIDE_ALOAD p1 -> ALOAD (u2_to_int p1)
       | BC.WIDE_ASTORE p1 -> ASTORE (u2_to_int p1)
       | BC.WIDE_DLOAD p1 -> DLOAD (u2_to_int p1)
@@ -636,13 +648,13 @@ module HighInstruction = struct (* {{{ *)
     let bc_LOOKUPSWITCH { ls_def; ls_branches } =
       let def = s4_offset ls_def in
       let cnt = s4 (List.length ls_branches) in
-      let eb (v, l) = (s4 v, s4_offset l) in
+      let eb (v, l) = (U.s4 v, s4_offset l) in
       let jmp = List.map eb (List.sort compare ls_branches) in
       BC.LOOKUPSWITCH (def, cnt, jmp) in
     let bc_TABLESWITCH { ts_def; ts_low; ts_high; ts_ofss } =
       if ts_low > ts_high then fail Invalid_TABLESWITCH;
       let def = s4_offset ts_def in
-      let low, high = s4 ts_low, s4 ts_high in
+      let low, high = U.s4 ts_low, U.s4 ts_high in
       let ofss = List.map s4_offset ts_ofss in
       BC.TABLESWITCH (def, low, high, ofss) in
 
@@ -1650,7 +1662,8 @@ module SymbExe = struct  (* {{{ *)
             U.k_log rs in
           let log_state =
             let map_step step s (l, c) m =
-              printf "@\n@[%d [shape=box,label=\"%Ld:" (Hashtbl.hash (s, l)) l;
+              printf "@\n@[%d [shape=box,label=\"%Ld:%s:"
+                (Hashtbl.hash (s, l)) l (HI.instruction_to_string c);
               let ls = step s (l, c) m in printf "\"];@]"; ls in
             U.k_map (fun (color, step, s, l) -> (color, map_step step, s, l)) in
           let log_edge =
@@ -1677,7 +1690,7 @@ module SymbExe = struct  (* {{{ *)
   (* was StackState.update *)
   let step st (lbl, i) next_lbl =
     let continue locals stack = ({stack; locals}, [next_lbl]) in
-    let jump1 locals stack jump_lbls = ({stack; locals}, jump_lbls) in
+    let jump locals stack jump_lbls = ({stack; locals}, jump_lbls) in
     let jump2 locals stack jump_lbl = ({stack; locals}, [jump_lbl; next_lbl]) in
     let return locals stack = ({stack; locals}, []) in
     let locals = st.locals in
@@ -2036,7 +2049,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
       | HI.GOTO lbl ->
-	jump1 locals stack [lbl]
+	jump locals stack [lbl]
       | HI.I2B ->
 	let stack = pop_if VI_integer stack in
 	let stack = push VI_integer stack in
@@ -2283,7 +2296,7 @@ module SymbExe = struct  (* {{{ *)
 	continue locals stack
       | HI.JSR lbl ->
         let stack = push (VI_return_address (LS.singleton next_lbl)) stack in
-	jump1 locals stack [lbl]
+	jump locals stack [lbl]
       | HI.L2D ->
 	let stack = pop_if VI_long stack in
 	let stack = push VI_double stack in
@@ -2351,7 +2364,7 @@ module SymbExe = struct  (* {{{ *)
       | HI.LOOKUPSWITCH {HI.ls_def; ls_branches} ->
 	let stack = pop_if VI_integer stack in
         let targets = ls_def :: (List.map snd ls_branches) in
-	jump1 locals stack targets
+	jump locals stack targets
       | HI.LOR ->
 	let stack = pop_if VI_long stack in
 	let stack = pop_if VI_long stack in
@@ -2448,7 +2461,7 @@ module SymbExe = struct  (* {{{ *)
           | VI_return_address lbls -> LS.elements lbls
           | v -> fail (report_invalid_local_contents
               (index, v, VI_return_address LS.empty))) in
-        jump1 locals stack lbls
+        jump locals stack lbls
       | HI.RETURN ->
 	return locals stack
       | HI.SALOAD ->
@@ -2473,7 +2486,7 @@ module SymbExe = struct  (* {{{ *)
       | HI.TABLESWITCH {HI.ts_def; ts_ofss; _} ->
 	let stack = pop_if VI_integer stack in
         let targets = ts_def :: ts_ofss in
-	jump1 locals stack targets
+	jump locals stack targets
   (* }}} *)
   (* unification {{{ *)
   type 'a unifier = 'a -> 'a -> 'a
