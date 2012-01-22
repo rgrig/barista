@@ -15,8 +15,14 @@ module HighInstruction : sig (* {{{ *)
   val fresh_label : unit -> label
   val invalid_label : label
   type iinc = { ii_var: int; ii_inc: int }
-  type lookupswitch = { ls_def: label; ls_branches: (int * label) list }
-  type tableswitch = { ts_def: label; ts_low: int; ts_high: int; ts_ofss: label list }
+  type lookupswitch =
+    { ls_def: label
+    ; ls_branches: (int32 * label) list }
+  type tableswitch =
+    { ts_def: label
+    ; ts_low: int32
+    ; ts_high: int32
+    ; ts_ofss: label list }
   type instruction =
     | AALOAD
     | AASTORE
