@@ -19,6 +19,7 @@
 # Directories
 true: -traverse
 true: debug
+#true: profile # slow
 <src/**>: include
 
 # Options

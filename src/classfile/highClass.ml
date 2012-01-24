@@ -41,7 +41,7 @@ type error =
   | SE_unexpected_size of (int * string)
   | SE_uninitialized_register of (int * int)
   | Too_many of string
-  | Unsupported_instruction of string
+  | Unsupported of string
 
 exception Exception of error
 
@@ -50,6 +50,7 @@ let fail e = raise (Exception e)
 let string_of_error = function
   | Invalid_TABLESWITCH -> "TABLESWITCH with empty range [low..high]"
   | Invalid_offset -> "offset does not point at start of instruction"
+  | Invalid_pool_element -> "unexpected element type in the constant pool"
   | Invalid_stack_map_table -> "invalid stack map table"
   | Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
@@ -64,7 +65,7 @@ let string_of_error = function
   | SE_missing_return -> "SE: no return at end of method"
   | SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
   | Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
-  | Unsupported_instruction s -> "unsupported instruction: " ^ s
+  | Unsupported s -> "unsupported " ^ s
   | _ -> "undescribed error (todo)"
 
 let checked_length s l =
@@ -83,6 +84,121 @@ let checked_length_u1 s l =
 
 (* }}} *)
 (* HighInstruction, SymbExe, HighAttribute, HighField and HighMethod *) (* {{{ *)
+module HighConstant = struct (* {{{ *)
+  type primitive =
+    [ `Double of float
+    | `Float of float
+    | `Int of int32
+    | `Long of int64
+    | `String of Utils.UTF8.t ]
+  type arrayref =
+    [ `Array_type of Descriptor.array_type ]
+  type classref =
+    [ `Class_or_interface of Name.for_class ]
+  type typeref =
+    [ arrayref | classref ]
+  type fieldref =
+    [ `Fieldref of Name.for_class * Name.for_field * Descriptor.for_field ]
+  type methodref =
+    [ `Methodref of typeref * Name.for_method * Descriptor.for_method ]
+  type stack =
+    [ primitive | typeref ]
+  type field =
+    primitive
+
+  type t =
+    [ arrayref
+    | classref
+    | field
+    | fieldref
+    | methodref
+    | primitive
+    | stack ]
+
+  let rec decode pool i : t =
+    let utf8 = CP.get_utf8_entry pool in
+    let s8_of_2s4 hi lo =
+      Int64.logor
+        (Int64.shift_left (Int64.of_int32 hi) 32)
+        (Int64.logand 0x00000000FFFFFFFFL (Int64.of_int32 lo)) in
+    let d_class n =
+      let s = utf8 n in
+      if U.UChar.equal opening_square_bracket (U.UTF8.get s 0) then
+        let t = Descriptor.java_type_of_internal_utf8 s in
+        `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type t)
+      else
+        `Class_or_interface (Name.make_for_class_from_internal s) in
+    let d_nt nt = match CP.get_entry pool nt with
+      | CP.NameAndType (n, t) -> (decode pool n, decode pool t)
+      | _ -> fail Invalid_pool_element in
+    let d_fieldref c nt = match decode pool c, d_nt nt with
+      | `Class_or_interface c, (`String f, `String t) -> `Fieldref
+          (c, Name.make_for_field f, Descriptor.field_of_utf8 t)
+      | _ -> fail Invalid_pool_element in
+    let d_methodref c nt =
+      let c = decode_typeref pool c in
+      match d_nt nt with
+        | `String m, `String t -> `Methodref
+            (c, Name.make_for_method m, Descriptor.method_of_utf8 t )
+        | _ -> fail Invalid_pool_element in
+    match CP.get_entry pool i with
+      | CP.Class n -> d_class n
+      | CP.Fieldref (c, nt) -> d_fieldref c nt
+      | CP.Methodref (c, nt)
+      | CP.InterfaceMethodref (c, nt) -> d_methodref c nt
+      | CP.String s -> decode pool s
+      | CP.Integer x -> `Int x
+      | CP.Float f -> `Float (Int32.float_of_bits f)
+      | CP.Long (hi, lo) -> `Long (s8_of_2s4 hi lo)
+      | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (s8_of_2s4 hi lo))
+      | CP.NameAndType _ -> fail Invalid_pool_element
+      | CP.UTF8 s -> `String s
+      | CP.MethodHandle _ -> fail (Unsupported "dynamic binding of methods")
+      | CP.MethodType _ -> fail (Unsupported "constant pool tag MethodType")
+      | CP.InvokeDynamic _ -> fail (Unsupported "instruction INVOKEDYNAMIC")
+      | CP.ModuleId _ -> fail (Unsupported "module system (jigsaw)")
+  (* These don't do much work, but are convenient. *)
+  and decode_classref pool i = match decode pool i with
+    | #classref as g -> g
+    | _ -> fail Invalid_pool_element
+  and decode_field pool i = match decode pool i with
+    | #field as g -> g
+    | _ -> fail Invalid_pool_element
+  and decode_fieldref pool i = match decode pool i with
+    | #fieldref as g -> g
+    | _ -> fail Invalid_pool_element
+  and decode_methodref pool i = match decode pool i with
+    | #methodref as g -> g
+    | _ -> fail Invalid_pool_element
+  and decode_stack pool i = match decode pool i with
+    | #stack as g -> g
+    | _ -> fail Invalid_pool_element
+  and decode_typeref pool i = match decode pool i with
+    | #typeref as g -> g
+    | _ -> fail Invalid_pool_element
+
+  let rec encode pool (e : t) = match e with
+    | #methodref -> failwith "INTERNAL: You must use encode_methodref"
+    | `Array_type a -> CP.add_array_class pool a
+    | `Class_or_interface c -> CP.add_class pool c
+    | `Double d -> CP.add_double pool d
+    | `Fieldref (c, f, t) -> CP.add_field pool c f t
+    | `Float f -> CP.add_float pool f
+    | `Int i -> CP.add_integer pool i
+    | `Long l -> CP.add_long pool l
+    | `String s -> CP.add_string pool s
+  let encode_methodref is_interface pool (c : methodref) = match c with
+    | `Methodref (`Class_or_interface c, m, t) ->
+        (if is_interface then CP.add_interface_method else CP.add_method)
+        pool c m t
+    | `Methodref (`Array_type a, m, t) -> CP.add_array_method pool a m t
+  let encode_fieldref pool (c : fieldref) = encode pool (c :> t)
+  let encode_stack pool (c : stack) = encode pool (c :> t)
+  let encode_typeref pool (c : typeref) = encode pool (c :> t)
+
+  let size : t -> int = function `Double _ | `Long _ -> 2 | _ -> 1
+end (* }}} *)
+module HC = HighConstant
 module HighInstruction = struct (* {{{ *)
   type label = int64
 
@@ -105,7 +221,7 @@ module HighInstruction = struct (* {{{ *)
     | AASTORE
     | ACONST_NULL
     | ALOAD of int
-    | ANEWARRAY of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | ANEWARRAY of HC.typeref
     | ARETURN
     | ARRAYLENGTH
     | ASTORE of int
@@ -115,7 +231,7 @@ module HighInstruction = struct (* {{{ *)
     | BIPUSH of int
     | CALOAD
     | CASTORE
-    | CHECKCAST of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | CHECKCAST of HC.typeref
     | D2F
     | D2I
     | D2L
@@ -159,8 +275,8 @@ module HighInstruction = struct (* {{{ *)
     | FRETURN
     | FSTORE of int
     | FSUB
-    | GETFIELD of (Name.for_class * Name.for_field * Descriptor.for_field)
-    | GETSTATIC of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | GETFIELD of HC.fieldref
+    | GETSTATIC of HC.fieldref
     | GOTO of label
     | I2B
     | I2C
@@ -200,12 +316,11 @@ module HighInstruction = struct (* {{{ *)
     | ILOAD of int
     | IMUL
     | INEG
-    | INSTANCEOF of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
-  (*  | INVOKEDYNAMIC of (Bootstrap.method_specifier * Name.for_method * Descriptor.for_method) *)
-    | INVOKEINTERFACE of (Name.for_class * Name.for_method * Descriptor.for_method) * U.u1
-    | INVOKESPECIAL of (Name.for_class * Name.for_method * Descriptor.for_method)
-    | INVOKESTATIC of (Name.for_class * Name.for_method * Descriptor.for_method)
-    | INVOKEVIRTUAL of ([`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type] * Name.for_method * Descriptor.for_method)
+    | INSTANCEOF of HC.typeref
+    | INVOKEINTERFACE of HC.methodref
+    | INVOKESPECIAL of HC.methodref
+    | INVOKESTATIC of HC.methodref
+    | INVOKEVIRTUAL of HC.methodref
     | IOR
     | IREM
     | IRETURN
@@ -226,15 +341,7 @@ module HighInstruction = struct (* {{{ *)
     | LCMP
     | LCONST_0
     | LCONST_1
-    | LDC of [ `Int of int32
-	     | `Float of float
-	     | `String of U.UTF8.t
-	     | `Class_or_interface of Name.for_class
-	     | `Array_type of Descriptor.array_type
-	     | `Method_type of Descriptor.for_method
-	     | `Method_handle of Bootstrap.method_handle
-             | `Long of int64
-             | `Double of float ]
+    | LDC of HC.stack
     | LDIV
     | LLOAD of int
     | LMUL
@@ -251,14 +358,14 @@ module HighInstruction = struct (* {{{ *)
     | LXOR
     | MONITORENTER
     | MONITOREXIT
-    | MULTIANEWARRAY of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type] * int
+    | MULTIANEWARRAY of HC.typeref * int
     | NEW of Name.for_class
     | NEWARRAY of Descriptor.java_type
     | NOP
     | POP
     | POP2
-    | PUTFIELD of (Name.for_class * Name.for_field * Descriptor.for_field)
-    | PUTSTATIC of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | PUTFIELD of HC.fieldref
+    | PUTSTATIC of HC.fieldref
     | RET of int
     | RETURN
     | SALOAD
@@ -296,6 +403,7 @@ module HighInstruction = struct (* {{{ *)
 *)
     let rel_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (ofs + (s :> int)) in
     let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + s4_to_int s) in
+    (*
     let entry = CP.get_entry pool in
     let utf8 = CP.get_utf8_entry pool in
     let get_class_or_array i =
@@ -317,18 +425,13 @@ module HighInstruction = struct (* {{{ *)
             Name.make_for_method (utf8 i2),
             Descriptor.method_of_utf8 (utf8 i3))
       | _ -> fail Invalid_pool_entry in
-    let get_special_ref cls nat = match entry cls, entry nat with
-      | CP.Class i1, CP.NameAndType (i2, i3)
-        when U.UTF8.equal (utf8 i2) class_constructor ->
-          (Name.make_for_class_from_internal (utf8 i1),
-            fst (Descriptor.method_of_utf8 (utf8 i3)))
-      | _ -> fail Invalid_pool_entry in
     let get_array_method_ref cls nat = match entry cls, entry nat with
       | CP.Class i1, CP.NameAndType (i2, i3) ->
           (get_class_or_array i1,
             Name.make_for_method (utf8 i2),
             Descriptor.method_of_utf8 (utf8 i3))
       | _ -> fail Invalid_pool_entry in
+  *)
     let primitive_array_type_of_int = function
       | 4 -> `Boolean
       | 5 -> `Char
@@ -339,27 +442,8 @@ module HighInstruction = struct (* {{{ *)
       | 10 -> `Int
       | 11 -> `Long
       | _ -> fail Invalid_primitive_array_type in
-    let get_method_handle kind idx =
-      match kind, entry idx with
-      | CP.REF_getField, CP.Fieldref (fc, nt) ->
-        `getField (get_field_ref fc nt)
-      | CP.REF_getStatic, CP.Fieldref (fc, nt) ->
-        `getStatic (get_field_ref fc nt)
-      | CP.REF_putField, CP.Fieldref (fc, nt) ->
-        `putField (get_field_ref fc nt)
-      | CP.REF_putStatic, CP.Fieldref (fc, nt) ->
-        `putStatic (get_field_ref fc nt)
-      | CP.REF_invokeVirtual, CP.Methodref (mc, mt) ->
-        `invokeVirtual (get_method_ref mc mt)
-      | CP.REF_invokeStatic, CP.Methodref (mc, mt) ->
-        `invokeStatic (get_method_ref mc mt)
-      | CP.REF_invokeSpecial, CP.Methodref (mc, mt) ->
-        `invokeSpecial (get_method_ref mc mt)
-      | CP.REF_newInvokeSpecial, CP.Methodref (mc, mt) ->
-        `newInvokeSpecial (get_special_ref mc mt)
-      | CP.REF_invokeInterface, CP.Methodref (mc, mt) ->
-        `invokeInterface (get_method_ref mc mt)
-      | _ -> fail Invalid_method_handle in
+    let hi_NEW c = match HC.decode_classref pool c with
+      | `Class_or_interface n -> NEW n in
     function
       | BC.AALOAD -> AALOAD
       | BC.AASTORE -> AASTORE
@@ -369,7 +453,7 @@ module HighInstruction = struct (* {{{ *)
       | BC.ALOAD_1 -> ALOAD 1
       | BC.ALOAD_2 -> ALOAD 2
       | BC.ALOAD_3 -> ALOAD 3
-      | BC.ANEWARRAY p1 -> ANEWARRAY (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+      | BC.ANEWARRAY p1 -> ANEWARRAY (HC.decode_typeref pool p1)
       | BC.ARETURN -> ARETURN
       | BC.ARRAYLENGTH -> ARRAYLENGTH
       | BC.ASTORE p1 -> ASTORE (u1_to_int p1)
@@ -383,7 +467,7 @@ module HighInstruction = struct (* {{{ *)
       | BC.BIPUSH p1 -> BIPUSH (s1_to_int p1)
       | BC.CALOAD -> CALOAD
       | BC.CASTORE -> CASTORE
-      | BC.CHECKCAST p1 -> CHECKCAST (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
+      | BC.CHECKCAST p1 -> CHECKCAST (HC.decode_typeref pool p1)
       | BC.D2F -> D2F
       | BC.D2I -> D2I
       | BC.D2L -> D2L
@@ -443,8 +527,8 @@ module HighInstruction = struct (* {{{ *)
       | BC.FSTORE_2 -> FSTORE 2
       | BC.FSTORE_3 -> FSTORE 3
       | BC.FSUB -> FSUB
-      | BC.GETFIELD p1 -> GETFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-      | BC.GETSTATIC p1 -> GETSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.GETFIELD p1 -> GETFIELD (HC.decode_fieldref pool p1)
+      | BC.GETSTATIC p1 -> GETSTATIC (HC.decode_fieldref pool p1)
       | BC.GOTO p1 -> GOTO (rel_s_ofs_to_lbl p1)
       | BC.GOTO_W p1 -> GOTO (rel_l_ofs_to_lbl p1)
       | BC.I2B -> I2B
@@ -489,12 +573,12 @@ module HighInstruction = struct (* {{{ *)
       | BC.ILOAD_3 -> ILOAD 3
       | BC.IMUL -> IMUL
       | BC.INEG -> INEG
-      | BC.INSTANCEOF p1 -> INSTANCEOF (match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element)
-      | BC.INVOKEDYNAMIC p1 -> fail (Unsupported_instruction "INVOKEDYNAMIC")
-      | BC.INVOKEINTERFACE (p1, p2) -> INVOKEINTERFACE ((match entry p1 with | CP.InterfaceMethodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element), p2)
-      | BC.INVOKESPECIAL p1 -> INVOKESPECIAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-      | BC.INVOKESTATIC p1 -> INVOKESTATIC (match entry p1 with | CP.Methodref (cls, nat) -> (get_method_ref cls nat) | _ -> fail Invalid_pool_element)
-      | BC.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (match entry p1 with | CP.Methodref (cls, nat) -> (get_array_method_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.INSTANCEOF p1 -> INSTANCEOF (HC.decode_typeref pool p1)
+      | BC.INVOKEDYNAMIC p1 -> fail (Unsupported "Instruction INVOKEDYNAMIC")
+      | BC.INVOKEINTERFACE (p1, _) -> INVOKEINTERFACE (HC.decode_methodref pool p1)
+      | BC.INVOKESPECIAL p1 -> INVOKESPECIAL (HC.decode_methodref pool p1)
+      | BC.INVOKESTATIC p1 -> INVOKESTATIC (HC.decode_methodref pool p1)
+      | BC.INVOKEVIRTUAL p1 -> INVOKEVIRTUAL (HC.decode_methodref pool p1)
       | BC.IOR -> IOR
       | BC.IREM -> IREM
       | BC.IRETURN -> IRETURN
@@ -520,9 +604,9 @@ module HighInstruction = struct (* {{{ *)
       | BC.LCMP -> LCMP
       | BC.LCONST_0 -> LCONST_0
       | BC.LCONST_1 -> LCONST_1
-      | BC.LDC p1 -> LDC (match entry (U.u2_of_u1 p1) with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-      | BC.LDC2_W p1 -> LDC (match entry p1 with | CP.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
-      | BC.LDC_W p1 -> LDC (match entry p1 with | CP.Integer v -> `Int v | CP.Float v -> `Float (Int32.float_of_bits v) | CP.String idx -> `String (utf8 idx) | CP.Class idx -> get_class_or_array idx | CP.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (utf8 idx)) | CP.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
+      | BC.LDC c -> LDC (HC.decode_stack pool (U.u2_of_u1 c))
+      | BC.LDC2_W c -> LDC (HC.decode_stack pool c)
+      | BC.LDC_W c -> LDC (HC.decode_stack pool c)
       | BC.LDIV -> LDIV
       | BC.LLOAD p1 -> LLOAD (u1_to_int p1)
       | BC.LLOAD_0 -> LLOAD 0
@@ -555,14 +639,14 @@ module HighInstruction = struct (* {{{ *)
       | BC.LXOR -> LXOR
       | BC.MONITORENTER -> MONITORENTER
       | BC.MONITOREXIT -> MONITOREXIT
-      | BC.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY ((match entry p1 with | CP.Class idx -> get_class_or_array idx | _ -> fail Invalid_pool_element), u1_to_int p2)
-      | BC.NEW p1 -> NEW (match entry p1 with | CP.Class idx -> (Name.make_for_class_from_internal (utf8 idx)) | _ -> fail Invalid_pool_element)
+      | BC.MULTIANEWARRAY (p1, p2) -> MULTIANEWARRAY (HC.decode_typeref pool p1, u1_to_int p2)
+      | BC.NEW p1 -> hi_NEW p1
       | BC.NEWARRAY p1 -> NEWARRAY (primitive_array_type_of_int (p1 :> int))
       | BC.NOP -> NOP
       | BC.POP -> POP
       | BC.POP2 -> POP2
-      | BC.PUTFIELD p1 -> PUTFIELD (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
-      | BC.PUTSTATIC p1 -> PUTSTATIC (match entry p1 with | CP.Fieldref (cls, nat) -> (get_field_ref cls nat) | _ -> fail Invalid_pool_element)
+      | BC.PUTFIELD p1 -> PUTFIELD (HC.decode_fieldref pool p1)
+      | BC.PUTSTATIC p1 -> PUTSTATIC (HC.decode_fieldref pool p1)
       | BC.RET p1 -> RET (u1_to_int p1)
       | BC.RETURN -> RETURN
       | BC.SALOAD -> SALOAD
@@ -608,16 +692,7 @@ module HighInstruction = struct (* {{{ *)
       | `Int -> 10
       | `Long -> 11
       | _ -> fail Invalid_primitive_array_type in
-    let reference = function
-      | `getField x -> CP.Reference_getField x
-      | `getStatic x -> CP.Reference_getStatic x
-      | `putField x -> CP.Reference_putField x
-      | `putStatic x -> CP.Reference_putStatic x
-      | `invokeVirtual x -> CP.Reference_invokeVirtual x
-      | `invokeStatic x -> CP.Reference_invokeStatic x
-      | `invokeSpecial x -> CP.Reference_invokeSpecial x
-      | `newInvokeSpecial x -> CP.Reference_newInvokeSpecial x
-      | `invokeInterface x -> CP.Reference_invokeInterface x in
+(*
     let index_of_constant c = ((match c with
       | `Int v -> CP.add_integer pool v
       | `Float v -> CP.add_float pool v
@@ -626,7 +701,9 @@ module HighInstruction = struct (* {{{ *)
       | `Array_type t -> CP.add_array_class pool t
       | `Method_type v -> CP.add_method_type pool v
       | `Method_handle v -> CP.add_method_handle pool (reference v)
-      | `Long v -> CP.add_long pool v
+      | `Long v ->
+(*           printf "@[oux %016Lx@]@\n" v; *)
+          CP.add_long pool v
       | `Double v -> CP.add_double pool v) :> int) in
     let u2_of_constant c =
       U.u2 (index_of_constant c) in
@@ -642,9 +719,15 @@ module HighInstruction = struct (* {{{ *)
       | `Long _
       | `Double _
           -> 2 in
-    let bc_INVOKEVIRTUAL p = BC.INVOKEVIRTUAL (match p with
-      | `Class_or_interface c, n, t -> CP.add_method pool c n t
-      | `Array_type a, n, t -> CP.add_array_method pool a n t) in
+*)
+    let bc_INVOKEINTERFACE m =
+      (* TODO(rgrig): Move the following two helpers in [Descriptor]? *)
+      let sizeof_jt : Descriptor.for_parameter -> int = function
+        | `Long | `Double -> 2 | _ -> 1 in
+      let sizeof_m ((args, _) : Descriptor.for_method) : int =
+        List.fold_left (fun s a -> s + sizeof_jt a) 1 args in
+      let `Methodref (_, _, d) = m in
+      BC.INVOKEINTERFACE (HC.encode_methodref true pool m, U.u1 (sizeof_m d)) in
     let bc_LOOKUPSWITCH { ls_def; ls_branches } =
       let def = s4_offset ls_def in
       let cnt = s4 (List.length ls_branches) in
@@ -659,12 +742,12 @@ module HighInstruction = struct (* {{{ *)
       BC.TABLESWITCH (def, low, high, ofss) in
 
     (* Helpers that pick between wide and narrow versions of instructions. *)
-    let bc_LDC c =
-      let j = index_of_constant c in
-      if size_of_constant c = 2 then
-        BC.LDC2_W (U.u2 j)
+    let bc_LDC (c : HC.stack) =
+      let j = HC.encode_stack pool c in
+      if HC.size (c :> HC.t) = 2 then
+        BC.LDC2_W j
       else
-        BC.LDC_W (U.u2 j) in
+        BC.LDC_W j in
     let bc_ALOAD x = BC.WIDE_ALOAD (U.u2 x) in
     let bc_ASTORE x = BC.WIDE_ASTORE (U.u2 x) in
     let bc_DLOAD x = BC.WIDE_DLOAD (U.u2 x) in
@@ -685,7 +768,7 @@ module HighInstruction = struct (* {{{ *)
     | AASTORE -> BC.AASTORE
     | ACONST_NULL -> BC.ACONST_NULL
     | ALOAD p1 -> bc_ALOAD p1
-    | ANEWARRAY p1 -> BC.ANEWARRAY (u2_of_constant p1)
+    | ANEWARRAY p1 -> BC.ANEWARRAY (HC.encode_typeref pool p1)
     | ARETURN -> BC.ARETURN
     | ARRAYLENGTH -> BC.ARRAYLENGTH
     | ASTORE p1 -> bc_ASTORE p1
@@ -695,7 +778,7 @@ module HighInstruction = struct (* {{{ *)
     | BIPUSH p1 -> BC.BIPUSH (U.s1 p1)
     | CALOAD -> BC.CALOAD
     | CASTORE -> BC.CASTORE
-    | CHECKCAST p1 -> BC.CHECKCAST (u2_of_constant p1)
+    | CHECKCAST p1 -> BC.CHECKCAST (HC.encode_typeref pool p1)
     | D2F -> BC.D2F
     | D2I -> BC.D2I
     | D2L -> BC.D2L
@@ -739,8 +822,8 @@ module HighInstruction = struct (* {{{ *)
     | FRETURN -> BC.FRETURN
     | FSTORE p1 -> bc_FSTORE p1
     | FSUB -> BC.FSUB
-    | GETFIELD (c, n, t) -> BC.GETFIELD (CP.add_field pool c n t)
-    | GETSTATIC (c, n, t) -> BC.GETSTATIC (CP.add_field pool c n t)
+    | GETFIELD f -> BC.GETFIELD (HC.encode_fieldref pool f)
+    | GETSTATIC f -> BC.GETSTATIC (HC.encode_fieldref pool f)
     | GOTO p1 -> bc_GOTO p1
     | I2B -> BC.I2B
     | I2C -> BC.I2C
@@ -780,11 +863,11 @@ module HighInstruction = struct (* {{{ *)
     | ILOAD p1 -> bc_ILOAD p1
     | IMUL -> BC.IMUL
     | INEG -> BC.INEG
-    | INSTANCEOF p1 -> BC.INSTANCEOF (u2_of_constant p1)
-    | INVOKEINTERFACE ((c, n, t), p2) -> BC.INVOKEINTERFACE (CP.add_interface_method pool c n t, p2)
-    | INVOKESPECIAL (c, n, t) -> BC.INVOKESPECIAL (CP.add_method pool c n t)
-    | INVOKESTATIC (c, n, t) -> BC.INVOKESTATIC (CP.add_method pool c n t)
-    | INVOKEVIRTUAL p1 -> bc_INVOKEVIRTUAL p1
+    | INSTANCEOF p1 -> BC.INSTANCEOF (HC.encode_typeref pool p1)
+    | INVOKEINTERFACE m -> bc_INVOKEINTERFACE m
+    | INVOKESPECIAL m -> BC.INVOKESPECIAL (HC.encode_methodref false pool m)
+    | INVOKESTATIC m -> BC.INVOKESTATIC (HC.encode_methodref false pool m)
+    | INVOKEVIRTUAL m -> BC.INVOKEVIRTUAL (HC.encode_methodref false pool m)
     | IOR -> BC.IOR
     | IREM -> BC.IREM
     | IRETURN -> BC.IRETURN
@@ -822,14 +905,14 @@ module HighInstruction = struct (* {{{ *)
     | LXOR -> BC.LXOR
     | MONITORENTER -> BC.MONITORENTER
     | MONITOREXIT -> BC.MONITOREXIT
-    | MULTIANEWARRAY (c, d) -> BC.MULTIANEWARRAY (u2_of_constant c, U.u1 d)
+    | MULTIANEWARRAY (c, d) -> BC.MULTIANEWARRAY (HC.encode_typeref pool c, U.u1 d)
     | NEW c -> BC.NEW (CP.add_class pool c)
     | NEWARRAY p1 -> BC.NEWARRAY (U.u1 (int_of_primitive_array_type p1))
     | NOP -> BC.NOP
     | POP -> BC.POP
     | POP2 -> BC.POP2
-    | PUTFIELD (c, n, t) -> BC.PUTFIELD (CP.add_field pool c n t)
-    | PUTSTATIC (c, n, t) -> BC.PUTSTATIC (CP.add_field pool c n t)
+    | PUTFIELD f -> BC.PUTFIELD (HC.encode_fieldref pool f)
+    | PUTSTATIC f -> BC.PUTSTATIC (HC.encode_fieldref pool f)
     | RET p1 -> bc_RET p1
     | RETURN -> BC.RETURN
     | SALOAD -> BC.SALOAD
@@ -963,7 +1046,7 @@ module HighInstruction = struct (* {{{ *)
     | LCMP -> Version.make_bounds "'LCMP' instruction" Version.Java_1_0 None
     | LCONST_0 -> Version.make_bounds "'LCONST_0' instruction" Version.Java_1_0 None
     | LCONST_1 -> Version.make_bounds "'LCONST_1' instruction" Version.Java_1_0 None
-    | LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_1_5 | `Method_type _ -> Version.Java_1_7 | `Method_handle _ -> Version.Java_1_7 | _ -> Version.Java_1_0) None
+    | LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ -> Version.Java_1_5 | _ -> Version.Java_1_0) None
     | LDIV -> Version.make_bounds "'LDIV' instruction" Version.Java_1_0 None
     | LLOAD _ -> Version.make_bounds "'LLOAD' instruction" Version.Java_1_0 None
     | LMUL -> Version.make_bounds "'LMUL' instruction" Version.Java_1_0 None
@@ -1162,6 +1245,7 @@ module HighAttribute = struct (* {{{ *)
 
   (* high-level *)
 
+  (* This is conceptually a subtype of CP.element. *)
   type constant_value =
     | Long_value of int64
     | Float_value of float
@@ -1239,7 +1323,7 @@ module HighAttribute = struct (* {{{ *)
     | `Unknown of Utils.UTF8.t * string ]
 
   type for_field =
-    [ `ConstantValue of constant_value
+    [ `ConstantValue of HC.field
     | `Synthetic
     | `FieldSignature of Signature.field_type_signature
     | `Deprecated
@@ -1331,7 +1415,7 @@ module SymbExe = struct  (* {{{ *)
     | VI_double
     | VI_null
     | VI_uninitialized_this
-    | VI_object of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | VI_object of HC.typeref
     | VI_uninitialized of HI.label
     | VI_return_address of LS.t
 
@@ -1436,7 +1520,7 @@ module SymbExe = struct  (* {{{ *)
 
   let pp_stack f x = fprintf f "@[[%a ]@]" (U.pp_list pp_vi) x
 
-  let equal_stack a b = List.fold_left2 (fun r a b -> r && equal_vi_se a b) true a b 
+  let equal_stack a b = List.fold_left2 (fun r a b -> r && equal_vi_se a b) true a b
 
   let empty () = []
 
@@ -2039,13 +2123,13 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if VI_float stack in
 	let stack = push VI_float stack in
 	continue locals stack
-      | HI.GETFIELD (_, _, desc) ->
+      | HI.GETFIELD (`Fieldref (_, _, desc)) ->
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
 	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
-      | HI.GETSTATIC (_, _, desc) ->
+      | HI.GETSTATIC (`Fieldref (_, _, desc)) ->
 	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
       | HI.GOTO lbl ->
@@ -2207,7 +2291,7 @@ module SymbExe = struct  (* {{{ *)
     let stack = push_return_value ret stack in
     { locals; stack }
   *)
-      | HI.INVOKEINTERFACE ((_, _, (params, ret)), _) ->
+      | HI.INVOKEINTERFACE (`Methodref (_, _, (params, ret))) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let topv = top stack in
@@ -2215,7 +2299,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop stack in
 	let stack = push_return_value ret stack in
 	continue locals stack
-      | HI.INVOKESPECIAL (cn, mn, (params, ret)) ->
+      | HI.INVOKESPECIAL (`Methodref (cn, mn, (params, ret))) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let topv = top stack in
@@ -2229,22 +2313,22 @@ module SymbExe = struct  (* {{{ *)
               | VI_uninitialized lbl ->
 		let f = function
 		  | VI_uninitialized lbl' when lbl = lbl' ->
-		    VI_object (`Class_or_interface cn)
+		    VI_object cn
 		  | x -> x in
 		U.IntMap.map f locals, List.map f stack
               | VI_uninitialized_this ->
-		let f = function VI_uninitialized_this -> VI_object (`Class_or_interface cn) | x -> x in
+		let f = function VI_uninitialized_this -> VI_object cn | x -> x in
 		U.IntMap.map f locals, List.map f stack
               | _ -> locals, stack
           else
             locals, stack in
 	continue locals stack
-      | HI.INVOKESTATIC (_, _, (params, ret)) ->
+      | HI.INVOKESTATIC (`Methodref (_, _, (params, ret))) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let stack = push_return_value ret stack in
 	continue locals stack
-      | HI.INVOKEVIRTUAL (_, _, (params, ret)) ->
+      | HI.INVOKEVIRTUAL (`Methodref (_, _, (params, ret))) ->
 	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let topv = top stack in
@@ -2447,13 +2531,13 @@ module SymbExe = struct  (* {{{ *)
           else
             pop stack in
 	continue locals stack
-      | HI.PUTFIELD (_, _, desc) ->
+      | HI.PUTFIELD (`Fieldref (_, _, desc)) ->
 	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
 	continue locals stack
-      | HI.PUTSTATIC (_, _, desc) ->
+      | HI.PUTSTATIC (`Fieldref (_, _, desc)) ->
 	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
 	continue locals stack
       | HI.RET index ->
@@ -2741,21 +2825,8 @@ module HighAttributeOps = struct (* {{{ *)
     ; da_i : A.info }
 
   let decode_attr_constant_value _ r st =
-        let const_index = IS.read_u2 st in
-        match CP.get_entry r.da_pool const_index with
-        | CP.Long (hi, lo) ->
-            let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
-            `ConstantValue (HA.Long_value v)
-        | CP.Float v ->
-            `ConstantValue (HA.Float_value (Int32.float_of_bits v))
-        | CP.Double (hi, lo) ->
-            let v = Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo) in
-            `ConstantValue (HA.Double_value (Int64.float_of_bits v))
-        | CP.Integer v ->
-            `ConstantValue (HA.Integer_value v)
-        | CP.String idx ->
-            `ConstantValue (HA.String_value (CP.get_utf8_entry r.da_pool idx))
-        | _ -> fail Invalid_constant_value
+    let i = IS.read_u2 st in
+    `ConstantValue (HC.decode_field r.da_pool i)
 
   let decode_attr_code decode r st =
     (* read these anyway to get into the stream *)
@@ -3265,35 +3336,27 @@ module HighAttributeOps = struct (* {{{ *)
     OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
     enc_return enc attr_code
 
-  let encode_attr_constant_value enc = function
-      | HA.Boolean_value b ->
-          let idx = CP.add_integer enc.en_pool (if b then 1l else 0l) in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | HA.Byte_value v | HA.Character_value v | HA.Short_value v ->
-          let idx = CP.add_integer enc.en_pool (Int32.of_int v) in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | HA.Double_value d ->
-          let idx = CP.add_double enc.en_pool d in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | HA.Float_value f ->
-          let idx = CP.add_float enc.en_pool f in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | HA.Integer_value i ->
-          let idx = CP.add_integer enc.en_pool i in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | HA.Long_value l ->
-          let idx = CP.add_long enc.en_pool l in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
-      | HA.String_value s ->
-          let idx = CP.add_string enc.en_pool s in
-          OS.write_u2 enc.en_st idx;
-          enc_return enc attr_constant_value
+  let encode_attr_constant_value enc (c : HC.field) = match c with
+    | `Double d ->
+        let idx = CP.add_double enc.en_pool d in
+        OS.write_u2 enc.en_st idx;
+        enc_return enc attr_constant_value
+    | `Float f ->
+        let idx = CP.add_float enc.en_pool f in
+        OS.write_u2 enc.en_st idx;
+        enc_return enc attr_constant_value
+    | `Int i ->
+        let idx = CP.add_integer enc.en_pool i in
+        OS.write_u2 enc.en_st idx;
+        enc_return enc attr_constant_value
+    | `Long l ->
+        let idx = CP.add_long enc.en_pool l in
+        OS.write_u2 enc.en_st idx;
+        enc_return enc attr_constant_value
+    | `String s ->
+        let idx = CP.add_string enc.en_pool s in
+        OS.write_u2 enc.en_st idx;
+        enc_return enc attr_constant_value
 
   let encode_attr_deprecated enc = enc_return enc attr_deprecated
 
