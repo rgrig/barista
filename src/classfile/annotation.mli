@@ -69,6 +69,7 @@ type target =
 (** Represents the target, that is the element actually annotated by an
     extended annotation. *)
 
+(* TODO(rgrig): Make normal variant, or comment why it is polymorphic. *)
 type primitive_type =
   [ `Boolean
   | `Byte

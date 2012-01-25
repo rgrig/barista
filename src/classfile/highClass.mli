@@ -10,6 +10,43 @@
 (* NOTE: This is supposed to be what [ClassDefinition] should have been in
 the first place. *)
 
+module HighConstant : sig (* {{{ *)
+  type primitive =
+    [ `Double of float
+    | `Float of float
+    | `Int of int32
+    | `Long of int64
+    | `String of Utils.UTF8.t ]
+  type arrayref =
+    [ `Array_type of Descriptor.array_type ]
+  type classref =
+    [ `Class_or_interface of Name.for_class ]
+  type typeref =
+    [ arrayref | classref ]
+  type fieldref = (* used by instructions like GETFIELD *)
+    [ `Fieldref of Name.for_class * Name.for_field * Descriptor.for_field ]
+  type methodref =
+    [ `Methodref of typeref * Name.for_method * Descriptor.for_method ]
+  type stack = (* what LDC may put on the stack *)
+    [ primitive | typeref ]
+  type field = (* what may initialize a field *)
+    primitive
+
+  (* Anything that may come from (the low-level) [ConstantPool.element]. *)
+  type t =
+    [ arrayref
+    | classref
+    | field
+    | fieldref
+    | methodref
+    | primitive
+    | stack ]
+
+  val decode : ConstantPool.t -> Utils.u2 -> t
+  val encode : ConstantPool.extendable -> t -> Utils.u2
+
+  (* TODO(rgrig): Add here the [decode_*] functions. *)
+end (* }}} *)
 module HighInstruction : sig (* {{{ *)
   type label
   val fresh_label : unit -> label
@@ -28,7 +65,7 @@ module HighInstruction : sig (* {{{ *)
     | AASTORE
     | ACONST_NULL
     | ALOAD of int
-    | ANEWARRAY of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | ANEWARRAY of HighConstant.typeref
     | ARETURN
     | ARRAYLENGTH
     | ASTORE of int
@@ -38,7 +75,7 @@ module HighInstruction : sig (* {{{ *)
     | BIPUSH of int
     | CALOAD
     | CASTORE
-    | CHECKCAST of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
+    | CHECKCAST of HighConstant.typeref
     | D2F
     | D2I
     | D2L
@@ -82,8 +119,8 @@ module HighInstruction : sig (* {{{ *)
     | FRETURN
     | FSTORE of int
     | FSUB
-    | GETFIELD of (Name.for_class * Name.for_field * Descriptor.for_field)
-    | GETSTATIC of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | GETFIELD of HighConstant.fieldref
+    | GETSTATIC of HighConstant.fieldref
     | GOTO of label
     | I2B
     | I2C
@@ -123,12 +160,11 @@ module HighInstruction : sig (* {{{ *)
     | ILOAD of int
     | IMUL
     | INEG
-    | INSTANCEOF of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type]
-  (*  | INVOKEDYNAMIC of (Bootstrap.method_specifier * Name.for_method * Descriptor.for_method) *)
-    | INVOKEINTERFACE of (Name.for_class * Name.for_method * Descriptor.for_method) * Utils.u1
-    | INVOKESPECIAL of (Name.for_class * Name.for_method * Descriptor.for_method)
-    | INVOKESTATIC of (Name.for_class * Name.for_method * Descriptor.for_method)
-    | INVOKEVIRTUAL of ([`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type] * Name.for_method * Descriptor.for_method)
+    | INSTANCEOF of HighConstant.typeref
+    | INVOKEINTERFACE of HighConstant.methodref
+    | INVOKESPECIAL of HighConstant.methodref
+    | INVOKESTATIC of HighConstant.methodref
+    | INVOKEVIRTUAL of HighConstant.methodref
     | IOR
     | IREM
     | IRETURN
@@ -149,15 +185,7 @@ module HighInstruction : sig (* {{{ *)
     | LCMP
     | LCONST_0
     | LCONST_1
-    | LDC of [ `Int of int32
-	     | `Float of float
-	     | `String of Utils.UTF8.t
-	     | `Class_or_interface of Name.for_class
-	     | `Array_type of Descriptor.array_type
-	     | `Method_type of Descriptor.for_method
-	     | `Method_handle of Bootstrap.method_handle
-             | `Long of int64
-             | `Double of float ]
+    | LDC of HighConstant.stack
     | LDIV
     | LLOAD of int
     | LMUL
@@ -174,14 +202,14 @@ module HighInstruction : sig (* {{{ *)
     | LXOR
     | MONITORENTER
     | MONITOREXIT
-    | MULTIANEWARRAY of [`Class_or_interface of Name.for_class | `Array_type of Descriptor.array_type] * int
+    | MULTIANEWARRAY of HighConstant.typeref * int
     | NEW of Name.for_class
     | NEWARRAY of Descriptor.java_type
     | NOP
     | POP
     | POP2
-    | PUTFIELD of (Name.for_class * Name.for_field * Descriptor.for_field)
-    | PUTSTATIC of (Name.for_class * Name.for_field * Descriptor.for_field)
+    | PUTFIELD of HighConstant.fieldref
+    | PUTSTATIC of HighConstant.fieldref
     | RET of int
     | RETURN
     | SALOAD
@@ -197,17 +225,6 @@ module HighInstruction : sig (* {{{ *)
   val version_bounds : t -> Version.bounds
 end (* }}} *)
 module HighAttribute : sig (* {{{ *)
-  type constant_value =
-    | Long_value of int64
-    | Float_value of float
-    | Double_value of float
-    | Boolean_value of bool
-    | Byte_value of int
-    | Character_value of int
-    | Short_value of int
-    | Integer_value of int32
-    | String_value of Utils.UTF8.t
-
   type inner_class_element = {
       inner_class : Name.for_class option;
       outer_class : Name.for_class option;
@@ -275,7 +292,7 @@ module HighAttribute : sig (* {{{ *)
     | `Unknown of Utils.UTF8.t * string ]
 
   type for_field =
-    [ `ConstantValue of constant_value
+    [ `ConstantValue of HighConstant.field
     | `Synthetic
     | `FieldSignature of Signature.field_type_signature
     | `Deprecated
@@ -404,7 +421,7 @@ type error =
   | SE_unexpected_size of (int * string)
   | SE_uninitialized_register of (int * int)
   | Too_many of string
-  | Unsupported_instruction of string
+  | Unsupported of string
 
 val string_of_error : error -> string
 
