@@ -28,7 +28,7 @@ type info = {
     access_flags : Utils.u2;
     name_index : Utils.u2;
     descriptor_index : Utils.u2;
-    attributes_count : Utils.u2;
+    attributes_count : Utils.u2;  (* TODO(rgrig): Remove redundant field. *)
     attributes_array : Attribute.info array;
   }
 (** Represents a field as defined in the class file format specification. *)

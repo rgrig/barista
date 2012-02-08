@@ -192,6 +192,7 @@ module HighConstant = struct (* {{{ *)
         (if is_interface then CP.add_interface_method else CP.add_method)
         pool c m t
     | `Methodref (`Array_type a, m, t) -> CP.add_array_method pool a m t
+  let encode_field pool (c : field) = encode pool (c :> t)
   let encode_fieldref pool (c : fieldref) = encode pool (c :> t)
   let encode_stack pool (c : stack) = encode pool (c :> t)
   let encode_typeref pool (c : typeref) = encode pool (c :> t)
@@ -395,43 +396,9 @@ module HighInstruction = struct (* {{{ *)
   let u1_to_int (u : U.u1) = (u :> int)
   let u2_to_int (u : U.u2) = (u :> int)
 
-  (* TODO(rgrig): handle overflow *)
   let decode pool ofs_to_lbl ofs =
-(*
-    let abs_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (s :> int) in
-    let abs_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (Int32.to_int (s :> Int32.t)) in
-*)
     let rel_s_ofs_to_lbl (s : U.s2) = ofs_to_lbl (ofs + (s :> int)) in
     let rel_l_ofs_to_lbl (s : U.s4) = ofs_to_lbl (ofs + s4_to_int s) in
-    (*
-    let entry = CP.get_entry pool in
-    let utf8 = CP.get_utf8_entry pool in
-    let get_class_or_array i =
-      let s = utf8 i in
-      if U.UChar.equal opening_square_bracket (U.UTF8.get s 0) then
-        let t = Descriptor.java_type_of_internal_utf8 s in
-        `Array_type (Descriptor.filter_non_array Descriptor.Invalid_array_element_type t)
-      else
-        `Class_or_interface (Name.make_for_class_from_internal s) in
-    let get_field_ref cls nat = match entry cls, entry nat with
-      | CP.Class i1, CP.NameAndType (i2, i3) ->
-          (Name.make_for_class_from_internal (utf8 i1),
-           Name.make_for_field (utf8 i2),
-           Descriptor.field_of_utf8 (utf8 i3))
-      | _ -> fail Invalid_pool_entry in
-    let get_method_ref cls nat = match entry cls, entry nat with
-      | CP.Class i1, CP.NameAndType (i2, i3) ->
-          (Name.make_for_class_from_internal (utf8 i1),
-            Name.make_for_method (utf8 i2),
-            Descriptor.method_of_utf8 (utf8 i3))
-      | _ -> fail Invalid_pool_entry in
-    let get_array_method_ref cls nat = match entry cls, entry nat with
-      | CP.Class i1, CP.NameAndType (i2, i3) ->
-          (get_class_or_array i1,
-            Name.make_for_method (utf8 i2),
-            Descriptor.method_of_utf8 (utf8 i3))
-      | _ -> fail Invalid_pool_entry in
-  *)
     let primitive_array_type_of_int = function
       | 4 -> `Boolean
       | 5 -> `Char
@@ -692,34 +659,6 @@ module HighInstruction = struct (* {{{ *)
       | `Int -> 10
       | `Long -> 11
       | _ -> fail Invalid_primitive_array_type in
-(*
-    let index_of_constant c = ((match c with
-      | `Int v -> CP.add_integer pool v
-      | `Float v -> CP.add_float pool v
-      | `String v -> CP.add_string pool v
-      | `Class_or_interface u -> CP.add_class pool u
-      | `Array_type t -> CP.add_array_class pool t
-      | `Method_type v -> CP.add_method_type pool v
-      | `Method_handle v -> CP.add_method_handle pool (reference v)
-      | `Long v ->
-(*           printf "@[oux %016Lx@]@\n" v; *)
-          CP.add_long pool v
-      | `Double v -> CP.add_double pool v) :> int) in
-    let u2_of_constant c =
-      U.u2 (index_of_constant c) in
-    let size_of_constant = function
-      | `Int _
-      | `Float _
-      | `String _
-      | `Class_or_interface _
-      | `Array_type _
-      | `Method_type _
-      | `Method_handle _
-          -> 1
-      | `Long _
-      | `Double _
-          -> 2 in
-*)
     let bc_INVOKEINTERFACE m =
       (* TODO(rgrig): Move the following two helpers in [Descriptor]? *)
       let sizeof_jt : Descriptor.for_parameter -> int = function
@@ -1180,7 +1119,6 @@ module HighInstruction = struct (* {{{ *)
     | IMUL -> "IMUL"
     | INEG -> "INEG"
     | INSTANCEOF _ -> "INSTANCEOF"
-  (*  | INVOKEDYNAMIC _ -> "INVOKEDYNAMIC" *)
     | INVOKEINTERFACE _ -> "INVOKEINTERFACE"
     | INVOKESPECIAL _ -> "INVOKESPECIAL"
     | INVOKESTATIC _ -> "INVOKESTATIC"
@@ -1244,18 +1182,6 @@ module HighAttribute = struct (* {{{ *)
   open Consts
 
   (* high-level *)
-
-  (* This is conceptually a subtype of CP.element. *)
-  type constant_value =
-    | Long_value of int64
-    | Float_value of float
-    | Double_value of float
-    | Boolean_value of bool
-    | Byte_value of int
-    | Character_value of int
-    | Short_value of int
-    | Integer_value of int32
-    | String_value of Utils.UTF8.t
 
   type inner_class_element = {
       inner_class : Name.for_class option;
@@ -3132,11 +3058,6 @@ module HighAttributeOps = struct (* {{{ *)
       length = U.u4 (Int64.of_int (String.length content));
       data = content; }
 
-  let write_info enc i =
-    OS.write_u2 enc.en_st i.Attribute.name_index;
-    OS.write_u4 enc.en_st i.Attribute.length;
-    OS.write_bytes enc.en_st i.Attribute.data
-
   let write_annotations enc l =
     OS.write_elements
       (checked_length "annotations")
@@ -3328,35 +3249,19 @@ module HighAttributeOps = struct (* {{{ *)
     List.iter
       (fun a ->
         let res = encode (Some m) sub_enc.en_pool (a :> HA.t) in
-        write_info sub_enc res)
+        A.write_info sub_enc.en_st res)
       c.HA.attributes;
     let res = encode_attr_stackmaptable label_to_ofs enc.en_pool stackmap in
-    write_info sub_enc res;
+    A.write_info sub_enc.en_st res;
     OS.close sub_enc.en_st;
     OS.write_bytes enc.en_st (Buffer.contents sub_enc.en_buffer);
     enc_return enc attr_code
 
-  let encode_attr_constant_value enc (c : HC.field) = match c with
-    | `Double d ->
-        let idx = CP.add_double enc.en_pool d in
-        OS.write_u2 enc.en_st idx;
-        enc_return enc attr_constant_value
-    | `Float f ->
-        let idx = CP.add_float enc.en_pool f in
-        OS.write_u2 enc.en_st idx;
-        enc_return enc attr_constant_value
-    | `Int i ->
-        let idx = CP.add_integer enc.en_pool i in
-        OS.write_u2 enc.en_st idx;
-        enc_return enc attr_constant_value
-    | `Long l ->
-        let idx = CP.add_long enc.en_pool l in
-        OS.write_u2 enc.en_st idx;
-        enc_return enc attr_constant_value
-    | `String s ->
-        let idx = CP.add_string enc.en_pool s in
-        OS.write_u2 enc.en_st idx;
-        enc_return enc attr_constant_value
+  let encode_attr_constant_value enc (c : HC.field) =
+    let c = HC.encode_field enc.en_pool c in
+    OS.write_u2 enc.en_st c;
+    assert (Buffer.length enc.en_buffer = 2);
+    enc_return enc attr_constant_value
 
   let encode_attr_deprecated enc = enc_return enc attr_deprecated
 
@@ -3402,10 +3307,10 @@ module HighAttributeOps = struct (* {{{ *)
           | None -> U.u2 0
           | Some c -> CP.add_utf8 enc.en_pool c in
           let fl = AccessFlag.list_to_u2 (inner_flags :> AccessFlag.t list) in
-          OutputStream.write_u2 enc.en_st inner_idx;
-          OutputStream.write_u2 enc.en_st outer_idx;
-          OutputStream.write_u2 enc.en_st name_idx;
-          OutputStream.write_u2 enc.en_st fl)
+          OS.write_u2 enc.en_st inner_idx;
+          OS.write_u2 enc.en_st outer_idx;
+          OS.write_u2 enc.en_st name_idx;
+          OS.write_u2 enc.en_st fl)
         l;
       enc_return enc attr_inner_classes
 
@@ -3606,7 +3511,6 @@ module HighField = struct (* {{{ *)
 
 end (* }}} *)
 module HF = HighField
-
 (* }}} *)
 (* rest/most of HighClass *) (* {{{ *)
 type t = {
