@@ -6,7 +6,7 @@ import Data.Maybe
 import Data.Typeable
 import Data.Word
 import OMap (OMap)
-import Prelude hiding ((.), (!!))
+import Prelude hiding ((.))
 import System.Environment
 import System.IO
 import System.IO.Unsafe -- TODO: remove
@@ -52,23 +52,23 @@ class_file = struct
   , u2 "attributes_count"
   , array attribute_info "attributes" ]
 
-constant_pool v = v"constant_pool" !! (asInteger(v"") - 1)
+constant_pool v = v"constant_pool" ! (asInteger(v"") - 1)
 
 cp_info = union
-  [ constant_Class_info
-  , constant_Fieldref_info
-  , constant_Methodref_info
-  , constant_InterfaceMethodref_info
-  , constant_String_info
-  , constant_Integer_info
-  , constant_Float_info
-  , constant_Long_info
-  , constant_Double_info
-  , constant_NameAndType_info
-  , constant_Utf8_info
-  , constant_MethodHandle_info
-  , constant_MethodType_info
-  , constant_InvokeDynamic_info ]
+  [ constant_Class_info "constant_Class_info"
+  , constant_Fieldref_info "constant_Fieldref_info"
+  , constant_Methodref_info "constant_Methodref_info"
+  , constant_InterfaceMethodref_info "constant_InterfaceMethodref_info"
+  , constant_String_info "constant_String_info"
+  , constant_Integer_info "constant_Integer_info"
+  , constant_Float_info "constant_Float_info"
+  , constant_Long_info "constant_Long_info"
+  , constant_Double_info "constant_Double_info"
+  , constant_NameAndType_info "constant_NameAndType_info"
+  , constant_Utf8_info "constant_Utf8_info"
+  , constant_MethodHandle_info "constant_MethodHandle_info"
+  , constant_MethodType_info "constant_MethodType_info"
+  , constant_InvokeDynamic_info "constant_InvokeDynamic_info" ]
 
 constant_Class = 7
 constant_Fieldref = 9
@@ -165,34 +165,33 @@ method_info = struct
   , array attribute_info "attributes" ]
 
 attribute_info = union
-  [ constantValue_attribute
-  , code_attribute
---  , exceptions_attribute
---  , innerClasses_attribute
---  , enclosingMethod_attribute
---  , synthetic_attribute
---  , signature_attribute
---  , sourceFile_attribute
---  , sourceDebugExtension_attribute
---  , lineNumberTable_attribute
---  , localVariableTable_attribute
---  , localVariableTypeTable_attribute
---  , deprecated_attribute
-  , unknown_attribute ]
+  [ constantValue_attribute "constantValue_attribute"
+  , code_attribute "code_attribute"
+--  , exceptions_attribute "exceptions_attribute"
+--  , innerClasses_attribute "innerClasses_attribute"
+--  , enclosingMethod_attribute "enclosingMethod_attribute"
+--  , synthetic_attribute "synthetic_attribute"
+--  , signature_attribute "signature_attribute"
+--  , sourceFile_attribute "sourceFile_attribute"
+--  , sourceDebugExtension_attribute "sourceDebugExtension_attribute"
+--  , lineNumberTable_attribute "lineNumberTable_attribute"
+--  , localVariableTable_attribute "localVariableTable_attribute"
+--  , localVariableTypeTable_attribute "localVariableTypeTable_attribute"
+--  , deprecated_attribute "deprecated_attribute"
+  , unknown_attribute "unknown_attribute" ]
+
+attribute_name_is n v = do
+  c <- constant_pool v
+  c <- c .? "constant_Utf8_info"
+  Just (asString(c."bytes") == n)
 
 constantValue_attribute = struct
-  [ u2 "attribute_name_index"
-      ?? (\v -> do
-        c <- constant_pool v
-        Just (asString(c."bytes") == "ConstantValue"))
+  [ u2 "attribute_name_index" ?? attribute_name_is "ConstantValue"
   , u4 "attribute_length" ?= 2
   , u2 "constantvalue_index" ~~> constant_pool ]
 
 code_attribute = struct
-  [ u2 "attribute_name_index"
-      ?? (\v-> do
-        c <- constant_pool v
-        Just (asString(c."bytes") == "Code"))
+  [ u2 "attribute_name_index" ?? attribute_name_is "Code"
   , u4 "attribute_length"
   , u2 "max_stack"
   , u2 "max_locals"
@@ -309,16 +308,6 @@ type Follower = Resolver -> Maybe [Ast]
 (parse ~~> follow) ts bs =
    (mapSnd $ fmap $ mapFst $ \ (Ast v fs) -> Ast v (follow:fs)) $ parse ts bs
 
--- A union tries all its members one by one, and returns the first that
--- succeeds.   Parsing fails only if all alternatives fail.  Union fields do
--- not have names, unlike C; so, we use a dummy name.
-
--- TODO: Union must have field names.
-union :: [String -> Parser] -> String -> Parser
-union ps field ts bs =
-  let rs = [r | p <- ps, let (_, r) = p "<unionField>" ts bs] in
-  (field, head $ (filter isJust rs ++ [Nothing]))
-
 -- A structure is a essentially a map from field names to Ast-s.  Subparsers
 -- have already been given the field names.
 
@@ -331,10 +320,22 @@ struct' ps ts bs =
     (m, bs) <- acc
     let (f, r) = parse (Ast (Struct m) [] : ts) bs
     (t, bs) <- r
-    unsafePerformIO (putStrLn ("parsed field " ++ f)) `seq` Just (OMap.insert f t m, bs)
+--DBG   unsafePerformIO (putStrLn ("parsed field " ++ f)) `seq`
+    Just (OMap.insert f t m, bs)
   } in
   let r = foldl pf (Just (OMap.empty, bs)) ps in
   fmap (mapFst (\m -> Ast (Struct m) [])) r
+
+-- A union tries all its members one by one, and returns the first that
+-- succeeds.   Parsing fails only if all alternatives fail.
+
+union :: [Parser] -> String -> Parser
+union ps field ts bs =
+  let { f xs = case xs of
+    (f, Just (t, bs)) : _ -> Just (Ast (Struct (OMap.singleton f t)) [], bs)
+    _ : xs' -> f xs'
+    [] -> Nothing
+  } in makeParseResult field (f [p ts bs | p <- ps])
 
 -- Arrays are very similar to structures.  The main difference is that their
 -- length must be computed: It is unknown at the time when this Haskell program
@@ -351,22 +352,27 @@ arrayG element field size ts bs =
 array :: (String -> Parser) -> String -> Parser
 array element field = arrayG element field (\v -> asInteger(v(lengthName field)))
 
--- There operators |(.)| and |(!!)| are useful for navigating the Ast.  In a
--- way, |(.)| is the counterpart of |struct|, and |(!!)| is the counterpart of
--- |arrayG|.  As in the case of |resolve| there are two failure modes:
--- |Nothing| indicates an error in the file being parsed, |badGrammar|
--- indicates a bug in this parser.
+-- The operators |(.)|, |(.?)|, and |(!)| navigte the Ast.  There are two
+-- failure modes: a bad input is signaled by |Nothing|, and a bad grammar is
+-- signaled by |badGrammar|.  All three operators should be used to go down one
+-- level from a |Struct|: |(.)| for structures, |(.?)| for unions, and |(!)|
+-- for arrays.
 
 (.) :: [Ast] -> String -> [Ast]
 (ts @ (Ast (Struct m) _ : _)) . f =
   maybe (badGrammar ("no field named " ++ f)) (:ts) (OMap.lookup f m)
-(Ast (Base _) _ : _) . _ = badGrammar ("trying to read field of primitive")
-[] . _ = badGrammar "how did I get called with an invalid position?"
+(Ast (Base _) _ : _) . _ = badGrammar "treating primitive as a struct"
+[] . _ = badGrammar "treating an invalid position as a struct"
 
-(!!) :: [Ast] -> Integer -> Maybe [Ast]
-(ts @ (Ast (Struct m) _ : _)) !! i = fmap (:ts) (OMap.lookup (show i) m)
-(Ast (Base _) _ : _) !! _ = badGrammar "trying to index a primitive"
-[] !! _ = badGrammar "how did I get called with an invalid position?"
+(.?) :: [Ast] -> String -> Maybe [Ast]
+(ts @ (Ast (Struct m) _ : _)) .? f = fmap (:ts) (OMap.lookup f m)
+(Ast (Base _) _ : _) .? _ = badGrammar "treating primitive as a union"
+[] .? [] = badGrammar "treating an invalid position as a union"
+
+(!) :: [Ast] -> Integer -> Maybe [Ast]
+(ts @ (Ast (Struct m) _ : _)) ! i = ts .? show i
+(Ast (Base _) _ : _) ! _ = badGrammar "trying to index a primitive"
+[] ! _ = badGrammar "treating an invalid position as an array"
 
 -- The converters |asInteger| and |asString| are the last part of the parser.
 
@@ -391,8 +397,18 @@ littleEndian bs = bigEndian (reverse bs)
 -- The printer begins here.  It is the third important part of this program,
 -- after the grammar and the parsing combinators.
 
+-- TODO: Follow followers.
+toText' :: String -> [Ast] -> String
+toText' nl (ts @ ((Ast (Struct m) _) : _ )) =
+  let nl' = nl ++ "  " in
+  let b f t s = s ++ nl' ++ f ++ " =" ++ toText' nl' (t : ts) in
+  " {" ++ OMap.fold b "" m ++ nl ++ "}"
+
+toText' nl ((Ast (Base bs) fs) : _) = bs >>= printf " %02x"
+toText' _ [] = error "INTERNAL: toText' called on an invalid position"
+
 toText :: Ast -> String
-toText _ = "AST" -- CONTINUE
+toText t = toText' "\n" [t]
 
 -- Some small utilities follow.
 
@@ -403,3 +419,6 @@ mapSnd f (x, y) = (x, f y)
 --  - Introduce notation. For example bs, cs for bytes; vs for values, ...
 --  - When parsing fails, it should say why.
 --  - Review & fix, after it works well enough.
+--  - Compile with all warnings turned on and fix.
+--  - Print string and integer versions of each node (if it looks like one).
+--  - Profile and make faster.
