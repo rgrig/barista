@@ -23,7 +23,8 @@ parse fn = do
   case bytecode (B.unpack bc) of
     Nothing -> printf "%s: parsing failed\n" fn
     Just (t, bs) -> do
-      printf "%s\n" (toText t)
+      printAsText t
+      printf "\n"
       let w = printf "%s: %d unexpected bytes at end of file\n" fn (length bs)
       when (bs /= []) w
 
@@ -398,17 +399,16 @@ littleEndian bs = bigEndian (reverse bs)
 -- after the grammar and the parsing combinators.
 
 -- TODO: Follow followers.
-toText' :: String -> [Ast] -> String
-toText' nl (ts @ ((Ast (Struct m) _) : _ )) =
+printAsText' :: String -> [Ast] -> IO ()
+printAsText' nl (ts @ ((Ast (Struct m) _) : _ )) =
   let nl' = nl ++ "  " in
-  let b f t s = s ++ nl' ++ f ++ " =" ++ toText' nl' (t : ts) in
-  " {" ++ OMap.fold b "" m ++ nl ++ "}"
+  let b f t p = p >> printf "%s%s =" nl' f >> printAsText' nl' (t : ts) in
+  printf " {" >> OMap.fold b (return ()) m >> printf "%s}" nl
+printAsText' nl ((Ast (Base bs) _) : _) = forM_ bs (printf " %02x")
+printAsText' _ [] = error "INTERNAL: printAsText' called on an invalid position"
 
-toText' nl ((Ast (Base bs) fs) : _) = bs >>= printf " %02x"
-toText' _ [] = error "INTERNAL: toText' called on an invalid position"
-
-toText :: Ast -> String
-toText t = toText' "\n" [t]
+printAsText :: Ast -> IO ()
+printAsText t = printAsText' "\n" [t]
 
 -- Some small utilities follow.
 
