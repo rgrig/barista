@@ -2,6 +2,7 @@ module Main where
 
 -- TODO: At the end delete the unused ones.
 import Control.Monad
+import Data.Char
 import Data.Maybe
 import Data.Typeable
 import Data.Word
@@ -507,15 +508,39 @@ littleEndian bs = bigEndian (reverse bs)
 
 -- TODO: Follow followers.
 printAsText' :: String -> [Ast] -> IO ()
-printAsText' nl (ts @ ((Ast (Struct m) _) : _ )) =
+printAsText' nl (ts @ (t @ (Ast (Struct m) _) : _ )) =
   let nl' = nl ++ "  " in
   let b f t p = p >> printf "%s%s =" nl' f >> printAsText' nl' (t : ts) in
-  printf " {" >> OMap.fold b (return ()) m >> printf "%s}" nl
-printAsText' nl ((Ast (Base bs) _) : _) = forM_ bs (printf " %02x")
+  do
+    printf " {"
+    OMap.fold b (return ()) m
+    printf "%s}" nl
+    when (looksLikeAString t) (printf " = \"%s\"" (asString ts))
+printAsText' nl ((Ast (Base bs) _) : _) = do
+  forM_ bs (printf " %02x")
+  let n = integerOrder bs
+  when (n < 1000) (printf " = dec %d" n)
 printAsText' _ [] = error "INTERNAL: printAsText' called on an invalid position"
 
 printAsText :: Ast -> IO ()
 printAsText t = printAsText' "\n" [t]
+
+looksLikeAString :: Ast -> Bool
+looksLikeAString t = astLooksLikeAString 100 t >= 0
+
+astLooksLikeAString (-1) _ = -1
+astLooksLikeAString limit (Ast (Base bs) _) = bytesLookLikeAString limit bs
+astLooksLikeAString limit (Ast (Struct m) _) =
+  OMap.fold f limit m
+  where
+    f _ _ (-1) = -1
+    f _ t limit = astLooksLikeAString limit t
+
+bytesLookLikeAString (-1) _ = -1
+bytesLookLikeAString limit [] = limit
+bytesLookLikeAString limit (b : bs)
+  | isPrint (toEnum (fromEnum b))   = bytesLookLikeAString (limit - 1) bs
+  | otherwise   = -1
 
 -- Some small utilities follow.
 
@@ -527,4 +552,3 @@ mapSnd f (x, y) = (x, f y)
 --  - When parsing fails, it should say why.
 --  - Review & fix, after it works well enough.
 --  - Compile with all warnings turned on and fix.
---  - Print string and integer versions of each node (if it looks like one).
