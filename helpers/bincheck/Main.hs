@@ -338,6 +338,7 @@ struct' ps ts bs =
 
 -- TODO: assert that ps isn't empty
 union :: [Parser] -> String -> Parser
+union [] _ _ _ = badGrammar "empty union"
 union ps field ts bs =
   let { pick r1 r2 = case (r1, r2) of
     ((_,_,Nothing), (_,_,Just _)) -> r2
