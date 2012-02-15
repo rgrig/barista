@@ -3379,9 +3379,9 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_attr_ignored enc =
       enc_return enc attr_ignored
 
-  let rec encode m pool : HA.t -> A.info =
+  let rec encode m pool : HA.t -> A.info = fun x ->
     let enc = make_encoder pool 64 in
-  function
+  match x with
     | `AnnotationDefault ev -> encode_attr_annotation_default enc ev
     | `BootstrapMethods _ -> encode_attr_bootstrap_methods ()
     | `ClassSignature s -> encode_attr_class_signature enc s

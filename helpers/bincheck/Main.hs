@@ -552,3 +552,4 @@ mapSnd f (x, y) = (x, f y)
 --  - When parsing fails, it should say why.
 --  - Review & fix, after it works well enough.
 --  - Compile with all warnings turned on and fix.
+--  - Add a check for attribute lengths.
