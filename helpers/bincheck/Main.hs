@@ -168,17 +168,18 @@ method_info = struct
 attribute_info = union
   [ constantValue_attribute "constantValue_attribute"
   , code_attribute "code_attribute"
---  , exceptions_attribute "exceptions_attribute"
---  , innerClasses_attribute "innerClasses_attribute"
---  , enclosingMethod_attribute "enclosingMethod_attribute"
---  , synthetic_attribute "synthetic_attribute"
---  , signature_attribute "signature_attribute"
---  , sourceFile_attribute "sourceFile_attribute"
---  , sourceDebugExtension_attribute "sourceDebugExtension_attribute"
---  , lineNumberTable_attribute "lineNumberTable_attribute"
---  , localVariableTable_attribute "localVariableTable_attribute"
---  , localVariableTypeTable_attribute "localVariableTypeTable_attribute"
---  , deprecated_attribute "deprecated_attribute"
+-- TODO:  , stackMapTable_attribute "stackMapTable_attribute"
+  , exceptions_attribute "exceptions_attribute"
+  , innerClasses_attribute "innerClasses_attribute"
+  , enclosingMethod_attribute "enclosingMethod_attribute"
+  , synthetic_attribute "synthetic_attribute"
+  , signature_attribute "signature_attribute"
+  , sourceFile_attribute "sourceFile_attribute"
+  , sourceDebugExtension_attribute "sourceDebugExtension_attribute"
+  , lineNumberTable_attribute "lineNumberTable_attribute"
+  , localVariableTable_attribute "localVariableTable_attribute"
+  , localVariableTypeTable_attribute "localVariableTypeTable_attribute"
+  , deprecated_attribute "deprecated_attribute"
   , unknown_attribute "unknown_attribute" ]
 
 attribute_name_is n v = do
@@ -209,6 +210,96 @@ exception = struct
   , u2 "handler_pc"
   , u2 "catch_type" ]
 
+{- TODO: Now it's incomplete
+stackMapTable_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "StackMapTable"
+  , u4 "attribute_length"
+  , u2 "number_of_entries"
+  , arrayG stack_map_frame "entries" (\v->asInteger(v"number_of_entries")) ]
+-}
+
+exceptions_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "Exceptions"
+  , u4 "attribute_length"
+  , u2 "number_of_exceptions"
+  , arrayG u2 "exception_index_table" (\v->asInteger(v"number_of_exceptions")) ]
+
+innerClasses_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "InnerClasses"
+  , u4 "attribute_length"
+  , u2 "number_of_classes"
+  , arrayG inner_class_info "classes" (\v->asInteger(v"number_of_classes")) ]
+
+inner_class_info = struct
+  [ u2 "inner_class_info_index"
+  , u2 "outer_class_info_index"
+  , u2 "inner_name_index"
+  , u2 "inner_class_access_flags" ]
+
+enclosingMethod_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "EnclosingMethod"
+  , u4 "attribute_length"
+  , u2 "class_index"
+  , u2 "method_index" ]
+
+synthetic_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "Synthetic"
+  , u4 "attribute_length" ]
+
+signature_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "Signature"
+  , u4 "attribute_length"
+  , u2 "signature_index" ]
+
+sourceFile_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "SourceFile"
+  , u4 "attribute_length"
+  , u2 "sourcefile_index" ]
+
+sourceDebugExtension_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "SourceDebugExtension"
+  , u4 "attribute_length"
+  , arrayG u1 "debug_extension" (\v->asInteger(v"attribute_length")) ]
+
+lineNumberTable_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "LineNumberTable"
+  , u4 "attribute_length"
+  , u2 "line_number_table_length"
+  , arrayG line_number_info "line_number_table" (\v->asInteger(v"line_number_table_length")) ]
+
+line_number_info = struct
+  [ u2 "start_pc"
+  , u2 "line_number" ]
+
+localVariableTable_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "LocalVariableTable"
+  , u4 "attribute_length"
+  , u2 "local_variable_table_length"
+  , arrayG local_variable_info "local_variable_table" (\v->asInteger(v"local_variable_table_length")) ]
+
+local_variable_info = struct
+  [ u2 "start_pc"
+  , u2 "length"
+  , u2 "name_index"
+  , u2 "descriptor_index"
+  , u2 "index" ]
+
+localVariableTypeTable_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "LocalVariableTypeTable"
+  , u4 "attribute_length"
+  , u2 "local_variable_type_table_length"
+  , arrayG local_variable_type_info "local_variable_type_table" (\v->asInteger(v"local_variable_type_table_length")) ]
+
+local_variable_type_info = struct
+  [ u2 "start_pc"
+  , u2 "length"
+  , u2 "name_index"
+  , u2 "signature_index"
+  , u2 "index" ]
+
+deprecated_attribute = struct
+  [ u2 "attribute_name_index" ?? attribute_name_is "Deprecated"
+  , u4 "attribute_length" ]
 
 unknown_attribute = struct
   [ u2 "attribute_name_index" ~~> constant_pool
