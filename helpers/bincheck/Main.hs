@@ -20,20 +20,20 @@ main = do
 
 parse fn = do
   bc <- withFile fn ReadMode B.hGetContents
-  case bytecode (B.unpack bc) of
-    Nothing -> printf "%s: parsing failed\n" fn
-    Just (t, bs) -> do
-      printAsText t
-      printf "\n"
-      let w = printf "%s: %d unexpected bytes at end of file\n" fn (length bs)
-      when (bs /= []) w
+  let (t, mbs) = bytecode (B.unpack bc)
+  printAsText t
+  printf "\n"
+  case mbs of
+    Nothing -> printf "%s: parsing failed after %d bytes\n" fn (sizeOfAst t)
+    Just (_ : _) -> printf "%s: parsing failed: trailing bytes\n" fn
+    _ -> return ()
 
 -- The grammar of Java bytecode starts here. {{{
 
 integerOrder = bigEndian
 lengthName x = x ++ "_count"
 
-bytecode bs = let (_, r) = class_file "TOP" [] bs in r
+bytecode bs = let (_, t, mbs) = class_file "TOP" [] bs in (t, mbs)
 
 class_file = struct
   [ u4 "magic" ?= 0xCAFEBABE
@@ -229,14 +229,16 @@ data Ast = Ast Value [Follower]
 -- This expression should evaluate to a parser.  Each parser consumes bytes and
 -- builds an Ast, but doesn't (typically) need the field name.  The field name
 -- is useful for the caller of the parser; so, parsers return a field name,
--- even if parsing fails.
+-- even if parsing fails.  When parsing everything finishes successfully there
+-- are |Just []| bytes remaining; when parsing fails there is |Nothing|
+-- remaining.
 
-type Parser = [Ast] -> [Word8] -> (String, Maybe (Ast, [Word8]))
+type Parser = [Ast] -> [Word8] -> (String, Ast, Maybe [Word8])
 
-u' :: Int -> [Word8] -> Maybe (Ast, [Word8])
+u' :: Int -> [Word8] -> (Ast, Maybe [Word8])
 u' n bs
-    | length cs < n   = Nothing
-    | otherwise       = Just (Ast (Base cs) [], ds)
+    | length cs < n   = (Ast (Base cs) [], Nothing)
+    | otherwise       = (Ast (Base cs) [], Just ds)
   where (cs, ds) = splitAt n bs
 
 u :: Int -> String -> Parser
@@ -249,8 +251,8 @@ u4 = u 4
 -- The empty string refers to the current Ast node; so, it can't be used as a
 -- field name, just like the keyword "this" in Java.
 
-makeParseResult field r
-  | field /= ""   = (field, r)
+makeParseResult field (t, mbs)
+  | field /= ""   = (field, t, mbs)
   | otherwise     = error "INTERNAL: Field name can't be empty."
 
 -- There are three kinds of parser combinators.
@@ -273,11 +275,13 @@ type Resolver = String -> [Ast]
 
 (??) :: Parser -> (Resolver -> Maybe Bool) -> Parser
 (parse ?? check) ts bs =
-  let { check' r = do
-    (t, _) <- r
-    ok <- check $ resolve (t : ts)
-    if ok then r else Nothing
-  } in mapSnd check' $ parse ts bs
+  case parse ts bs of
+    (r @ (f, t, Nothing)) -> r
+    (f, t, Just bs) ->
+      let { mbs = do
+        ok <- check $ resolve (t : ts)
+        if ok then Just bs else Nothing
+      } in (f, t, mbs)
 
 (?=) :: Parser -> Integer -> Parser
 parse ?= value = parse ?? (\v -> Just (asInteger(v"") == value))
@@ -307,7 +311,8 @@ type Follower = Resolver -> Maybe [Ast]
 
 (~~>) :: Parser -> Follower -> Parser
 (parse ~~> follow) ts bs =
-   (mapSnd $ fmap $ mapFst $ \ (Ast v fs) -> Ast v (follow:fs)) $ parse ts bs
+  case parse ts bs of
+    (f, Ast v fs, mbs) -> (f, Ast v (follow : fs), mbs)
 
 -- A structure is a essentially a map from field names to Ast-s.  Subparsers
 -- have already been given the field names.
@@ -315,28 +320,38 @@ type Follower = Resolver -> Maybe [Ast]
 struct :: [Parser] -> String -> Parser
 struct ps field ts bs = makeParseResult field (struct' ps ts bs)
 
-struct' :: [Parser] -> [Ast] -> [Word8] -> Maybe (Ast, [Word8])
+struct' :: [Parser] -> [Ast] -> [Word8] -> (Ast, Maybe [Word8])
 struct' ps ts bs =
-  let { pf acc parse = do   -- Process one Field
-    (m, bs) <- acc
-    let (f, r) = parse (Ast (Struct m) [] : ts) bs
-    (t, bs) <- r
---DBG   unsafePerformIO (putStrLn ("parsed field " ++ f)) `seq`
-    Just (OMap.insert f t m, bs)
+  let ast m = Ast (Struct m) [] in
+  let { pf acc parse = case acc of
+    (m, Nothing) -> acc
+    (m, Just bs) ->
+      let (f, t, mbs) = parse ((ast m) : ts) bs in
+      (OMap.insert f t m, mbs)
   } in
-  let r = foldl pf (Just (OMap.empty, bs)) ps in
-  fmap (mapFst (\m -> Ast (Struct m) [])) r
+  let r = foldl pf (OMap.empty, Just bs) ps in
+  mapFst ast r
 
 -- A union tries all its members one by one, and returns the first that
--- succeeds.   Parsing fails only if all alternatives fail.
+-- succeeds.   Parsing fails only if all alternatives fail.  In that case, we
+-- keep the one with the biggest Ast.
 
+-- TODO: assert that ps isn't empty
 union :: [Parser] -> String -> Parser
 union ps field ts bs =
-  let { f xs = case xs of
-    (f, Just (t, bs)) : _ -> Just (Ast (Struct (OMap.singleton f t)) [], bs)
-    _ : xs' -> f xs'
-    [] -> Nothing
-  } in makeParseResult field (f [p ts bs | p <- ps])
+  let { pick r1 r2 = case (r1, r2) of
+    ((_,_,Nothing), (_,_,Just _)) -> r2
+    ((_,_,Just _), (_,_,_)) -> r1
+    ((_,t1,Nothing), (_,t2,Nothing)) ->
+      if sizeOfAst t1 >= sizeOfAst t2 then r1 else r2
+  } in
+  let z = ("<empty union>", Ast (Base []) [], Nothing) in
+  let (f, t, mbs) = foldl pick z [p ts bs | p <- ps] in
+  makeParseResult field (Ast (Struct (OMap.singleton f t)) [], mbs)
+
+sizeOfAst :: Ast -> Int
+sizeOfAst (Ast (Base bs) _) = length bs
+sizeOfAst (Ast (Struct m) _) = OMap.fold (\_ t sz -> sz + sizeOfAst t) 0 m
 
 -- Arrays are very similar to structures.  The main difference is that their
 -- length must be computed: It is unknown at the time when this Haskell program
@@ -348,7 +363,7 @@ arrayG :: (String -> Parser) -> String -> (Resolver -> Integer) -> Parser
 arrayG element field size ts bs =
   let sz = size (resolve ts) in
   let r = struct' (map element $ map show [0..sz-1]) ts bs in
-  (field, r)
+  makeParseResult field r
 
 array :: (String -> Parser) -> String -> Parser
 array element field = arrayG element field (\v -> asInteger(v(lengthName field)))
@@ -421,4 +436,3 @@ mapSnd f (x, y) = (x, f y)
 --  - Review & fix, after it works well enough.
 --  - Compile with all warnings turned on and fix.
 --  - Print string and integer versions of each node (if it looks like one).
---  - Profile and make faster.
