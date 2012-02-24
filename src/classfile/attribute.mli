@@ -25,7 +25,7 @@
 
 type info = {
     name_index : Utils.u2;
-    length : Utils.u4;
+    length : Utils.u4; (* TODO(rgrig): Remove this redundant field. *)
     data : string;
   }
 (** Represents an attribute as defined in the class file format specification. *)

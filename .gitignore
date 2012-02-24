@@ -1,4 +1,6 @@
+/.vimrc
 /Makefile.config
+/TODO
 /_build
 /doc/jvm-javase7-mr3-spec.pdf
 /setenv
