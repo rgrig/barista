@@ -1187,7 +1187,7 @@ module HighAttribute = struct (* {{{ *)
       inner_class : Name.for_class option;
       outer_class : Name.for_class option;
       inner_name : Utils.UTF8.t option;
-      inner_flags : AF.for_inner_class list;
+      inner_flags : AccessFlag.for_inner_class list;
     }
 
   type enclosing_method_value = {
@@ -1294,20 +1294,20 @@ module HA = HighAttribute
 module M = Method
 module HighMethod = struct (* {{{ *)
   type regular = {
-      flags : AF.for_method list;
+      flags : AccessFlag.for_method list;
       name : Name.for_method;
       descriptor : Descriptor.for_method;
       attributes : HighAttribute.for_method list;
     }
 
   type constructor = {
-      cstr_flags : AF.for_constructor list;
+      cstr_flags : AccessFlag.for_constructor list;
       cstr_descriptor : Descriptor.for_parameter list;
       cstr_attributes : HighAttribute.for_method list;
     }
 
   type class_initializer = {
-      init_flags : AF.for_initializer list;
+      init_flags : AccessFlag.for_initializer list;
       init_attributes : HighAttribute.for_method list;
     }
 
@@ -1315,13 +1315,11 @@ module HighMethod = struct (* {{{ *)
     | Regular of regular
     | Constructor of constructor
     | Initializer of class_initializer
-    | Native of Method.info
 
   let to_string = function
     | Regular r -> U.UTF8.to_string (Name.utf8_for_method r.name)
     | Constructor _ -> "Constructor"
     | Initializer _ -> "Initializer"
-    | Native _ -> "Native"
 end
 (* }}} *)
 module HM = HighMethod
@@ -2973,17 +2971,17 @@ module HighAttributeOps = struct (* {{{ *)
     try UTF8Hashtbl.find decoders attr_name decode r st
     with Not_found -> `Unknown (attr_name, r.da_i.A.data)
 
-  let decode_for_class da_pool da_i =
+  let decode_class da_pool da_i =
     match decode { da_element = A.Class; da_pool; da_i } with
       | #HA.for_class as g -> g
       | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "class"))
 
-  let decode_for_field da_pool da_i =
+  let decode_field da_pool da_i =
     match decode { da_element = A.Field; da_pool; da_i } with
       | #HA.for_field as g -> g
       | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "field"))
 
-  let decode_for_method da_pool da_i =
+  let decode_method da_pool da_i =
     match decode { da_element = A.Method; da_pool; da_i } with
       | #HA.for_method as g -> g
       | b -> fail (Misplaced_attribute (HA.name_of_attribute b, "method"))
@@ -3308,7 +3306,7 @@ module HighAttributeOps = struct (* {{{ *)
           let name_idx = match inner_name with
           | None -> U.u2 0
           | Some c -> CP.add_utf8 enc.en_pool c in
-          let fl = AF.list_to_u2 (inner_flags :> AF.t list) in
+          let fl = AccessFlag.list_to_u2 (inner_flags :> AccessFlag.t list) in
           OutputStream.write_u2 enc.en_st inner_idx;
           OutputStream.write_u2 enc.en_st outer_idx;
           OutputStream.write_u2 enc.en_st name_idx;
@@ -3411,79 +3409,72 @@ module HighAttributeOps = struct (* {{{ *)
     | `Synthetic -> encode_attr_synthetic enc
     | `Unknown u -> encode_attr_unknown enc u
 
-  let encode_for_class pool a = encode None pool (a : HA.for_class :> HA.t)
-  let encode_for_field pool a = encode None pool (a : HA.for_field :> HA.t)
-  let encode_for_method m pool a = encode (Some m) pool (a : HA.for_method :> HA.t)
+  let encode_class pool a = encode None pool (a : HA.for_class :> HA.t)
+  let encode_field pool a = encode None pool (a : HA.for_field :> HA.t)
+  let encode_method m pool a = encode (Some m) pool (a : HA.for_method :> HA.t)
 end
 (* }}} *)
 module HAO = HighAttributeOps
 module HighMethodOps = struct (* {{{ *)
   let decode_initializer init_attributes flags _ =
-    let init_flags = AF.check_initializer_flags flags in
+    let init_flags = AccessFlag.check_initializer_flags flags in
     HM.Initializer { HM.init_flags; HM.init_attributes }
 
   let decode_constructor (cstr_descriptor,_) cstr_attributes flags _ =
-    let cstr_flags = AF.check_constructor_flags flags in
+    let cstr_flags = AccessFlag.check_constructor_flags flags in
     HM.Constructor { HM.cstr_flags; HM.cstr_descriptor; HM.cstr_attributes }
 
   let decode_regular i name descriptor attributes flags _ =
-    let flags = AF.check_method_flags i flags in
+    let flags = AccessFlag.check_method_flags i flags in
     HM.Regular { HM.flags; HM.name; HM.descriptor; HM.attributes }
 
-  let is_native m =
-    let flags = AF.from_u2 true m.M.access_flags in
-    List.mem `Native flags
-
   let decode is_interface pool m =
-    if is_native m then HM.Native m else
     let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
     let utf8_name = utf8 m.M.name_index in
     let name = Name.make_for_method utf8_name in
     let descriptor =
       Descriptor.method_of_utf8 (utf8 m.M.descriptor_index) in
     let attributes =
-      U.map_array_to_list (HAO.decode_for_method pool) m.M.attributes_array in
-    let flags = AF.from_u2 true m.M.access_flags in
+      U.map_array_to_list (HAO.decode_method pool) m.M.attributes_array in
+    let flags = AccessFlag.from_u2 true m.M.access_flags in
     U.switch U.UTF8.equal
       [ class_initializer, decode_initializer attributes flags
       ; class_constructor, decode_constructor descriptor attributes flags ]
       (decode_regular is_interface name descriptor attributes flags)
       utf8_name
 
-  let encode pool = function
-    | HM.Native mi -> mi
-    | m ->
-      let flags, name, desc, attrs = match m with
-	| HM.Regular r ->
-	  r.HM.flags,
-	  r.HM.name,
-	  r.HM.descriptor,
-	  r.HM.attributes
-	| HM.Constructor c ->
-	  (c.HM.cstr_flags :> AF.for_method list),
-	  (Name.make_for_method class_constructor),
-	  (c.HM.cstr_descriptor, `Void),
-	  c.HM.cstr_attributes
-	| HM.Initializer i ->
-	  (i.HM.init_flags :> AF.for_method list),
-	  (Name.make_for_method class_initializer),
-	  ([], `Void),
-	  i.HM.init_attributes in
-      let acc_flags = AF.list_to_u2 (flags :> AF.t list) in
-      let name_idx = CP.add_utf8 pool (Name.utf8_for_method name) in
-      let desc_utf8 = Descriptor.utf8_of_method desc in
-      let desc_idx = CP.add_utf8 pool desc_utf8 in
-      if log_se_full then printf "@\n@[encoding method %s@\n@." (HM.to_string m);
-      if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
-      let r =
-	{ M.access_flags = acc_flags;
-          name_index = name_idx;
-          descriptor_index = desc_idx;
-          attributes_count = U.u2 (List.length attrs);
-          attributes_array = U.map_list_to_array (HAO.encode_for_method m pool) (attrs :> HA.for_method list); }
-      in
-      if log_se then printf "@]@\n}";
-      r
+  let encode pool m =
+    let flags, name, desc, attrs = match m with
+      | HM.Regular r ->
+	r.HM.flags,
+	r.HM.name,
+	r.HM.descriptor,
+	r.HM.attributes
+      | HM.Constructor c ->
+	(c.HM.cstr_flags :> AF.for_method list),
+	(Name.make_for_method class_constructor),
+	(c.HM.cstr_descriptor, `Void),
+	c.HM.cstr_attributes
+      | HM.Initializer i ->
+	(i.HM.init_flags :> AF.for_method list),
+	(Name.make_for_method class_initializer),
+	([], `Void),
+	i.HM.init_attributes in
+    let acc_flags = AF.list_to_u2 (flags :> AF.t list) in
+    let name_idx = CP.add_utf8 pool (Name.utf8_for_method name) in
+    let desc_utf8 = Descriptor.utf8_of_method desc in
+    let desc_idx = CP.add_utf8 pool desc_utf8 in
+    if log_se_full then printf "@\n@[encoding method %s@\n@." (HM.to_string m);
+    if log_se then printf "@\n@[<2>digraph %s {" (HM.to_string m);
+    let r =
+      { M.access_flags = acc_flags;
+        name_index = name_idx;
+        descriptor_index = desc_idx;
+        attributes_count = U.u2 (List.length attrs);
+        attributes_array = U.map_list_to_array (HAO.encode_method m pool) (attrs :> HA.for_method list); }
+    in
+    if log_se then printf "@]@\n}";
+    r
 end (* }}} *)
 module HMO = HighMethodOps
 module F = Field
@@ -3504,11 +3495,11 @@ module HighField = struct (* {{{ *)
     let descriptor = CP.get_utf8_entry pool i.F.descriptor_index in
     let descriptor = Descriptor.field_of_utf8 descriptor in
     let attributes =
-      U.map_array_to_list (HAO.decode_for_field pool) i.F.attributes_array in
+      U.map_array_to_list (HAO.decode_field pool) i.F.attributes_array in
     { flags; name; descriptor; attributes }
 
   let encode pool f =
-    let access_flags = AF.list_to_u2 (f.flags :> AF.t list) in
+    let access_flags = AF.list_to_u2 (f.flags :> AccessFlag.t list) in
     let name_index = CP.add_utf8 pool (Name.utf8_for_field f.name) in
     let desc_utf8 = Descriptor.utf8_of_field f.descriptor in
     let descriptor_index = CP.add_utf8 pool desc_utf8 in
@@ -3523,7 +3514,7 @@ module HF = HighField
 (* }}} *)
 (* rest/most of HighClass *) (* {{{ *)
 type t = {
-    access_flags : AF.for_class list;
+    access_flags : AccessFlag.for_class list;
     name : Name.for_class;
     extends : Name.for_class option;
     implements : Name.for_class list;
@@ -3566,7 +3557,7 @@ let decode cf =
   let is_interface = List.mem `Interface flags in
   let field_decode = HF.decode is_interface pool in
   let method_decode = HMO.decode is_interface pool in
-  let attribute_decode = HAO.decode_for_class pool in
+  let attribute_decode = HAO.decode_class pool in
   let hc = check_version_high version { access_flags = flags;
     name = class_name cf.CF.this_class;
     extends = extends;
@@ -3590,7 +3581,7 @@ let encode (cd, version) =
   let itfs = U.map_list_to_array (fun s -> CP.add_class pool s) cd.implements in
   let flds = U.map_list_to_array (HF.encode pool) cd.fields in
   let mths = U.map_list_to_array (HMO.encode pool) cd.methods in
-  let atts = U.map_list_to_array (HAO.encode_for_class pool) cd.attributes in
+  let atts = U.map_list_to_array (HAO.encode_class pool) cd.attributes in
   let cpool = CP.to_pool pool in
   let checked_number s sz =
     if sz <= U.max_u2 then
