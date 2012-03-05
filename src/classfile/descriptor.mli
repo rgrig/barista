@@ -104,6 +104,8 @@ val java_type_of_external_utf8 : Utils.UTF8.t -> java_type
 val equal_java_type : java_type -> java_type -> bool
 (* Equality over Java types. *)
 
+val size : java_type -> int
+(* [size t] gives the number of words occupied by a value of type [t] *)
 
 (** {6 Field descriptors} *)
 

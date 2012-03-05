@@ -297,6 +297,8 @@ let rec equal_java_type x y =
   | (`Array a1), (`Array a2) -> equal_java_type (a1 :> java_type) (a2 :> java_type)
   | _ -> false
 
+let size : java_type -> int =
+  function `Double | `Long -> 2 | `Void -> 0 | _ -> 1
 
 (* Field descriptors *)
 
