@@ -120,27 +120,14 @@ let dummy_element =
   []
 
 let make_methods () =
-  ExtendableArray.make 0 128 dummy_element
+  ExtendableArray.make 0 dummy_element
 
 let is_empty m =
   (ExtendableArray.length m) = 0
 
 let add_method_specifier m ms =
-  ExtendableArray.add_if_not_found
-    (Exception (Too_large (ExtendableArray.length m)))
-    (fun x ->
-      (x != dummy_element) && (equal_method_specifier ms x))
-    m
-    ms
-    dummy_element
-    false
+  failwith "todo"
 
 let add m ms =
-  let _ =
-    ExtendableArray.add
-      (Exception (Too_large (ExtendableArray.length m)))
-      m
-      ms
-      dummy_element
-      false in
-  ()
+  failwith "todo"
+

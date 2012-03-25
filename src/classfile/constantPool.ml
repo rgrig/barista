@@ -533,11 +533,11 @@ let check_version v pool =
 type extendable = element ExtendableArray.t
 
 let make_extendable () =
-  ExtendableArray.make 1 128 dummy_element
+  ExtendableArray.make 1 dummy_element
 
 let make_extendable_from_pool pool =
   let error = Too_large (Array.length pool) in
-  ExtendableArray.from_array (Exception error) pool dummy_element
+  ExtendableArray.from_array (Exception error) pool
 
 let get_extendable_entry pool i =
   let i' = (i : u2 :> int) in
@@ -553,18 +553,17 @@ let get_extendable_entry pool i =
     else
       res
 
+(* NOTE: This relies on UTF8.equal being the same as =. *)
 let add_if_not_found ext elem =
-  ExtendableArray.add_if_not_found
-    (Exception (Too_large (ExtendableArray.length ext)))
-    (fun x ->
-      (x != dummy_element)
-        && (match x, elem with
-        | (UTF8 u), (UTF8 u') -> UTF8.equal u u'
-        | _ -> x = elem))
-    ext
-    elem
-    dummy_element
-    (element_size elem = 2)
+  try ExtendableArray.index elem ext
+  with Not_found -> begin
+    let e = Exception (Too_large max_u2) in
+    let r = ExtendableArray.add e ext elem in
+    for i = 2 to element_size elem do
+      ExtendableArray.add e ext dummy_element
+    done;
+    r
+  end
 
 let add_utf8 ext s =
   let elem = UTF8 s in

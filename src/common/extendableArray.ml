@@ -18,97 +18,72 @@
 
 open Utils
 
+(* TODO(rgrig): Turn into a functor of Hashtbl.HashedType. *)
 
-type 'a t = {
-    mutable current : 'a array;
-    mutable next : int;
-  }
+type 'a t =
+  { mutable current : 'a array
+  ; inverse : ('a, IntSet.t) Hashtbl.t
+  ; mutable length : int }
 
-let default_capacity = 128
+let check_index s i =
+  if not (0 <= i && i < s.length) then
+    invalid_arg "Barista.ExtendableArray invalid index"
 
-let make len cap init =
-  if (cap < 0) || (len < 0) then
-    invalid_arg "BaristaLibrary.ExtendableArray.make";
-  let cap = max cap len in
-  if cap <= (max_u2 + 1) then
-    { current = Array.make cap init;
-      next = len; }
-  else
-    invalid_arg "BaristaLibrary.ExtendableArray.make"
+let add_index x i h =
+  let ii = try Hashtbl.find h x with Not_found -> IntSet.empty in
+  Hashtbl.replace h x (IntSet.add i ii)
 
-let from_array e a x =
-  let len = Array.length a in
-  let size = ref default_capacity in
-  while (!size <= max_u2) && (!size < len) do
-    size := 2 * !size
-  done;
-  let size = min max_u2 !size in
-  if (size >= len) then
-    { current =
-      Array.init
-        size
-        (fun i -> if i < len then a.(i) else x);
-      next = len; }
-  else
-    raise e
+let del_index x i h =
+  Hashtbl.replace h x (IntSet.remove i (Hashtbl.find h x))
 
-let to_array a =
-  Array.sub a.current 0 a.next
+let get_index x h =
+  IntSet.min_elt (Hashtbl.find h x)
 
-let length a =
-  a.next
+let grab_array current =
+  let length = Array.length current in
+  let inverse = Hashtbl.create length in
+  for i = 0 to length - 1 do add_index current.(i) i inverse done;
+  { current; inverse; length }
 
-let capacity a =
-  Array.length a.current
+let expand s x =
+  let n = Array.length s.current in
+  s.current <-
+    Array.init (1 + n + n / 2) (fun i -> if i < n then s.current.(i) else x)
 
-let get a i =
+let make n x =
+  grab_array (Array.make n x)
+
+let from_array e a =
+  let length = Array.length a in
+  if not (0 <= length && length <= max_u2) then raise e;
+  grab_array (Array.copy a)
+
+let to_array s =
+  Array.sub s.current 0 s.length
+
+let length s =
+  s.length
+
+let get s i =
   let i = (i : u2 :> int) in
-  let len = a.next in
-  if (i < 0) || (i >= len) then
-    invalid_arg "BaristaLibrary.ExtendableArray.get"
-  else
-    a.current.(i)
+  check_index s i;
+  s.current.(i)
 
-let set a i x =
+let set s i x =
   let i = (i : u2 :> int) in
-  let len = a.next in
-  if (i < 0) || (i >= len) then
-    invalid_arg "BaristaLibrary.ExtendableArray.set"
-  else
-    a.current.(i) <- x
+  check_index s i;
+  del_index s.current.(i) i s.inverse;
+  add_index x i s.inverse;
+  s.current.(i) <- x
 
-let find p a =
-  let len = Array.length a.current in
-  let idx = ref 0 in
-  while (!idx < len) && not (p a.current.(!idx)) do
-    incr idx
-  done;
-  if (!idx < len) then
-    u2 !idx
-  else
-    raise Not_found
+let add e s x =
+  if s.length = max_u2 then raise e;
+  (if s.length = Array.length s.current
+  then expand s x
+  else s.current.(s.length) <- x);
+  add_index x s.length s.inverse;
+  s.length <- succ s.length;
+  u2 (pred s.length)
 
-let rec add e a x z addit =
-  let len = Array.length a.current in
-  let size = if addit then 2 else 1 in
-  let next = a.next in
-  if next + size <= len then begin
-    a.current.(a.next) <- x;
-    if addit then a.current.(succ a.next) <- z;
-    a.next <- next + size;
-    u2 next
-  end else begin
-    if len >= max_u2 then raise e;
-    let new_array =
-      Array.init
-        (min max_u2 (2 * len))
-        (fun i -> if i < len then a.current.(i) else z) in
-    a.current <- new_array;
-    add e a x z addit
-  end
-
-let add_if_not_found e p a x z addit =
-  try
-    find p a
-  with Not_found ->
-    add e a x z addit
+let index x s =
+  u2 (get_index x s.inverse)
