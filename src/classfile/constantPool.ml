@@ -560,7 +560,7 @@ let add_if_not_found ext elem =
     let e = Exception (Too_large max_u2) in
     let r = ExtendableArray.add e ext elem in
     for i = 2 to element_size elem do
-      ExtendableArray.add e ext dummy_element
+      ignore (ExtendableArray.add e ext dummy_element)
     done;
     r
   end

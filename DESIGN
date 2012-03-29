@@ -1,0 +1,91 @@
+Thinking out loud notes.  Not kept up-to-date after the fact.
+
+2012-03-29 rgrig
+
+Should locals have a higher level representation?  Some values occupy two
+words; most, only one.  That means, for example, that argument k is *not* in
+local k, when execution of a method starts.  Clients of Barista need to scan
+the argument list and keep track of how big they are.
+
+The simplest solution that comes to mind is to have a high-level
+representation that is size agnostic.  Locals of a method would always occupy
+a contiguous range 0..n-1.  A prefix 0..m-1 would hold the arguments of a
+method when the method starts.
+
+At first sight this seems to work: encoding would introduce gaps in the
+numbering to account for big values.  However, there is a complication. It is
+perfectly legal to reuse locals with different types, including with types
+that have different sizes.  So there is no such thing as an invariant mapping
+from 0..n-1 to types.
+
+Let me try to summarize the Java rules.  The bytecode uses a range 0..p-1 of
+locals.  A valid mapping f : 0..p-1 -> Type must satisfy
+  size(f i)=k => 1<=j<k => f(i+j)=T
+where T is a special value. Here, f(j)=T is false if j not in the domain.  An
+instruction [store i v] transforms the mapping.
+  [store i v] f j = type v, if i=j
+                    T, if 1<=j-i<size(type v)
+                    T, if 1<=i-j<size(type(f i))
+                    f j, otherwise
+In words, location i will have the type of v, a few locations to the right
+(which are used by v) are reset to T, a few locations to the right (which used
+to also use location i) are reset to T, and all other locations remain as
+before. Whenever a local is read it must have a type corresponding to the
+instruction being used to read.  In particular, locations with type T can't be
+read.
+
+I think that the mapping should be flow-insensitive.  That is, it should be
+possible to associate a mapping to each program point such that the rules in
+the previous paragraph are obeyed.  At least for version >=51 the bytecode
+should explicitly contain such flow-insensitive mappings.  I'm not sure what
+is supposed to be valid bytecode in previous versions.
+
+I think it is reasonable to only produce bytecode that has *one* mapping of
+locals to types per method.  However, we must be able to decode any valid
+bytecode, preferably even if the mappings are flow-sensitive.  So, the
+question is how to do this decoding.
+
+Let's first see the simplest case.  Suppose that to each access to a local
+(read or write) we associate a pair (index, type).  Given two such pairs (i,s)
+and (j,t) with i<=j, we say that they are conflicting iff (i=j and s!=t) or
+1<=j-i<size s.  If there are no conflicting pairs then we are done: We've
+essentially been handed the global mapping (except we need to handle the
+gaps).
+
+One option, of course, is to just handle this simple case, and say that we
+don't support anything else.  This is a sensible choice if, say, all the
+existing bytecode on my machine fits in this case.  I could determine this
+with an experiment. But, first I want to think a bit about how to handle a
+more general case.
+
+Suppose there are such conflicting pairs.  So what?  We just group all
+accesses into equivalence classes, based on their associated pair.  Then we
+solve conflicts by changing the index of some of these classes, taking care
+not to change the pairs that correspond to arguments.  We can preconstruct the
+list of pairs that correspond to arguments by going once through the list of
+arguments.
+
+Yay! This seems simple enough.
+
+Let's see in just a bit more detail how the re-indexing works.  We maintain a
+map from 0..p-1 to types.  This mapping is in the low-level form, it contains
+explicit gaps represented by Ts.  Initially it reflects the arguments of the
+method.  Then, as we go through the bytecode, we see pairs (i,s) one by one.
+For each, we first check if it matches the existing mapping.  If it does then
+we are OK.  There are two ways of non-matching.  First, the index might be
+out-of-bounds.  This case is almost like a match; we just need to extend the
+mapping.  (The mapping might be implemented by an array, but in this
+description I do *not* assume a representation that forces a contiguous
+domain.)  The other non-matching situation is caused by the existence of a
+conflicting pair in the domain of the mapping.  (This can be checked in
+constant time because the maximum size is bounded, it is 2.)  In this case we
+remap the current pair to a fresh pair, which is not in the domain of the
+accumulated mapping.  The correspondence between the old pair and the new pair
+is itself recorded.  All pairs seen in the bytecode are first filtered through
+this recorded correspondence *before* looking at the pair->type mapping.
+Finally, pairs are mapped to a contiguous range of integers 0..n-1, taking
+care to map the pairs corresponding to arguments to a prefix 0..m-1.
+
+Armed with the pair->int map, the real decoding can start.
+
+vim:tw=78:spell:fo+=t:et:
