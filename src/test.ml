@@ -6,7 +6,7 @@ open Format
 module IS = InputStream
 module OS = OutputStream
 module CF = ClassFile
-module HC = HighClass
+module HC = Coder
 module HT = HighTypes
 
 let write = ref false

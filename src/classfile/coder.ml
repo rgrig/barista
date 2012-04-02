@@ -3137,7 +3137,7 @@ module HighField = struct (* {{{ *)
 end (* }}} *)
 module HF = HighField
 (* }}} *)
-(* rest/most of HighClass *) (* {{{ *)
+(* rest/most of Coder *) (* {{{ *)
 let check_version_high version c =
   let check_flag x = Version.check (AF.version_bounds x) version in
   let check_attribute x = Version.check (HAO.version_bounds x) version in
