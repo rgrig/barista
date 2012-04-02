@@ -7,6 +7,7 @@ module IS = InputStream
 module OS = OutputStream
 module CF = ClassFile
 module HC = HighClass
+module HT = HighTypes
 
 let write = ref false
 
@@ -33,7 +34,7 @@ let handle fn =
     | Version.Exception e -> printf "  %s@." (Version.string_of_error e)
     | Name.Exception e -> printf "  %s@." (Name.string_of_error e)
     | AccessFlag.Exception e -> printf "  %s@." (AccessFlag.string_of_error e)
-    | HC.Exception e -> printf "  %s@." (HC.string_of_error e)
+    | HT.Exception e -> printf "  %s@." (HC.string_of_error e)
 
 let () =
   let flags =

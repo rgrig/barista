@@ -124,7 +124,7 @@ let decode itf bsm pool i =
    let attributes =
      Attribute.check_method_attributes
        (map_array_to_list
-          (Attribute.decode Attribute.Method bsm pool)
+          (Attribute.decode (Attribute.Method []) bsm pool)
           i.attributes_array) in
    switch
      UTF8.equal

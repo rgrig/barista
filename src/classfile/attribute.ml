@@ -304,7 +304,7 @@ type for_module =
 
 type enclosing_element =
   | Class
-  | Method
+  | Method of Descriptor.for_parameter list
   | Field
   | Package
   | Module
@@ -854,7 +854,7 @@ let rec decode element bsm pool i =
         let s = get_utf8 pool signature_index Invalid_signature in
         let s' = (match element with
         | Class -> `Class (Signature.class_signature_of_utf8 s)
-        | Method -> `Method (Signature.method_signature_of_utf8 s)
+        | Method _ -> `Method (Signature.method_signature_of_utf8 s)
         | Field -> `Field (Signature.field_type_signature_of_utf8 s)
         | Package -> fail Invalid_package_attribute
         | Module -> fail Invalid_module_attribute) in

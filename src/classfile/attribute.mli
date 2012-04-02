@@ -266,7 +266,7 @@ type for_module =
 
 type enclosing_element =
   | Class (** Kind of classes. *)
-  | Method (** Kind of methods. *)
+  | Method of Descriptor.for_parameter list
   | Field (** Kind of fields. *)
   | Package (** Kind of package. *)
   | Module (** Kind of module. *)

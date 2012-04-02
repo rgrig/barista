@@ -50,7 +50,6 @@ exception Exception of error
 val string_of_error : error -> string
 (** Converts the passed error into a string. *)
 
-
 (** {6 Traversal} *)
 
 val map : Traversal.class_definition_mapper -> t -> t
@@ -58,7 +57,6 @@ val map : Traversal.class_definition_mapper -> t -> t
 
 val iter : Traversal.class_definition_iterator -> t -> unit
 (** Applies the "iterator" to the class definition. *)
-
 
 (** {6 Conversion functions} *)
 

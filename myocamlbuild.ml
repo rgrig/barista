@@ -21,33 +21,34 @@ open Ocamlbuild_plugin
 let odocl_file = Pathname.pwd / "barista.odocl"
 let mlpack_file = Pathname.pwd / "baristaLibrary.mlpack"
 let src_path = Pathname.pwd / "src"
-let excluded_modules = []
+let lib_dirs = ["analysis"; "classfile"; "common"; "helpers"; "utf8"]
+let excluded_modules = ref []
 
 let () =
   let odocl_chan = open_out odocl_file in
   let mlpack_chan = open_out mlpack_file in
   let add_file filename =
-    if (Pathname.check_extension filename "mli")
-      || (Pathname.check_extension filename "mly")
-      || (Pathname.check_extension filename "mll") then begin
+    let ok_extensions = ["ml"; "mly"; "mll"] in
+    if List.exists (Pathname.check_extension filename) ok_extensions then begin
           let modulename = Pathname.remove_extension filename in
           let modulename = Pathname.basename modulename in
           let modulename = String.capitalize modulename in
-          if not (List.mem modulename excluded_modules) then begin
+          if not (List.mem modulename !excluded_modules) then begin
+            excluded_modules := modulename :: !excluded_modules;
             output_string odocl_chan modulename;
             output_char odocl_chan '\n';
             output_string mlpack_chan modulename;
             output_char mlpack_chan '\n'
           end
       end in
-  Array.iter
+  List.iter
     (fun path ->
       let path = src_path / path in
       if Pathname.is_directory path then
         Array.iter add_file (Pathname.readdir path)
       else
         add_file path)
-    (Pathname.readdir src_path);
+    lib_dirs;
   close_out_noerr odocl_chan;
   close_out_noerr mlpack_chan
 

@@ -1,5 +1,27 @@
 Thinking out loud notes.  Not kept up-to-date after the fact.
 
+2012-04-02 rgrig
+
+I refactor the code to have all data types for the high-level representation
+of bytecode in one file.  Previously the design was fairly OO:  each module
+had one (or very few) data types, and the operations associated to them.  The
+problems with the old approach are:
+
+1)  Each type is repeated in the ml and the mli file, and the types are huge.
+Note that it makes sense to have an mli file to hide the helper functions.
+
+2)  We kept bumping into cyclic dependencies.  Consider two types t and s, and
+two functions f and g.  It may be that f is primarily an operation on t, but
+needs s for various sub-tasks; also, g is primarily an operation on s, but
+needs t for various sub-tasks.  The natural grouping, f and t in a module, g
+and s in another module, is a cyclic dependency.
+
+It would make sense to have a similar grouping for the low level types. But, I
+don't think I'll have time for it anytime soon.  Another issue is that I'd
+like to remove redundant traces of the high-level representation.  This I
+think I'll do soon.
+
+
 2012-03-29 rgrig
 
 Should locals have a higher level representation?  Some values occupy two

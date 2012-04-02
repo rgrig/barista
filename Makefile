@@ -52,11 +52,6 @@ default:
 
 all: generate
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME)Library.otarget
-	if [ -x "$(PATH_OCAML_PREFIX)/bin/ocamljava" ]; then \
-	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).native $(PROJECT_NAME).jar; \
-	else \
-	  $(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).native; \
-	fi
 
 doc:
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) $(PROJECT_NAME).docdir/index.html
@@ -85,14 +80,6 @@ install: all
 	  for ext in cma cmxa cmja a ja; do \
 	    test -f $(PATH_BUILD)/$(PROJECT_NAME)Library.$$ext && cp $(PATH_BUILD)/$(PROJECT_NAME)Library.$$ext $(PATH_INSTALL) || true; \
 	  done; \
-	  for ext in byte native jar; do \
-	    test -f $(PATH_BUILD)/src/driver/$(PROJECT_NAME).$$ext && cp $(PATH_BUILD)/src/driver/$(PROJECT_NAME).$$ext $(PATH_OCAML_PREFIX)/bin || true; \
-	  done; \
-	  if [ -x "$(PATH_OCAML_PREFIX)/bin/barista.native" ]; then \
-	    ln -s -f $(PATH_OCAML_PREFIX)/bin/barista.native $(PATH_OCAML_PREFIX)/bin/barista; \
-	  else \
-	    ln -s -f $(PATH_OCAML_PREFIX)/bin/barista.byte $(PATH_OCAML_PREFIX)/bin/barista; \
-	  fi \
 	fi
 
 generate:
