@@ -1,2 +1,0 @@
-CLASS_NAME=pack.Test
-include ../makefiles/Makefile.asmp-ocaml

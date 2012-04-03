@@ -24,7 +24,6 @@ PATH_BASE=`pwd`
 PATH_BUILD=$(PATH_BASE)/_build
 PATH_OCAMLDOC=$(PATH_BASE)/ocamldoc
 PATH_SRC=$(PATH_BASE)/src
-PATH_TESTS=$(PATH_BASE)/tests
 PATH_INSTALL=$(PATH_OCAML_PREFIX)/lib/ocaml/barista
 
 
@@ -43,7 +42,6 @@ default:
 	@echo "available targets:"
 	@echo "  all         compiles all files"
 	@echo "  doc         generates ocamldoc documentations"
-	@echo "  tests       runs tests"
 	@echo "  clean       deletes all produced files (excluding documentation)"
 	@echo "  veryclean   deletes all produced files (including documentation)"
 	@echo "  install     copies executable and library files"
@@ -60,12 +58,8 @@ doc:
 scrap:
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) test.native
 
-tests:
-	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) all && cd ..) || true
-
 clean:
 	$(OCAMLBUILD) $(OCAMLBUILD_FLAGS) -clean
-	test -f $(PATH_TESTS)/Makefile && (cd $(PATH_TESTS) && $(MAKE) $(MAKE_QUIET) clean && cd ..) || true
 	rm -f $(MODULES_ODOCL) $(MODULES_MLPACK) $(PROJECT_NAME)Library.itarget
 
 veryclean: clean
@@ -87,4 +81,4 @@ generate:
 	(test -x $(PATH_OCAML_PREFIX)/bin/ocamlopt && echo '$(PROJECT_NAME)Library.cmxa' >> $(PROJECT_NAME)Library.itarget) || true
 	(test -x $(PATH_OCAML_PREFIX)/bin/ocamljava && echo '$(PROJECT_NAME)Library.cmja' >> $(PROJECT_NAME)Library.itarget) || true
 
-.PHONY: doc clean generate scrap tests
+.PHONY: doc clean generate scrap

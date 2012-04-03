@@ -1,3 +1,0 @@
-RUN_PARAMS=abc def
-CLASS_NAME=pack.Test
-include ../makefiles/Makefile.asm-ocaml
