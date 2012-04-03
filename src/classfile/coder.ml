@@ -17,6 +17,11 @@ module T = HighTypes
 
 (* }}} *)
 
+type enclosing_element =
+  | EE_class
+  | EE_method of Descriptor.for_parameter list
+  | EE_field
+
 let fail e = raise (T.Exception e)
 
 let string_of_error = function
@@ -2155,29 +2160,6 @@ module SymbExe = struct  (* {{{ *)
         java_lang_Object_name in
     make_unifier utjlo
 
-  let unify_to_closest_common_parent cl l =
-    let rec parents cn =
-      let hd, prn =
-        try
-          let c, p = List.find (fun (x, _) -> Name.equal_for_class cn x) l in
-          (Name.internal_utf8_for_class c), p
-        with Not_found ->
-          let cd = ClassLoader.find_class cl (Name.external_utf8_for_class cn) in
-          (Name.internal_utf8_for_class cd.ClassDefinition.name),
-          cd.ClassDefinition.extends in
-      let tl = match prn with
-      | Some x -> parents x
-      | None -> [] in
-      hd :: tl in
-    let rec common_parent l = function
-    | hd :: tl -> if List.exists (U.UTF8.equal hd) l then hd else common_parent l tl
-    | [] -> U.UTF8.of_string "java/lang/Object" in
-    let utccp x y =
-      let parents_x = parents x in
-      let parents_y = parents y in
-      Name.make_for_class_from_internal (common_parent parents_x parents_y) in
-      make_unifier utccp
-
   let unify_to_parent_list l =
     let rec parents cn =
       let hd, prn =
@@ -2390,7 +2372,7 @@ module HighAttributeOps = struct (* {{{ *)
   (* actual decoders for attributes *)
 
   type decoding_arguments =
-    { da_element : Attribute.enclosing_element
+    { da_element : enclosing_element
       (* TODO(rgrig): For hl locals I need some the arguments on Method *)
     ; da_pool : CP.t
     ; da_i : Attribute.info }
@@ -2471,8 +2453,8 @@ module HighAttributeOps = struct (* {{{ *)
     `Code
       { T.cv_code = instrs
       ; cv_exception_table = exceptions
-      ; cv_attributes = attrs }
-(*      ; type_of_local = U.IntMap.empty }  (* XXX *) *)
+      ; cv_attributes = attrs
+      ; cv_type_of_local = U.IntMap.empty }
 
   let decode_attr_exceptions _ r st : T.attribute =
     let f st = CP.get_class_name r.da_pool (IS.read_u2 st) in
@@ -2514,10 +2496,9 @@ module HighAttributeOps = struct (* {{{ *)
     let signature_index = IS.read_u2 st in
     let s = CP.get_utf8_entry r.da_pool signature_index in
     match r.da_element with
-      | Attribute.Class -> `ClassSignature (Signature.class_signature_of_utf8 s)
-      | Attribute.Method _ -> `MethodSignature (Signature.method_signature_of_utf8 s)
-      | Attribute.Field -> `FieldSignature (Signature.field_type_signature_of_utf8 s)
-      | _ -> fail T.Invalid_attribute
+      | EE_class -> `ClassSignature (Signature.class_signature_of_utf8 s)
+      | EE_method _ -> `MethodSignature (Signature.method_signature_of_utf8 s)
+      | EE_field -> `FieldSignature (Signature.field_type_signature_of_utf8 s)
 
   let decode_attr_source_file _ r st =
     let sourcefile_index = IS.read_u2 st in
@@ -2557,7 +2538,14 @@ module HighAttributeOps = struct (* {{{ *)
     let eiv = Annotation.read_info_element_value st in
     `AnnotationDefault (Annotation.decode_element_value r.da_pool eiv)
 
+  (* Not needed. *)
   let decode_attr_stack_map_table _ _ _ : T.attribute = `IgnoredAttribute
+
+  (* See issue #14. *)
+  let decode_attr_local_variable_table _ _ _ : T.attribute =
+    `IgnoredAttribute
+  let decode_attr_local_variable_type_table _ _ _ : T.attribute =
+    `IgnoredAttribute
 
   let decode_attr_bootstrap_methods _ = failwith "todo:decode_attr_bootstrap_methods"
   let decode_attr_module _ = failwith "todo:decode_attr_module"
@@ -2581,6 +2569,8 @@ module HighAttributeOps = struct (* {{{ *)
       ; attr_exceptions, decode_attr_exceptions
       ; attr_inner_classes, decode_attr_inner_classes
       ; attr_line_number_table, decode_attr_line_number_table
+      ; attr_local_variable_table, decode_attr_local_variable_table
+      ; attr_local_variable_type_table, decode_attr_local_variable_type_table
       ; attr_module, decode_attr_module
       ; attr_module_permits, decode_attr_module_permits
       ; attr_module_provides, decode_attr_module_provides
@@ -2594,8 +2584,8 @@ module HighAttributeOps = struct (* {{{ *)
       ; attr_signature, decode_attr_signature
       ; attr_source_debug_extension, decode_attr_source_debug_extension
       ; attr_source_file, decode_attr_source_file
-      ; attr_synthetic, decode_attr_synthetic
-      ; attr_stack_map_table, decode_attr_stack_map_table ] in
+      ; attr_stack_map_table, decode_attr_stack_map_table
+      ; attr_synthetic, decode_attr_synthetic ] in
     hash_of_list UTF8Hashtbl.create UTF8Hashtbl.add ds
 
   (* knot tying and visible functions *)
@@ -2608,17 +2598,17 @@ module HighAttributeOps = struct (* {{{ *)
     with Not_found -> `Unknown (attr_name, r.da_i.Attribute.data)
 
   let decode_class da_pool da_i =
-    match decode { da_element = Attribute.Class; da_pool; da_i } with
+    match decode { da_element = EE_class; da_pool; da_i } with
       | #T.class_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "class"))
 
   let decode_field da_pool da_i =
-    match decode { da_element = Attribute.Field; da_pool; da_i } with
+    match decode { da_element = EE_field; da_pool; da_i } with
       | #T.field_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "field"))
 
   let decode_method arg_types da_pool da_i =
-    match decode { da_element = Attribute.Method arg_types; da_pool; da_i } with
+    match decode { da_element = EE_method arg_types; da_pool; da_i } with
       | #T.method_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "method"))
 

@@ -300,8 +300,8 @@ type exception_table_element =
 type code_value =
   { cv_code : labeled_instruction list
   ; cv_exception_table : exception_table_element list
-  ; cv_attributes : code_attribute list }
-(* XXX   ; type_of_local : SET.verification_type_info U.IntMap.t } *)
+  ; cv_attributes : code_attribute list
+  ; cv_type_of_local : bytecode_type Utils.IntMap.t }
 
 type class_attribute =
   [ `BootstrapMethods of Bootstrap.method_specifier list (** bootstrap for dynamic methods *)

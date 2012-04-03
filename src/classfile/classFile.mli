@@ -18,8 +18,7 @@
 
 (** Class file definition as well as i/o functions.
     Class file instances are low-level Java class definitions,
-    high-level definitions being provided by [ClassDefinition.t]
-    instances. *)
+    high-level definitions being provided by [HighTypes]. *)
 
 
 (** {6 Type} *)

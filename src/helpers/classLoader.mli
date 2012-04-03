@@ -16,8 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *)
 
-(** Class loaders that allows easy access and loading of classes,
-    packages, and modules. *)
+(** Class loaders that allows easy access and loading of classes
+    and packages.  Modules are not supported. *)
 
 
 type t
@@ -38,71 +38,26 @@ val make : ClassPath.t -> t
 (** Constructs a class loader from a class path that will be used to load
     elements. The returned class loader contains no definition. *)
 
-val find_class : t -> Utils.UTF8.t -> ClassDefinition.t
+val find_class : t -> Utils.UTF8.t -> HighTypes.class_
 (** [find_class cl cn] returns the class definition for the class named
     [cn] (in external form) using class loader [cl].
     Raises [Exception] if such a class has not alredy been loaded and
     cannot be loaded. *)
 
-val find_package : t -> Utils.UTF8.t -> PackageDefinition.t
-(** [find_package cl pn] returns the package definition for the package
-    named [pn] (in external form) using class loader [cl].
-    Raises [Exception] if such a package has not alredy been loaded and
-    cannot be loaded. *)
-
-val find_module : t -> Utils.UTF8.t -> ModuleDefinition.t
-(** [find_module cl pn] returns the module definition for the module
-    named [mn] (in external form) using class loader [cl].
-    Raises [Exception] if such a module has not alredy been loaded and
-    cannot be loaded. *)
-
-val add_class : t -> ClassDefinition.t -> unit
+val add_class : t -> HighTypes.class_ -> unit
 (** [add_class cl cd] adds the class [cd] to the class loader [cl].
     Raises [Exception] if a class with the same name has already been
-    loaded. *)
-
-val add_package : t -> PackageDefinition.t -> unit
-(** [add_package cl pd] adds the package [pd] to the class loader [cl].
-    Raises [Exception] if a package with the same name has already been
-    loaded. *)
-
-val add_module : t -> ModuleDefinition.t -> unit
-(** [add_module cl md] adds the module [md] to the class loader [cl].
-    Raises [Exception] if a module with the same name has already been
     loaded. *)
 
 val mem_class : t -> Utils.UTF8.t -> bool
 (** [mem_class cl cn] tests whether the class named [cn] has been loaded
     by the class loader [cl]. *)
 
-val mem_package : t -> Utils.UTF8.t -> bool
-(** [mem_package cl pn] tests whether the package named [pn] has been
-    loaded by the class loader [cl]. *)
-
-val mem_module : t -> Utils.UTF8.t -> bool
-(** [mem_module cl mn] tests whether the module named [mn] has been
-    loaded by the class loader [cl]. *)
-
 val remove_class : t -> Utils.UTF8.t -> unit
 (** [remove_class cl cn] removes the definition for class [cn] from
     class loader [cl]. *)
 
-val remove_package : t -> Utils.UTF8.t -> unit
-(** [remove_package cl pn] removes the definition for package [pn] from
-    class loader [cl]. *)
-
-val remove_module : t -> Utils.UTF8.t -> unit
-(** [remove_module cl mn] removes the definition for module [mn] from
-    class loader [cl]. *)
-
-val replace_class : t -> ClassDefinition.t -> unit
+val replace_class : t -> HighTypes.class_ -> unit
 (** Equivalent to [add_class] except that a previous definition is
     replaced. *)
 
-val replace_package : t -> PackageDefinition.t -> unit
-(** Equivalent to [add_package] except that a previous definition is
-    replaced. *)
-
-val replace_module : t -> ModuleDefinition.t -> unit
-(** Equivalent to [add_module] except that a previous definition is
-    replaced. *)

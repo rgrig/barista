@@ -18,13 +18,9 @@
 
 open Utils
 
-
-type t = {
-    class_path : ClassPath.t;
-    loaded_classes : ClassDefinition.t UTF8Hashtbl.t;
-    loaded_packages : PackageDefinition.t UTF8Hashtbl.t;
-    loaded_modules : ModuleDefinition.t UTF8Hashtbl.t;
-  }
+type t =
+  { class_path : ClassPath.t
+  ; loaded_classes : HighTypes.class_ UTF8Hashtbl.t }
 
 type error =
   | Unable_to_load of UTF8.t * string
@@ -47,10 +43,8 @@ let () =
       | _ -> None)
 
 let make cp =
-  { class_path = cp;
-    loaded_classes = UTF8Hashtbl.create 17;
-    loaded_packages = UTF8Hashtbl.create 17;
-    loaded_modules = UTF8Hashtbl.create 17; }
+  { class_path = cp
+  ; loaded_classes = UTF8Hashtbl.create 0 }
 
 let create_functions
     (get : t -> 'a Utils.UTF8Hashtbl.t)
@@ -92,19 +86,6 @@ let find_class, add_class, mem_class, remove_class, replace_class =
   create_functions
     (fun cl -> cl.loaded_classes)
     ""
-    ClassDefinition.decode
-    (fun cd -> Name.external_utf8_for_class cd.ClassDefinition.name)
+    (fun x -> fst (Coder.decode x))
+    (fun cd -> Name.external_utf8_for_class cd.HighTypes.c_name)
 
-let find_package, add_package, mem_package, remove_package, replace_package =
-  create_functions
-    (fun cl -> cl.loaded_packages)
-    "/package-info"
-    PackageDefinition.decode
-    (fun cd -> Name.external_utf8_for_package cd.PackageDefinition.name)
-
-let find_module, add_module, mem_module, remove_module, replace_module =
-  create_functions
-    (fun cl -> cl.loaded_modules)
-    "/module-info"
-    ModuleDefinition.decode
-    (fun cd -> Name.external_utf8_for_module cd.ModuleDefinition.name)

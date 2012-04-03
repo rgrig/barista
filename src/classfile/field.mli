@@ -34,20 +34,6 @@ type info = {
 (** Represents a field as defined in the class file format specification. *)
 
 
-(** {6 Exception} *)
-
-type error =
-  | Invalid_name of Utils.UTF8.t
-  | Invalid_name_value of Utils.u2
-  | Invalid_descriptor_value of Utils.u2
-
-exception Exception of error
-(** Exception to be raised when a function of this module fails. *)
-
-val string_of_error : error -> string
-(** Converts the passed error into a string. *)
-
-
 (** {6 I/O functions} *)
 
 val read_info : InputStream.t -> info
@@ -58,30 +44,3 @@ val write_info : OutputStream.t -> info -> unit
 (** [write_info st f] writes field [f] onto [st].
     Raises [OutputStream.Exception] if an i/o error occurs. *)
 
-
-(** {6 High-level form} *)
-
-type t = {
-    flags : AccessFlag.for_field list; 
-    name : Name.for_field;
-    descriptor : Descriptor.for_field;
-    attributes : Attribute.for_field list;
-  }
-(** Represents a field as defined in the Java language. *)
-
-
-(** {6 Conversion functions} *)
-
-val decode : bool -> ConstantPool.t -> info -> t
-(** Converts from a low-level into a high-level form according to passed
-    pool. The passed boolean indicates whether the enclosing element is
-    an interface.
-    Raises [Exception] if an error occurs during conversion. *)
-
-val encode : ConstantPool.extendable -> t -> info
-(** Converts from a high-level into a low-level form, using passed
-    extendable pool.
-    Raises [Exception] if an error occurs during conversion. *)
-
-val compare : t -> t -> int
-(** Comparison over fields. *)

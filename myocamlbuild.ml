@@ -21,7 +21,7 @@ open Ocamlbuild_plugin
 let odocl_file = Pathname.pwd / "barista.odocl"
 let mlpack_file = Pathname.pwd / "baristaLibrary.mlpack"
 let src_path = Pathname.pwd / "src"
-let lib_dirs = ["analysis"; "classfile"; "common"; "helpers"; "utf8"]
+let lib_dirs = ["classfile"; "common"; "helpers"; "utf8"]
 let excluded_modules = ref []
 
 let () =
