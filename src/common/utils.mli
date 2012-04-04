@@ -222,5 +222,7 @@ val list_equal : ?eq:('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 
 val pp_list : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a list -> unit
 
+val string_of_pp : (Format.formatter -> 'a -> unit) -> 'a -> string
+
 val fresh : unit -> unit -> int64
 (** [fresh ()] returns a function that, in turn, generates 0L, 1L, 2L, ... *)

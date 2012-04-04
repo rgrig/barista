@@ -16,10 +16,10 @@ module U = Utils
 module T = HighTypes
 
 (* }}} *)
-
+(* helpers *) (* {{{ *)
 type enclosing_element =
   | EE_class
-  | EE_method of Descriptor.for_parameter list
+  | EE_method of T.method_
   | EE_field
 
 let fail e = raise (T.Exception e)
@@ -60,6 +60,69 @@ let checked_length_u1 s l =
     fail (T.Too_many s)
 
 let fresh_label = U.fresh ()
+
+let size_of_bt = function T.Double | T.Long -> 2 | _ -> 1
+
+let pp_label_set pe f = T.LabelSet.iter (fun e -> fprintf f "@ %a" pe e)
+
+let pp_bt f = function
+  | T.Top -> fprintf f "top"
+  | T.Integer -> fprintf f "integer"
+  | T.Float -> fprintf f "float"
+  | T.Long -> fprintf f "long"
+  | T.Double -> fprintf f "double"
+  | T.Null -> fprintf f "null"
+  | T.Uninitialized_this -> fprintf f "uninitialized_this"
+  | T.Object _ -> fprintf f "object"
+  | T.Uninitialized l -> fprintf f "uninitialized(%Ld)" l
+  | T.Return_address l -> fprintf f "return_address [%a]" (pp_label_set (fun f a -> fprintf f "%Ld" a)) l
+  | T.Reference -> fprintf f "reference"
+
+let string_of_bt =
+  U.string_of_pp pp_bt
+
+let bt_of_descriptor = function
+  | `Boolean -> T.Integer
+  | `Byte -> T.Integer
+  | `Char -> T.Integer
+  | `Double -> T.Double
+  | `Float -> T.Float
+  | `Int -> T.Integer
+  | `Long -> T.Long
+  | `Short -> T.Integer
+  | `Class cn -> T.Object (`Class_or_interface cn)
+  | `Array e -> T.Object (`Array_type (`Array e))
+
+(* make types less precise, by mapping to the subset of types that correspond
+to instruction types *)
+let fuzzy_bt = function
+  | T.Integer -> T.Integer
+  | T.Float -> T.Float
+  | T.Long -> T.Long
+  | T.Double -> T.Double
+  | T.Null
+  | T.Uninitialized_this
+  | T.Reference
+  | T.Object _
+  | T.Uninitialized _
+  | T.Return_address _ -> T.Reference
+  | _ -> failwith "INTERNAL: Already *too* fuzzy."
+
+let java_lang_Class = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Class")
+
+let locals_of_method m = match m with
+  | T.RegularMethod { T.rm_flags; rm_descriptor; _ } ->
+      let l = fst rm_descriptor in
+      let l = List.map bt_of_descriptor l in
+      if List.mem `Static rm_flags then
+        l
+      else
+        (T.Object (`Class_or_interface java_lang_Class)) :: l
+  | T.InitMethod { T.im_descriptor = l ; _ } ->
+      let l = List.map bt_of_descriptor l in
+      T.Uninitialized_this :: l
+  | T.ClinitMethod _ ->
+      []
 
 (* }}} *)
 (* HighInstruction, SymbExe, HighAttribute, HighField and HighMethod *) (* {{{ *)
@@ -966,22 +1029,6 @@ module HM = HighMethod
 module SymbExe = struct  (* {{{ *)
   module LS = HighTypes.LabelSet
   module H = HighTypes.LabelHash
-  let pp_label_set pe f = LS.iter (fun e -> fprintf f "@ %a" pe e)
-
-  let pp_vi f = function
-    | T.Top -> fprintf f "top"
-    | T.Integer -> fprintf f "integer"
-    | T.Float -> fprintf f "float"
-    | T.Long -> fprintf f "long"
-    | T.Double -> fprintf f "double"
-    | T.Null -> fprintf f "null"
-    | T.Uninitialized_this -> fprintf f "uninitialized_this"
-    | T.Object _ -> fprintf f "object"
-    | T.Uninitialized l -> fprintf f "uninitialized(%Ld)" l
-    | T.Return_address l -> fprintf f "return_address [%a]" (pp_label_set (fun f a -> fprintf f "%Ld" a)) l
-
-  let string_of_verification_type_info vi =
-    pp_vi str_formatter vi; flush_str_formatter ()
 
   (* equal shape, used for verification *)
   let equal_verification_type_info x y = match (x, y) with
@@ -997,26 +1044,11 @@ module SymbExe = struct  (* {{{ *)
     | _ -> x = y
 
   (* equal shape and value, used for symbolic execution *)
-  let equal_vi_se x y = match (x, y) with
+  let equal_bt_se x y = match (x, y) with
     | T.Return_address sx, T.Return_address sy -> LS.equal sx sy
     | _ -> equal_verification_type_info x y
 
-  let size_of_vi = function T.Double | T.Long -> 2 | _ -> 1
-
-  let verification_type_info_of_parameter_descriptor = function
-    | `Boolean -> T.Integer
-    | `Byte -> T.Integer
-    | `Char -> T.Integer
-    | `Double -> T.Double
-    | `Float -> T.Float
-    | `Int -> T.Integer
-    | `Long -> T.Long
-    | `Short -> T.Integer
-    | `Class cn -> T.Object (`Class_or_interface cn)
-    | `Array e -> T.Object (`Array_type (`Array e))
-
   let java_lang_String = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.String")
-  let java_lang_Class = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Class")
   let java_lang_invoke_MethodType = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.invoke.MethodType")
   let java_lang_invoke_MethodHandle = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.invoke.MethodHandle")
   let verification_type_info_of_constant_descriptor = function
@@ -1052,24 +1084,24 @@ module SymbExe = struct  (* {{{ *)
 
   (* error reporting {{{ *)
   let report_invalid_stack_top (v, v') =
-    T.SE_invalid_stack_top (string_of_verification_type_info v, string_of_verification_type_info v')
+    T.SE_invalid_stack_top (string_of_bt v, string_of_bt v')
 
-  let report_reference_expected x = T.SE_reference_expected (string_of_verification_type_info x)
+  let report_reference_expected x = T.SE_reference_expected (string_of_bt x)
 
-  let report_array_expected x = T.SE_array_expected (string_of_verification_type_info x)
+  let report_array_expected x = T.SE_array_expected (string_of_bt x)
 
   let report_invalid_local_contents (i, v, v') =
-    T.SE_invalid_local_contents (i, string_of_verification_type_info v, string_of_verification_type_info v')
+    T.SE_invalid_local_contents (i, string_of_bt v, string_of_bt v')
 
   let report_unexpected_size s x =
-    T.SE_unexpected_size (s, string_of_verification_type_info x)
+    T.SE_unexpected_size (s, string_of_bt x)
   (* }}} *)
   (* symbolic stack {{{ *)
   type stack = T.bytecode_type list (* stack top is list head *)
 
-  let pp_stack f x = fprintf f "@[[%a ]@]" (U.pp_list pp_vi) x
+  let pp_stack f x = fprintf f "@[[%a ]@]" (U.pp_list pp_bt) x
 
-  let equal_stack a b = List.fold_left2 (fun r a b -> r && equal_vi_se a b) true a b
+  let equal_stack a b = List.fold_left2 (fun r a b -> r && equal_bt_se a b) true a b
 
   let empty () = []
 
@@ -1080,7 +1112,7 @@ module SymbExe = struct  (* {{{ *)
   let push_return_value x s = match x with
     | `Void -> s
     | #Descriptor.for_parameter as y ->
-      push (verification_type_info_of_parameter_descriptor y) s
+      push (bt_of_descriptor y) s
 
   let top = function
     | hd :: _ -> hd
@@ -1105,7 +1137,7 @@ module SymbExe = struct  (* {{{ *)
     assert (s = 1 || s = 2);
     function
     | hd :: tl ->
-        if size_of_vi hd = 1
+        if size_of_bt hd = 1
         then (if log_se then printf "-"; (hd, tl))
         else fail (report_unexpected_size s hd)
     | [] -> fail T.SE_empty_stack
@@ -1115,10 +1147,10 @@ module SymbExe = struct  (* {{{ *)
   type locals = T.bytecode_type U.IntMap.t
 
   let pp_locals f ls =
-    let pb r v = fprintf f "@ (%d->%a)" r pp_vi v in
+    let pb r v = fprintf f "@ (%d->%a)" r pp_bt v in
     fprintf f "@[["; U.IntMap.iter pb ls; fprintf f " ]@]"
 
-  let equal_locals a b = U.IntMap.equal equal_vi_se a b
+  let equal_locals a b = U.IntMap.equal equal_bt_se a b
 
   let intmap_width m =
     try
@@ -1139,7 +1171,7 @@ module SymbExe = struct  (* {{{ *)
 
   let store i v l =
     let l = U.IntMap.add i v l in
-    let l = if size_of_vi v = 2 then U.IntMap.add (succ i) T.Top l else l in
+    let l = if size_of_bt v = 2 then U.IntMap.add (succ i) T.Top l else l in
     l
 
   let encode_locals m =
@@ -1150,7 +1182,7 @@ module SymbExe = struct  (* {{{ *)
         r := (try U.IntMap.find i m with Not_found -> T.Top) :: !r
       done;
       let rec f acc = function
-        | T.Top :: l :: ls when size_of_vi l = 2 -> f (l :: acc) ls
+        | T.Top :: l :: ls when size_of_bt l = 2 -> f (l :: acc) ls
         | l :: ls -> f (l :: acc) ls
         | [] -> acc in
       f !r []
@@ -1168,6 +1200,7 @@ module SymbExe = struct  (* {{{ *)
       | T.Null
       | T.Uninitialized_this
       | T.Object _
+      | T.Reference
       | T.Uninitialized _ -> ()
 
   let check_reference_or_return x =
@@ -1328,8 +1361,8 @@ module SymbExe = struct  (* {{{ *)
     let return locals stack = ({stack; locals}, []) in
     let locals = st.locals in
     let stack = st.stack in
-    let state_contains vi =
-      List.mem vi stack || U.IntMap.exists (fun _ v -> v = vi) locals in
+    let state_contains bt =
+      List.mem bt stack || U.IntMap.exists (fun _ v -> v = bt) locals in
     match i with
       | T.AALOAD ->
 	let stack = pop_if T.Integer stack in
@@ -1339,7 +1372,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack =
           (match topv with
             | T.Null -> push T.Null stack
-            | T.Object (`Array_type (`Array t)) -> push (verification_type_info_of_parameter_descriptor t) stack
+            | T.Object (`Array_type (`Array t)) -> push (bt_of_descriptor t) stack
             | _ -> fail (report_array_expected topv)) in
 	continue locals stack
       | T.AASTORE ->
@@ -1407,7 +1440,7 @@ module SymbExe = struct  (* {{{ *)
 	continue locals stack
       | T.CHECKCAST parameter -> (* no check needed? *)
 	let stack = pop stack in
-	let stack = push (verification_type_info_of_parameter_descriptor (match parameter with `Array_type at -> (at :> Descriptor.for_parameter) | `Class_or_interface cn -> `Class cn)) stack in
+	let stack = push (bt_of_descriptor (match parameter with `Array_type at -> (at :> Descriptor.for_parameter) | `Class_or_interface cn -> `Class cn)) stack in
 	continue locals stack
       | T.D2F ->
 	let stack = pop_if T.Double stack in
@@ -1496,7 +1529,7 @@ module SymbExe = struct  (* {{{ *)
 	let v1 = top stack in
 	let stack = pop stack in
 	let stack =
-          if size_of_vi v1 = 1 then
+          if size_of_bt v1 = 1 then
             let v2, stack = pop_if_size 1 stack in
             let stack = push v2 stack in
             let stack = push v1 stack in
@@ -1508,7 +1541,7 @@ module SymbExe = struct  (* {{{ *)
       | T.DUP2_X1 ->
 	let v1 = top stack in
 	let stack =
-          if size_of_vi v1 = 1 then
+          if size_of_bt v1 = 1 then
             let stack = pop stack in
             let v2, stack = pop_if_size 1 stack in
             let v3, stack = pop_if_size 1 stack in
@@ -1527,11 +1560,11 @@ module SymbExe = struct  (* {{{ *)
       | T.DUP2_X2 ->
 	let v1 = top stack in
 	let stack =
-          if size_of_vi v1 = 1 then begin
+          if size_of_bt v1 = 1 then begin
             let stack = pop stack in
             let v2, stack = pop_if_size 1 stack in
             let v3 = top stack in
-            if size_of_vi v3 = 1 then begin
+            if size_of_bt v3 = 1 then begin
               let stack = pop stack in
               let v4 = top stack in
               let stack = pop stack in
@@ -1552,7 +1585,7 @@ module SymbExe = struct  (* {{{ *)
           end else begin
             let stack = pop stack in
             let v2 = top stack in
-            if size_of_vi v2 = 1 then begin
+            if size_of_bt v2 = 1 then begin
               let stack = pop stack in
               let v3, stack = pop_if_size 1 stack in
               let stack = push v1 stack in
@@ -1578,7 +1611,7 @@ module SymbExe = struct  (* {{{ *)
 	let v1, stack = pop_if_size 1 stack in
 	let v2 = top stack in
 	let stack =
-          if size_of_vi v2 = 1 then
+          if size_of_bt v2 = 1 then
             let v2, stack = pop_if_size 1 stack in
             let v3, stack = pop_if_size 1 stack in
             let stack = push v1 stack in
@@ -1676,10 +1709,10 @@ module SymbExe = struct  (* {{{ *)
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
-	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
+	let stack = push (bt_of_descriptor desc) stack in
 	continue locals stack
       | T.GETSTATIC (`Fieldref (_, _, desc)) ->
-	let stack = push (verification_type_info_of_parameter_descriptor desc) stack in
+	let stack = push (bt_of_descriptor desc) stack in
 	continue locals stack
       | T.GOTO lbl ->
 	jump locals stack [lbl]
@@ -1832,7 +1865,7 @@ module SymbExe = struct  (* {{{ *)
 	continue locals stack
   (*
     | T.INVOKEDYNAMIC (_, _, (params, ret)) ->
-    let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+    let infos = List.rev_map bt_of_descriptor params in
     let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
     let topv = top stack in
     check_reference topv;
@@ -1841,7 +1874,7 @@ module SymbExe = struct  (* {{{ *)
     { locals; stack }
   *)
       | T.INVOKEINTERFACE (`Methodref (_, _, (params, ret))) ->
-	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let infos = List.rev_map bt_of_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let topv = top stack in
 	check_reference topv;
@@ -1849,7 +1882,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push_return_value ret stack in
 	continue locals stack
       | T.INVOKESPECIAL (`Methodref (cn, mn, (params, ret))) ->
-	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let infos = List.rev_map bt_of_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let topv = top stack in
 	check_reference topv;
@@ -1873,12 +1906,12 @@ module SymbExe = struct  (* {{{ *)
             locals, stack in
 	continue locals stack
       | T.INVOKESTATIC (`Methodref (_, _, (params, ret))) ->
-	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let infos = List.rev_map bt_of_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let stack = push_return_value ret stack in
 	continue locals stack
       | T.INVOKEVIRTUAL (`Methodref (_, _, (params, ret))) ->
-	let infos = List.rev_map verification_type_info_of_parameter_descriptor params in
+	let infos = List.rev_map bt_of_descriptor params in
 	let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
 	let topv = top stack in
 	check_reference topv;
@@ -2059,9 +2092,9 @@ module SymbExe = struct  (* {{{ *)
 	continue locals stack
       | T.NEW _ ->
       (* TODO(rlp) understand why the argument to NEW is thrown away *)
-        let vi = T.Uninitialized lbl in
-        if state_contains vi then fail T.SE_double_new;
-	let stack = push vi stack in
+        let bt = T.Uninitialized lbl in
+        if state_contains bt then fail T.SE_double_new;
+	let stack = push bt stack in
 	continue locals stack
       | T.NEWARRAY parameter ->
 	let stack = pop_if T.Integer stack in
@@ -2075,19 +2108,19 @@ module SymbExe = struct  (* {{{ *)
       | T.POP2 ->
 	let v1 = top stack in
 	let stack =
-          if size_of_vi v1 = 1 then
+          if size_of_bt v1 = 1 then
             snd (pop_if_size 1 (snd (pop_if_size 1 stack)))
           else
             pop stack in
 	continue locals stack
       | T.PUTFIELD (`Fieldref (_, _, desc)) ->
-	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
+	let stack = pop_if (bt_of_descriptor desc) stack in
 	let topv = top stack in
 	check_reference topv;
 	let stack = pop stack in
 	continue locals stack
       | T.PUTSTATIC (`Fieldref (_, _, desc)) ->
-	let stack = pop_if (verification_type_info_of_parameter_descriptor desc) stack in
+	let stack = pop_if (bt_of_descriptor desc) stack in
 	continue locals stack
       | T.RET index ->
         let lbls = (match load index locals with
@@ -2224,20 +2257,6 @@ module SymbExe = struct  (* {{{ *)
     let (m, _) = List.fold_left fold (U.IntMap.empty, 0) l in
     m
 
-  let locals_of_method m = of_list (match m with
-    | T.RegularMethod { T.rm_flags; rm_descriptor; _ } ->
-        let l = fst rm_descriptor in
-        let l = List.map verification_type_info_of_parameter_descriptor l in
-        if List.mem `Static rm_flags then
-          l
-        else
-          (T.Object (`Class_or_interface java_lang_Class)) :: l
-    | T.InitMethod { T.im_descriptor = l ; _ } ->
-        let l = List.map verification_type_info_of_parameter_descriptor l in
-        T.Uninitialized_this :: l
-    | T.ClinitMethod _ ->
-        [])
-
   (* Makes sure exception handlers refer only to live labels. *)
   let adjust_exception_table is_live c =
     let prev, next = prev_next_label c.T.cv_code in
@@ -2253,7 +2272,7 @@ module SymbExe = struct  (* {{{ *)
 
   (* public *) (* {{{ *)
   let compute_max_stack_locals m c =
-    let init = { locals = locals_of_method m; stack = [] } in
+    let init = { locals = of_list (locals_of_method m); stack = [] } in
     let exec_throw s = { s with stack = [T.Object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
@@ -2373,7 +2392,6 @@ module HighAttributeOps = struct (* {{{ *)
 
   type decoding_arguments =
     { da_element : enclosing_element
-      (* TODO(rgrig): For hl locals I need some the arguments on Method *)
     ; da_pool : CP.t
     ; da_i : Attribute.info }
 
@@ -2381,10 +2399,73 @@ module HighAttributeOps = struct (* {{{ *)
     let i = IS.read_u2 st in
     `ConstantValue (HC.decode_field r.da_pool i)
 
+  let enclosing_arguments = function
+    | EE_method m -> List.map fuzzy_bt (locals_of_method m)
+    | _ -> failwith "TODO: Does this happen?"
+
+  let local_of_instruction = function
+    | T.ALOAD x | T.ASTORE x | T.DLOAD x | T.DSTORE x | T.FLOAD x
+    | T.FSTORE x | T.IINC { T.ii_var = x; _ } | T.ILOAD x | T.ISTORE x
+    | T.LLOAD x | T.LSTORE x | T.RET x
+        -> Some x
+    | _ -> None
+
+  let set_local i = function
+    | T.ALOAD _ -> T.ALOAD i
+    | T.ASTORE _ -> T.ASTORE i
+    | T.DLOAD _ -> T.DLOAD i
+    | T.DSTORE _ -> T.DSTORE i
+    | T.FLOAD _ -> T.FLOAD i
+    | T.FSTORE _ -> T.FSTORE i
+    | T.IINC a -> T.IINC {a with T.ii_var = i}
+    | T.ILOAD _ -> T.ILOAD i
+    | T.ISTORE _ -> T.ISTORE i
+    | T.LLOAD _ -> T.LLOAD i
+    | T.LSTORE _ -> T.LSTORE i
+    | T.RET _ -> T.RET i
+    | _ -> failwith "INTERNAL: Trying to set local on an opcode with no local."
+
+  let bt_of_instruction = function
+    | T.ALOAD _ | T.ASTORE _ | T.RET _ -> Some T.Reference
+    | T.DLOAD _ | T.DSTORE _ -> Some T.Double
+    | T.FLOAD _ | T.FSTORE _ -> Some T.Float
+    | T.IINC _ | T.ILOAD _ | T.ISTORE _ -> Some T.Integer
+    | T.LLOAD _ | T.LSTORE _ -> Some T.Long
+    | _ -> None
+
+  let map_local_access f g x =
+    match local_of_instruction x, bt_of_instruction x with
+      | Some k, Some t -> f x k t
+      | None, None -> g x
+      | _ -> failwith "INTERNAL"
+
+  let update_locals f =
+    let update x k t = set_local (f (k, t)) x in
+    List.map (map_local_access update (fun x -> x))
+
+  let decode_locals arguments code =
+    try
+      let m = Hashtbl.create 0 in (* old (index, type) -> new index *)
+      let sz = ref 0 in
+      let fresh t = let r = !sz in sz := succ r; r in
+      let record_access k t =
+        if not (Hashtbl.mem m (k, t)) then
+          Hashtbl.add m (k, t) (fresh t) in
+      let record_argument k t = record_access k t; k + size_of_bt t in
+      let labels, code = List.split code in
+      ignore (List.fold_left record_argument 0 arguments);
+      List.iter (map_local_access (fun _ -> record_access) (fun _ -> ())) code;
+      let code = update_locals (Hashtbl.find m) code in
+      let code = List.combine labels code in
+      let add_type (_, t) i = U.IntMap.add i t in
+      let types = Hashtbl.fold add_type m U.IntMap.empty in
+      (code, types)
+    with _ ->
+      failwith "INTERNAL: decode_locals"
+
   let decode_attr_code decode r st =
-    (* read these anyway to get into the stream *)
     let (*mx_stack*) _ = IS.read_u2 st in
-    let (*mx_locals*) _ = IS.read_u2 st in
+    let (*max_locals*) _ = IS.read_u2 st in
     let code_len' = IS.read_u4 st in
     let code_len =
       let x = (code_len' : Utils.u4 :> int64) in
@@ -2411,13 +2492,15 @@ module HighAttributeOps = struct (* {{{ *)
         end in
       ( (fun o -> snd a.(bs o 0 (pred n))),
         (fun o -> snd a.(pred (bs o 1 n))) ) in
-    let instrs =
+    let cv_code =
       let f (o, ss) s =
         (o + BC.size_of o s,
           (ofs_to_label o, HI.decode r.da_pool ofs_to_label o s) :: ss) in
       let _, r = List.fold_left f (0, []) instr_codes in
       List.rev r in
-    let exceptions =
+    let cv_code, cv_type_of_local =
+      decode_locals (enclosing_arguments r.da_element) cv_code in
+    let cv_exception_table =
       IS.read_elements
         st
         (fun st ->
@@ -2435,7 +2518,7 @@ module HighAttributeOps = struct (* {{{ *)
           ; try_end = ofs_to_prev_label (end_pc : Utils.u2 :> int)
           ; catch = u2_ofs_to_label handler_pc
           ; caught = catch_type; }) in
-    let attrs = IS.read_elements
+    let cv_attributes = IS.read_elements
         st
         (fun st -> decode { r with da_i = read_info st }) in
     let update_lnt = function
@@ -2448,13 +2531,9 @@ module HighAttributeOps = struct (* {{{ *)
           T.LabelHash.iter f h;
           `LineNumberTable r
       | x -> x in
-    let attrs = List.map check_code_attribute attrs in
-    let attrs = List.map update_lnt attrs in
-    `Code
-      { T.cv_code = instrs
-      ; cv_exception_table = exceptions
-      ; cv_attributes = attrs
-      ; cv_type_of_local = U.IntMap.empty }
+    let cv_attributes = List.map check_code_attribute cv_attributes in
+    let cv_attributes = List.map update_lnt cv_attributes in
+    `Code { T.cv_code; cv_exception_table; cv_attributes; cv_type_of_local }
 
   let decode_attr_exceptions _ r st : T.attribute =
     let f st = CP.get_class_name r.da_pool (IS.read_u2 st) in
@@ -2607,8 +2686,8 @@ module HighAttributeOps = struct (* {{{ *)
       | #T.field_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "field"))
 
-  let decode_method arg_types da_pool da_i =
-    match decode { da_element = EE_method arg_types; da_pool; da_i } with
+  let decode_method m da_pool da_i =
+    match decode { da_element = EE_method m; da_pool; da_i } with
       | #T.method_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "method"))
 
@@ -2724,7 +2803,8 @@ module HighAttributeOps = struct (* {{{ *)
       let smt = T.LabelHash.fold full_frame m [] in
       let smt = List.sort compare smt in
       let write_smf previous (o, locals, stack) =
-        let write_vi = function
+        let write_bt = function
+          | T.Reference -> failwith "INTERNAL: type should be more specific"
           | T.Top -> OS.write_u1 enc.en_st (U.u1 0)
           | T.Return_address _ (* TODO(rgrig): check whether this is OK. *)
           | T.Integer -> OS.write_u1 enc.en_st (U.u1 1)
@@ -2744,12 +2824,12 @@ module HighAttributeOps = struct (* {{{ *)
               OS.write_u2 enc.en_st (U.u2 (ool l)) in
         let write_list l =
           OS.write_u2 enc.en_st (U.u2 (List.length l));
-          List.iter write_vi l in
+          List.iter write_bt l in
         let o = match previous with None -> 0 | Some (o',_,_) -> o-o'-1 in
-        let same vi =
+        let same bt =
           assert (0 <= o);
           let e = 64 <= o in    (* extended *)
-          let s = vi <> None in (* with stack *)
+          let s = bt <> None in (* with stack *)
           let frame_type = match e, s with
             | false, false -> o
             | false, true -> o + 64
@@ -2757,14 +2837,14 @@ module HighAttributeOps = struct (* {{{ *)
             | true, true -> 247 in
           OS.write_u1 enc.en_st (U.u1 frame_type);
           if e then OS.write_u2 enc.en_st (U.u2 o);
-          if s then write_vi (U.from_some vi) in
+          if s then write_bt (U.from_some bt) in
         let diff (k, vis) =
           assert (-4 < k && k < 4);
           assert (k <> 0);
           assert (k < 0 || k = List.length vis);
           OS.write_u1 enc.en_st (U.u1 (k + 251));
           OS.write_u2 enc.en_st (U.u2 o);
-          List.iter write_vi vis in
+          List.iter write_bt vis in
         let full () =
           OS.write_u1 enc.en_st (U.u1 255);
           OS.write_u2 enc.en_st (U.u2 o);
@@ -2834,10 +2914,31 @@ module HighAttributeOps = struct (* {{{ *)
     let bcl = i_list_to_labeled_bc_list (fun _ -> 0) pool l in
     fix_map (fun _ -> (0,0)) bcl
 
+  let encode_locals arguments code =
+    let record_use m k t =
+      let ov = try U.IntMap.find k m with Not_found -> 0 in
+      U.IntMap.add k (max ov (size_of_bt t)) m in
+    let record_arg (m, k) t = (record_use m k t, succ k) in
+    let record_instruction m =
+      map_local_access (fun _ -> record_use m) (fun _ -> m) in
+    let labels, code = List.split code in
+    let m, _ = List.fold_left record_arg (U.IntMap.empty, 0) arguments in
+    let m = List.fold_left record_instruction m code in
+    let new_index =
+      let h = Hashtbl.create 0 in
+      let f o sz n =
+        assert (sz > 0);
+        Hashtbl.add h o n;
+        n + sz in
+      ignore (U.IntMap.fold f m 0);
+      fun (k, _) -> Hashtbl.find h k in
+    let code = update_locals new_index code in
+    List.combine labels code
+
   let rec encode_attr_code m enc encode c =
-    let m = match m with
-      | Some m -> m
-      | None -> failwith "INTERNAL: encode_attr_code" in
+    let m = U.from_some m in
+    let arguments = List.map fuzzy_bt (locals_of_method m) in
+    let c = { c with T.cv_code = encode_locals arguments c.T.cv_code } in
     let c, stackmap, max_stack, max_locals =
       SE.compute_max_stack_locals m c in
     let label_to_ofs, label_to_next_ofs, code_content =
@@ -3036,33 +3137,38 @@ end
 (* }}} *)
 module HAO = HighAttributeOps
 module HighMethodOps = struct (* {{{ *)
-  let decode_initializer cm_attributes flags _ =
+  let make_ClinitMethod flags _ =
     let cm_flags = AccessFlag.check_initializer_flags flags in
-    T.ClinitMethod { T.cm_flags; cm_attributes }
+    T.ClinitMethod { T.cm_flags; cm_attributes = [] }
 
-  let decode_constructor (im_descriptor,_) im_attributes flags _ =
+  let make_InitMethod (im_descriptor,_) flags _ =
     let im_flags = AccessFlag.check_constructor_flags flags in
-    T.InitMethod { T.im_flags; im_descriptor; im_attributes }
+    T.InitMethod { T.im_flags; im_descriptor; im_attributes = [] }
 
-  let decode_regular i rm_name rm_descriptor rm_attributes rm_flags _ =
-    let rm_flags = AccessFlag.check_method_flags i rm_flags in
-    T.RegularMethod { T.rm_flags; rm_name; rm_descriptor; rm_attributes }
+  let make_RegularMethod i rm_name rm_descriptor flags _ =
+    let rm_flags = AccessFlag.check_method_flags i flags in
+    T.RegularMethod { T.rm_flags; rm_name; rm_descriptor; rm_attributes = [] }
+
+  let set_method_attributes xs = function
+    | T.RegularMethod m -> T.RegularMethod { m with T.rm_attributes = xs }
+    | T.InitMethod m -> T.InitMethod { m with T.im_attributes = xs }
+    | T.ClinitMethod m -> T.ClinitMethod { m with T.cm_attributes = xs }
 
   let decode is_interface pool m =
     let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
     let utf8_name = utf8 m.M.name_index in
-    let name = Name.make_for_method utf8_name in
-    let descriptor =
-      Descriptor.method_of_utf8 (utf8 m.M.descriptor_index) in
-    let decode_attribute = HAO.decode_method (fst descriptor) pool in
+    let n = Name.make_for_method utf8_name in
+    let d = Descriptor.method_of_utf8 (utf8 m.M.descriptor_index) in
+    let fs = AccessFlag.from_u2 true m.M.access_flags in
+    let hm = U.switch U.UTF8.equal
+      [ class_initializer, make_ClinitMethod fs
+      ; class_constructor, make_InitMethod d fs ]
+      (make_RegularMethod is_interface n d fs)
+      utf8_name in
+    let decode_attribute = HAO.decode_method hm pool in
     let attributes =
       U.map_array_to_list decode_attribute m.M.attributes_array in
-    let flags = AccessFlag.from_u2 true m.M.access_flags in
-    U.switch U.UTF8.equal
-      [ class_initializer, decode_initializer attributes flags
-      ; class_constructor, decode_constructor descriptor attributes flags ]
-      (decode_regular is_interface name descriptor attributes flags)
-      utf8_name
+    set_method_attributes attributes hm
 
   let encode pool m =
     let flags, name, desc, attrs = match m with

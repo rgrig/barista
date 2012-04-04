@@ -42,19 +42,18 @@ from 0..n-1 to types.
 
 Let me try to summarize the Java rules.  The bytecode uses a range 0..p-1 of
 locals.  A valid mapping f : 0..p-1 -> Type must satisfy
-  size(f i)=k => 1<=j<k => f(i+j)=T
-where T is a special value. Here, f(j)=T is false if j not in the domain.  An
+  size(f i)=k => 1<=j-i<k => f(j)=T
+where T is a special value. Here, f(j)=T holds only if j is in the domain.  An
 instruction [store i v] transforms the mapping.
   [store i v] f j = type v, if i=j
                     T, if 1<=j-i<size(type v)
-                    T, if 1<=i-j<size(type(f i))
+                    T, if 1<=i-j<size(type(f j))
                     f j, otherwise
-In words, location i will have the type of v, a few locations to the right
-(which are used by v) are reset to T, a few locations to the right (which used
-to also use location i) are reset to T, and all other locations remain as
-before. Whenever a local is read it must have a type corresponding to the
-instruction being used to read.  In particular, locations with type T can't be
-read.
+In words: Location i will have the type of v, a few locations to the right
+(which are used by v) have type T, and the value that started from <i and
+extended over to i (if there was such a value) is erased.  Whenever a local is
+read it must have a type corresponding to the instruction being used to read.
+In particular, locations with type T can't be read.
 
 I think that the mapping should be flow-insensitive.  That is, it should be
 possible to associate a mapping to each program point such that the rules in

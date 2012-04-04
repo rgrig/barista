@@ -276,6 +276,10 @@ module IntSet = Set.Make (struct type t = int let compare = compare end)
 
 let pp_list pe f = List.iter (fun e -> fprintf f "@ %a" pe e)
 
+let string_of_pp pp x =
+  pp str_formatter x;
+  flush_str_formatter ()
+
 let fresh () =
   let x = ref (-1L) in
   fun () ->
