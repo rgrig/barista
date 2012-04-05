@@ -109,7 +109,6 @@ type instruction =
   | ATHROW
   | BALOAD
   | BASTORE
-  | BIPUSH of int
   | CALOAD
   | CASTORE
   | CHECKCAST of constant_typeref
@@ -169,13 +168,6 @@ type instruction =
   | IALOAD
   | IAND
   | IASTORE
-  | ICONST_0
-  | ICONST_1
-  | ICONST_2
-  | ICONST_3
-  | ICONST_4
-  | ICONST_5
-  | ICONST_M1
   | IDIV
   | IF_ACMPEQ of label
   | IF_ACMPNE of label
@@ -307,7 +299,7 @@ type code_value =
   { cv_code : labeled_instruction list
   ; cv_exception_table : exception_table_element list
   ; cv_attributes : code_attribute list
-  ; cv_type_of_local : bytecode_type Utils.IntMap.t }
+  ; cv_type_of_local : bytecode_type Utils.IntMap.t }  (* REDUNDANT *)
 
 type class_attribute =
   [ `BootstrapMethods of Bootstrap.method_specifier list (** bootstrap for dynamic methods *)

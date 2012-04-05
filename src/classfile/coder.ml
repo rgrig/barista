@@ -225,6 +225,7 @@ module HighInstruction = struct (* {{{ *)
   let invalid_label = -1L
 
   let s1_to_int (s : U.s1) = (s :> int)
+  let s1_to_int32 (s : U.s1) = Int32.of_int (s :> int)
   let s2_to_int (s : U.s2) = (s :> int)
   let s4_to_int (s : U.s4) =
     let int_32 = (s :> int32) in
@@ -272,7 +273,7 @@ module HighInstruction = struct (* {{{ *)
       | BC.ATHROW -> T.ATHROW
       | BC.BALOAD -> T.BALOAD
       | BC.BASTORE -> T.BASTORE
-      | BC.BIPUSH p1 -> T.BIPUSH (s1_to_int p1)
+      | BC.BIPUSH p1 -> T.LDC (`Int (s1_to_int32 p1))
       | BC.CALOAD -> T.CALOAD
       | BC.CASTORE -> T.CASTORE
       | BC.CHECKCAST p1 -> T.CHECKCAST (HC.decode_typeref pool p1)
@@ -349,13 +350,13 @@ module HighInstruction = struct (* {{{ *)
       | BC.IALOAD -> T.IALOAD
       | BC.IAND -> T.IAND
       | BC.IASTORE -> T.IASTORE
-      | BC.ICONST_0 -> T.ICONST_0
-      | BC.ICONST_1 -> T.ICONST_1
-      | BC.ICONST_2 -> T.ICONST_2
-      | BC.ICONST_3 -> T.ICONST_3
-      | BC.ICONST_4 -> T.ICONST_4
-      | BC.ICONST_5 -> T.ICONST_5
-      | BC.ICONST_M1 -> T.ICONST_M1
+      | BC.ICONST_0 -> T.LDC (`Int 0l)
+      | BC.ICONST_1 -> T.LDC (`Int 1l)
+      | BC.ICONST_2 -> T.LDC (`Int 2l)
+      | BC.ICONST_3 -> T.LDC (`Int 3l)
+      | BC.ICONST_4 -> T.LDC (`Int 4l)
+      | BC.ICONST_5 -> T.LDC (`Int 5l)
+      | BC.ICONST_M1 -> T.LDC (`Int (-1l))
       | BC.IDIV -> T.IDIV
       | BC.IF_ACMPEQ p1 -> T.IF_ACMPEQ (rel_s_ofs_to_lbl p1)
       | BC.IF_ACMPNE p1 -> T.IF_ACMPNE (rel_s_ofs_to_lbl p1)
@@ -522,12 +523,21 @@ module HighInstruction = struct (* {{{ *)
       BC.TABLESWITCH (def, low, high, ofss) in
 
     (* Helpers that pick between wide and narrow versions of instructions. *)
-    let bc_LDC (c : T.constant_stack) =
-      let j = HC.encode_stack pool c in
-      if HC.size (c :> T.constant) = 2 then
-        BC.LDC2_W j
-      else
-        BC.LDC_W j in
+    let bc_LDC = function
+      | `Int (-1l) -> BC.ICONST_M1
+      | `Int 0l -> BC.ICONST_0
+      | `Int 1l -> BC.ICONST_1
+      | `Int 2l -> BC.ICONST_2
+      | `Int 3l -> BC.ICONST_3
+      | `Int 4l -> BC.ICONST_4
+      | `Int 5l -> BC.ICONST_5
+      | `Int x when -128l <= x && x < 128l -> BC.BIPUSH (U.s1 (Int32.to_int x))
+      | c ->
+          let j = HC.encode_stack pool c in
+          if HC.size (c :> T.constant) = 2 then
+            BC.LDC2_W j
+          else
+            BC.LDC_W j in
     let bc_ALOAD x = BC.WIDE_ALOAD (U.u2 x) in
     let bc_ASTORE x = BC.WIDE_ASTORE (U.u2 x) in
     let bc_DLOAD x = BC.WIDE_DLOAD (U.u2 x) in
@@ -555,7 +565,6 @@ module HighInstruction = struct (* {{{ *)
     | T.ATHROW -> BC.ATHROW
     | T.BALOAD -> BC.BALOAD
     | T.BASTORE -> BC.BASTORE
-    | T.BIPUSH p1 -> BC.BIPUSH (U.s1 p1)
     | T.CALOAD -> BC.CALOAD
     | T.CASTORE -> BC.CASTORE
     | T.CHECKCAST p1 -> BC.CHECKCAST (HC.encode_typeref pool p1)
@@ -615,13 +624,6 @@ module HighInstruction = struct (* {{{ *)
     | T.IALOAD -> BC.IALOAD
     | T.IAND -> BC.IAND
     | T.IASTORE -> BC.IASTORE
-    | T.ICONST_0 -> BC.ICONST_0
-    | T.ICONST_1 -> BC.ICONST_1
-    | T.ICONST_2 -> BC.ICONST_2
-    | T.ICONST_3 -> BC.ICONST_3
-    | T.ICONST_4 -> BC.ICONST_4
-    | T.ICONST_5 -> BC.ICONST_5
-    | T.ICONST_M1 -> BC.ICONST_M1
     | T.IDIV -> BC.IDIV
     | T.IF_ACMPEQ p1 -> BC.IF_ACMPEQ (s2_offset p1)
     | T.IF_ACMPNE p1 -> BC.IF_ACMPNE (s2_offset p1)
@@ -713,7 +715,6 @@ module HighInstruction = struct (* {{{ *)
     | T.ATHROW -> Version.make_bounds "'ATHROW' instruction" Version.Java_1_0 None
     | T.BALOAD -> Version.make_bounds "'BALOAD' instruction" Version.Java_1_0 None
     | T.BASTORE -> Version.make_bounds "'BASTORE' instruction" Version.Java_1_0 None
-    | T.BIPUSH _ -> Version.make_bounds "'BIPUSH' instruction" Version.Java_1_0 None
     | T.CALOAD -> Version.make_bounds "'CALOAD' instruction" Version.Java_1_0 None
     | T.CASTORE -> Version.make_bounds "'CASTORE' instruction" Version.Java_1_0 None
     | T.CHECKCAST _ -> Version.make_bounds "'CHECKCAST' instruction" Version.Java_1_0 None
@@ -773,13 +774,6 @@ module HighInstruction = struct (* {{{ *)
     | T.IALOAD -> Version.make_bounds "'IALOAD' instruction" Version.Java_1_0 None
     | T.IAND -> Version.make_bounds "'IAND' instruction" Version.Java_1_0 None
     | T.IASTORE -> Version.make_bounds "'IASTORE' instruction" Version.Java_1_0 None
-    | T.ICONST_0 -> Version.make_bounds "'ICONST_0' instruction" Version.Java_1_0 None
-    | T.ICONST_1 -> Version.make_bounds "'ICONST_1' instruction" Version.Java_1_0 None
-    | T.ICONST_2 -> Version.make_bounds "'ICONST_2' instruction" Version.Java_1_0 None
-    | T.ICONST_3 -> Version.make_bounds "'ICONST_3' instruction" Version.Java_1_0 None
-    | T.ICONST_4 -> Version.make_bounds "'ICONST_4' instruction" Version.Java_1_0 None
-    | T.ICONST_5 -> Version.make_bounds "'ICONST_5' instruction" Version.Java_1_0 None
-    | T.ICONST_M1 -> Version.make_bounds "'ICONST_M1' instruction" Version.Java_1_0 None
     | T.IDIV -> Version.make_bounds "'IDIV' instruction" Version.Java_1_0 None
     | T.IF_ACMPEQ _ -> Version.make_bounds "'IF_ACMPEQ' instruction" Version.Java_1_0 None
     | T.IF_ACMPNE _ -> Version.make_bounds "'IF_ACMPNE' instruction" Version.Java_1_0 None
@@ -871,7 +865,6 @@ module HighInstruction = struct (* {{{ *)
     | T.ATHROW -> "ATHROW"
     | T.BALOAD -> "BALOAD"
     | T.BASTORE -> "BASTORE"
-    | T.BIPUSH _ -> "BIPUSH"
     | T.CALOAD -> "CALOAD"
     | T.CASTORE -> "CASTORE"
     | T.CHECKCAST _ -> "CHECKCAST"
@@ -931,13 +924,6 @@ module HighInstruction = struct (* {{{ *)
     | T.IALOAD -> "IALOAD"
     | T.IAND -> "IAND"
     | T.IASTORE -> "IASTORE"
-    | T.ICONST_0 -> "ICONST"
-    | T.ICONST_1 -> "ICONST"
-    | T.ICONST_2 -> "ICONST"
-    | T.ICONST_3 -> "ICONST"
-    | T.ICONST_4 -> "ICONST"
-    | T.ICONST_5 -> "ICONST"
-    | T.ICONST_M1 -> "ICONST"
     | T.IDIV -> "IDIV"
     | T.IF_ACMPEQ _ -> "IF"
     | T.IF_ACMPNE _ -> "IF"
@@ -1425,9 +1411,6 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if T.Integer stack in
 	let stack = pop stack in
 	continue locals stack
-      | T.BIPUSH _ ->
-	let stack = push T.Integer stack in
-	continue locals stack
       | T.CALOAD ->
 	let stack = pop_if T.Integer stack in
 	let stack = pop stack in
@@ -1759,27 +1742,6 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if T.Integer stack in
 	let stack = pop_if T.Integer stack in
 	let stack = pop stack in
-	continue locals stack
-      | T.ICONST_0 ->
-	let stack = push T.Integer stack in
-	continue locals stack
-      | T.ICONST_1 ->
-	let stack = push T.Integer stack in
-	continue locals stack
-      | T.ICONST_2 ->
-	let stack = push T.Integer stack in
-	continue locals stack
-      | T.ICONST_3 ->
-	let stack = push T.Integer stack in
-	continue locals stack
-      | T.ICONST_4 ->
-	let stack = push T.Integer stack in
-	continue locals stack
-      | T.ICONST_5 ->
-	let stack = push T.Integer stack in
-	continue locals stack
-      | T.ICONST_M1 ->
-	let stack = push T.Integer stack in
 	continue locals stack
       | T.IDIV ->
 	let stack = pop_if T.Integer stack in
