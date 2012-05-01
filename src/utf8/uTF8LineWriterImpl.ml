@@ -18,7 +18,7 @@
 
 open CamomileLibrary
 
-module Encoding = CharEncoding.Configure (CamomileLibraryDefault.Config)
+module Encoding = CharEncoding.Configure (BaristaCamomile.Config)
 
 module UTF8Line = ULine.Make (UTF8)
 

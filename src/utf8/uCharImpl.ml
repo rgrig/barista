@@ -60,7 +60,7 @@ let equal = UChar.eq
 
 let compare = UChar.compare
 
-module CharInfo = UCharInfo.Make (CamomileLibraryDefault.Config)
+module CharInfo = UCharInfo.Make (BaristaCamomile.Config)
 
 let is_letter ch =
   match CharInfo.general_category ch with
