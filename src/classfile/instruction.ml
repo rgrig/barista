@@ -19,6 +19,7 @@
 open Utils
 open Consts
 
+module U = Utils
 
 (* Types *)
 
@@ -553,7 +554,7 @@ let decode bsi cpool i =
   | ByteCode.LCONST_0 -> LCONST_0
   | ByteCode.LCONST_1 -> LCONST_1
   | ByteCode.LDC p1 -> LDC (match get_entry (u2_of_u1 p1) with | ConstantPool.Integer v -> `Int v | ConstantPool.Float v -> `Float (Int32.float_of_bits v) | ConstantPool.String idx -> `String (get_utf8 idx) | ConstantPool.Class idx -> get_class_or_array idx | ConstantPool.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (get_utf8 idx)) | ConstantPool.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
-  | ByteCode.LDC2_W p1 -> LDC2_W (match get_entry p1 with | ConstantPool.Long (hi, lo) -> `Long (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo)) | ConstantPool.Double (hi, lo) -> `Double (Int64.float_of_bits (Int64.logor (Int64.shift_left (Int64.of_int32 hi) 32) (Int64.of_int32 lo))) | _ -> fail Invalid_pool_element)
+  | ByteCode.LDC2_W p1 -> LDC2_W (match get_entry p1 with | ConstantPool.Long (hi, lo) -> `Long (U.i64_of_2i32 hi lo) | ConstantPool.Double (hi, lo) -> `Double (Int64.float_of_bits (U.i64_of_2i32 hi lo)) | _ -> fail Invalid_pool_element)
   | ByteCode.LDC_W p1 -> LDC_W (match get_entry p1 with | ConstantPool.Integer v -> `Int v | ConstantPool.Float v -> `Float (Int32.float_of_bits v) | ConstantPool.String idx -> `String (get_utf8 idx) | ConstantPool.Class idx -> get_class_or_array idx | ConstantPool.MethodType idx -> `Method_type (Descriptor.method_of_utf8 (get_utf8 idx)) | ConstantPool.MethodHandle (kind, idx) -> `Method_handle (get_method_handle kind idx) | _ -> fail Invalid_pool_element)
   | ByteCode.LDIV -> LDIV
   | ByteCode.LLOAD p1 -> LLOAD p1

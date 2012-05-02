@@ -102,6 +102,10 @@ type s8 = private int64
 external s8 : int64 -> s8 = "%identity"
 (** Identity function. *)
 
+val i64_of_2i32 : int32 -> int32 -> int64
+
+val s8_of_2s4 : s4 -> s4 -> s8
+
 val u1_succ : u1 -> u1
 (** Increments the passed value, raising [Integer_exception] if result
     would be out of bounds. *)

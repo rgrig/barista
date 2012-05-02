@@ -129,10 +129,6 @@ let locals_of_method m = match m with
 module HighConstant = struct (* {{{ *)
   let rec decode pool i : T.constant =
     let utf8 = CP.get_utf8_entry pool in
-    let s8_of_2s4 hi lo =
-      Int64.logor
-        (Int64.shift_left (Int64.of_int32 hi) 32)
-        (Int64.logand 0x00000000FFFFFFFFL (Int64.of_int32 lo)) in
     let d_class n =
       let s = utf8 n in
       if U.UChar.equal opening_square_bracket (U.UTF8.get s 0) then
@@ -161,8 +157,8 @@ module HighConstant = struct (* {{{ *)
       | CP.String s -> decode pool s
       | CP.Integer x -> `Int x
       | CP.Float f -> `Float (Int32.float_of_bits f)
-      | CP.Long (hi, lo) -> `Long (s8_of_2s4 hi lo)
-      | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (s8_of_2s4 hi lo))
+      | CP.Long (hi, lo) -> `Long (U.i64_of_2i32 hi lo)
+      | CP.Double (hi, lo) -> `Double (Int64.float_of_bits (U.i64_of_2i32 hi lo))
       | CP.NameAndType _ -> fail T.Invalid_pool_element
       | CP.UTF8 s -> `String s
       | CP.MethodHandle _ -> fail (T.Unsupported "dynamic binding of methods")

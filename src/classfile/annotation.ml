@@ -19,6 +19,7 @@
 open Utils
 open Consts
 
+module U = Utils
 
 (* Low-level form *)
 
@@ -456,18 +457,14 @@ let rec decode_element_value pool i =
       | (ConstantPool.Integer v), `Char ->
           Char_value (UChar.of_code (Int32.to_int v))
       | (ConstantPool.Double (hi, lo)), `Double ->
-          let d = Int64.logor
-              (Int64.shift_left (Int64.of_int32 hi) 32)
-              (Int64.of_int32 lo) in
+          let d = U.i64_of_2i32 hi lo in
           Double_value (Int64.float_of_bits d)
       | (ConstantPool.Float f), `Float ->
           Float_value (Int32.float_of_bits f)
       | (ConstantPool.Integer v), `Int ->
           Int_value v
       | (ConstantPool.Long (hi, lo)), `Long ->
-          let v = Int64.logor
-              (Int64.shift_left (Int64.of_int32 hi) 32)
-              (Int64.of_int32 lo) in
+          let v = U.i64_of_2i32 hi lo in
           Long_value v
       | (ConstantPool.Integer v), `Short ->
           Short_value (Int32.to_int v)

@@ -107,6 +107,13 @@ type s8 = int64
 
 external s8 : int64 -> int64 = "%identity"
 
+let i64_of_2i32 hi lo =
+  Int64.logor
+    (Int64.shift_left (Int64.of_int32 hi) 32)
+    (Int64.logand 0x00000000FFFFFFFFL (Int64.of_int32 lo))
+
+let s8_of_2s4 = i64_of_2i32
+
 let u1_succ x =
   if x < 255 then
     succ x
