@@ -510,7 +510,9 @@ littleEndian bs = bigEndian (reverse bs)
 printAsText' :: String -> [Ast] -> IO ()
 printAsText' nl (ts @ (t @ (Ast (Struct m) _) : _ )) =
   let nl' = nl ++ "  " in
-  let b f t p = p >> printf "%s%s =" nl' f >> printAsText' nl' (t : ts) in
+  let { b f t p =
+    p >> printf "%s%s =" nl' (f :: String) >> printAsText' nl' (t : ts)
+  } in
   do
     printf " {"
     OMap.fold b (return ()) m

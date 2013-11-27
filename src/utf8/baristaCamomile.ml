@@ -37,7 +37,7 @@ module Config = struct
           with Not_found | Sys_error _ | Unix.Unix_error _ -> iter fs) in
     iter fs
 
-  module D = CamomileLibrary.DefaultConfig
+  module D = CamomileLibraryDefault.Config
 
   let datadir = find_dir "CAMOMILE_DATADIR" "database" D.datadir
   let localedir = find_dir "CAMOMILE_LOCALEDIR" "locales" D.localedir
