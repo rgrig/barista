@@ -109,6 +109,9 @@ let fuzzy_bt = function
   | _ -> failwith "INTERNAL: Already *too* fuzzy."
 
 let java_lang_Class = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Class")
+let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
+let java_lang_Object = `Class_or_interface java_lang_Object_name
+
 
 let locals_of_method m = match m with
   | T.RegularMethod { T.rm_flags; rm_descriptor; _ } ->
@@ -117,7 +120,7 @@ let locals_of_method m = match m with
       if List.mem `Static rm_flags then
         l
       else
-        (T.Object (`Class_or_interface java_lang_Class)) :: l
+        (T.Object java_lang_Object) :: l
   | T.InitMethod { T.im_descriptor = l ; _ } ->
       let l = List.map bt_of_descriptor l in
       T.Uninitialized_this :: l
@@ -1167,7 +1170,7 @@ module SymbExe = struct  (* {{{ *)
         | T.Top :: l :: ls when size_of_bt l = 2 -> f (l :: acc) ls
         | l :: ls -> f (l :: acc) ls
         | [] -> acc in
-      f !r []
+      List.rev (f !r [])
     with Not_found -> []
   (* }}} *)
   (* checks {{{ *)
@@ -1215,10 +1218,6 @@ module SymbExe = struct  (* {{{ *)
 
   let equal_t a b =
     equal_locals a.locals b.locals && equal_stack a.stack b.stack
-
-  let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
-
-  let java_lang_Object = `Class_or_interface java_lang_Object_name
 
   let make_empty () =
     { locals = U.IntMap.empty; stack = []; }

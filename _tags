@@ -23,7 +23,7 @@ true: debug
 <src/**>: include
 
 # Options
-<src/**>: package(bigarray), package(camomile), package(str), package(unix), package(camlzip)
+<src/**>: package(bigarray), package(camomile), package(str), package(unix), package(zip)
 <src/**> and not "src/driver/barista.ml": for-pack(BaristaLibrary)
 #<**/*.ml{,i}>: warnings
 
