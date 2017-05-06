@@ -120,7 +120,7 @@ let search_stream cp s =
       lookup cp s
     with _ ->
       try
-        s.[String.rindex s '/'] <- '$';
+        Bytes.set s (String.rindex s '/') '$';
         search ()
       with _ -> fail (Class_not_found s) in
   search ()

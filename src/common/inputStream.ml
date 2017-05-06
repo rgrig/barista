@@ -149,7 +149,7 @@ let make_of_channel ch =
     | _ -> fail Unable_to_read_data in
   let read_bytes nb =
     try
-      let res = String.create nb in
+      let res = Bytes.create nb in
       really_input ch res 0 nb;
       res
     with

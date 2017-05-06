@@ -66,10 +66,9 @@ type bounds = bound * bound option
 
 let copy_bound b =
   { bound_version = b.bound_version;
-    bound_feature = String.copy b.bound_feature; }
+    bound_feature = b.bound_feature; }
 
 let make_bounds f lo hi =
-  let f = String.copy f in
   { bound_version = lo; bound_feature = f; },
   (match hi with
   | Some v -> Some { bound_version = v; bound_feature = f; }
@@ -110,7 +109,7 @@ let () =
 
 let min_supported = u2 45, u2 0
 
-let max_supported = u2 51, u2 0
+let max_supported = u2 52, u2 0
 
 
 (* Conversion functions *)
