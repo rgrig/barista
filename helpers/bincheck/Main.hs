@@ -41,6 +41,7 @@ class_file = struct
   , u2 "minor_version"
   , u2 "major_version"
   , u2 "constant_pool_count"
+  -- FIXME: Long and Double constant pool entries 'use' 2 entries in the array
   , arrayG cp_info "constant_pool" (\v-> asInteger(v"constant_pool_count") - 1)
   , u2 "access_flags"
   , u2 "this_class" ~~> constant_pool
