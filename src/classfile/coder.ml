@@ -19,7 +19,7 @@ module T = HighTypes
 (* helpers *) (* {{{ *)
 type enclosing_element =
   | EE_class
-  | EE_method of T.method_
+  | EE_method of (Name.for_class * T.method_)
   | EE_field
 
 let fail e = raise (T.Exception e)
@@ -113,14 +113,15 @@ let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string 
 let java_lang_Object = `Class_or_interface java_lang_Object_name
 
 
-let locals_of_method m = match m with
+let locals_of_method c_name m = match m with
   | T.RegularMethod { T.rm_flags; rm_descriptor; _ } ->
       let l = fst rm_descriptor in
       let l = List.map bt_of_descriptor l in
       if List.mem `Static rm_flags then
         l
       else
-        (T.Object java_lang_Object) :: l
+(*         (T.Object java_lang_Object) :: l *)
+        (T.Object (`Class_or_interface c_name)) :: l
   | T.InitMethod { T.im_descriptor = l ; _ } ->
       let l = List.map bt_of_descriptor l in
       T.Uninitialized_this :: l
@@ -2228,8 +2229,8 @@ module SymbExe = struct  (* {{{ *)
     U.map_partial adjust_handler c.T.cv_exception_table
 
   (* public *) (* {{{ *)
-  let compute_max_stack_locals m c =
-    let init = { locals = of_list (locals_of_method m); stack = [] } in
+  let compute_max_stack_locals c_name m c =
+    let init = { locals = of_list (locals_of_method c_name m); stack = [] } in
     let exec_throw s = { s with stack = [T.Object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
@@ -2357,7 +2358,7 @@ module HighAttributeOps = struct (* {{{ *)
     `ConstantValue (HC.decode_field r.da_pool i)
 
   let enclosing_arguments = function
-    | EE_method m -> List.map fuzzy_bt (locals_of_method m)
+    | EE_method (c_name, m) -> List.map fuzzy_bt (locals_of_method c_name m)
     | _ -> failwith "TODO: Does this happen?"
 
   let local_of_instruction = function
@@ -2643,8 +2644,8 @@ module HighAttributeOps = struct (* {{{ *)
       | #T.field_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "field"))
 
-  let decode_method m da_pool da_i =
-    match decode { da_element = EE_method m; da_pool; da_i } with
+  let decode_method c_name m da_pool da_i =
+    match decode { da_element = EE_method (c_name, m); da_pool; da_i } with
       | #T.method_attribute as g -> g
       | b -> fail (T.Misplaced_attribute (name_of_attribute b, "method"))
 
@@ -2892,12 +2893,12 @@ module HighAttributeOps = struct (* {{{ *)
     let code = update_locals new_index code in
     List.combine labels code
 
-  let rec encode_attr_code m enc encode c =
-    let m = U.from_some m in
-    let arguments = List.map fuzzy_bt (locals_of_method m) in
+  let rec encode_attr_code env enc encode c =
+    let c_name, m = U.from_some env in
+    let arguments = List.map fuzzy_bt (locals_of_method c_name m) in
     let c = { c with T.cv_code = encode_locals arguments c.T.cv_code } in
     let c, stackmap, max_stack, max_locals =
-      SE.compute_max_stack_locals m c in
+      SE.compute_max_stack_locals c_name m c in
     let label_to_ofs, label_to_next_ofs, code_content =
       encode_instr_list enc.en_pool c.T.cv_code in
     let code_enc = make_encoder enc.en_pool 16 in
@@ -2928,7 +2929,7 @@ module HighAttributeOps = struct (* {{{ *)
     let sub_enc = make_encoder enc.en_pool 16 in
     List.iter
       (fun a ->
-        let res = encode (Some m) sub_enc.en_pool (a :> T.attribute) in
+        let res = encode env sub_enc.en_pool (a :> T.attribute) in
         A.write_info sub_enc.en_st res)
       c.T.cv_attributes;
     let res = encode_attr_stackmaptable label_to_ofs enc.en_pool stackmap in
@@ -3059,37 +3060,42 @@ module HighAttributeOps = struct (* {{{ *)
   let encode_attr_ignored enc =
       enc_return enc attr_ignored
 
-  let rec encode m pool : T.attribute -> A.info = fun x ->
-    let enc = make_encoder pool 64 in
-  match x with
-    | `AnnotationDefault ev -> encode_attr_annotation_default enc ev
-    | `BootstrapMethods _ -> encode_attr_bootstrap_methods ()
-    | `ClassSignature s -> encode_attr_class_signature enc s
-    | `Code c -> encode_attr_code m enc encode c
-    | `ConstantValue v -> encode_attr_constant_value enc v
-    | `Deprecated -> encode_attr_deprecated enc
-    | `EnclosingMethod em -> encode_attr_enclosing_method enc em
-    | `Exceptions l -> encode_attr_exceptions enc l
-    | `FieldSignature s -> encode_attr_field_signature enc s
-    | `IgnoredAttribute -> encode_attr_ignored enc
-    | `InnerClasses l -> encode_attr_inner_classes enc l
-    | `LineNumberTable _ -> encode_attr_line_number_table enc
-    | `MethodSignature s -> encode_attr_method_signature enc s
-    | `Module _ -> encode_attr_module ()
-    | `RuntimeInvisibleAnnotations l -> encode_attr_runtime_invisible_annotations enc l
-    | `RuntimeInvisibleParameterAnnotations l -> encode_attr_runtime_invisible_parameter_annotations enc l
-    | `RuntimeInvisibleTypeAnnotations l -> encode_attr_runtime_invisible_type_annotations enc l
-    | `RuntimeVisibleAnnotations l -> encode_attr_runtime_visible_annotations enc l
-    | `RuntimeVisibleParameterAnnotations l -> encode_attr_runtime_visible_parameter_annotations enc l
-    | `RuntimeVisibleTypeAnnotations l -> encode_attr_runtime_visible_type_annotations enc l
-    | `SourceDebugExtension sde -> encode_attr_source_debug_extension enc sde
-    | `SourceFile sf -> encode_attr_source_file enc sf
-    | `Synthetic -> encode_attr_synthetic enc
-    | `Unknown u -> encode_attr_unknown enc u
+  type encode_env = (Name.for_class * T.method_) option
 
-  let encode_class pool a = encode None pool (a : T.class_attribute :> T.attribute)
-  let encode_field pool a = encode None pool (a : T.field_attribute :> T.attribute)
-  let encode_method m pool a = encode (Some m) pool (a : T.method_attribute :> T.attribute)
+  let rec encode (env : encode_env) pool : T.attribute -> A.info = fun x ->
+    let encoder = make_encoder pool 64 in
+  match x with
+    | `AnnotationDefault ev -> encode_attr_annotation_default encoder ev
+    | `BootstrapMethods _ -> encode_attr_bootstrap_methods ()
+    | `ClassSignature s -> encode_attr_class_signature encoder s
+    | `Code c -> encode_attr_code env encoder encode c
+    | `ConstantValue v -> encode_attr_constant_value encoder v
+    | `Deprecated -> encode_attr_deprecated encoder
+    | `EnclosingMethod em -> encode_attr_enclosing_method encoder em
+    | `Exceptions l -> encode_attr_exceptions encoder l
+    | `FieldSignature s -> encode_attr_field_signature encoder s
+    | `IgnoredAttribute -> encode_attr_ignored encoder
+    | `InnerClasses l -> encode_attr_inner_classes encoder l
+    | `LineNumberTable _ -> encode_attr_line_number_table encoder
+    | `MethodSignature s -> encode_attr_method_signature encoder s
+    | `Module _ -> encode_attr_module ()
+    | `RuntimeInvisibleAnnotations l -> encode_attr_runtime_invisible_annotations encoder l
+    | `RuntimeInvisibleParameterAnnotations l -> encode_attr_runtime_invisible_parameter_annotations encoder l
+    | `RuntimeInvisibleTypeAnnotations l -> encode_attr_runtime_invisible_type_annotations encoder l
+    | `RuntimeVisibleAnnotations l -> encode_attr_runtime_visible_annotations encoder l
+    | `RuntimeVisibleParameterAnnotations l -> encode_attr_runtime_visible_parameter_annotations encoder l
+    | `RuntimeVisibleTypeAnnotations l -> encode_attr_runtime_visible_type_annotations encoder l
+    | `SourceDebugExtension sde -> encode_attr_source_debug_extension encoder sde
+    | `SourceFile sf -> encode_attr_source_file encoder sf
+    | `Synthetic -> encode_attr_synthetic encoder
+    | `Unknown u -> encode_attr_unknown encoder u
+
+  let encode_class pool a =
+    encode None pool (a : T.class_attribute :> T.attribute)
+  let encode_field pool a =
+    encode None pool (a : T.field_attribute :> T.attribute)
+  let encode_method c_name m pool a =
+    encode (Some (c_name, m)) pool (a : T.method_attribute :> T.attribute)
 end
 (* }}} *)
 module HAO = HighAttributeOps
@@ -3111,7 +3117,7 @@ module HighMethodOps = struct (* {{{ *)
     | T.InitMethod m -> T.InitMethod { m with T.im_attributes = xs }
     | T.ClinitMethod m -> T.ClinitMethod { m with T.cm_attributes = xs }
 
-  let decode is_interface pool m =
+  let decode c_name is_interface pool m =
     let utf8 = CP.get_utf8_entry pool in (* (local) short name *)
     let utf8_name = utf8 m.M.name_index in
     let n = Name.make_for_method utf8_name in
@@ -3122,12 +3128,12 @@ module HighMethodOps = struct (* {{{ *)
       ; class_constructor, make_InitMethod d fs ]
       (make_RegularMethod is_interface n d fs)
       utf8_name in
-    let decode_attribute = HAO.decode_method hm pool in
+    let decode_attribute = HAO.decode_method c_name hm pool in
     let attributes =
       U.map_array_to_list decode_attribute m.M.attributes_array in
     set_method_attributes attributes hm
 
-  let encode pool m =
+  let encode c_name pool m =
     let flags, name, desc, attrs = match m with
       | T.RegularMethod m ->
 	m.T.rm_flags,
@@ -3155,7 +3161,7 @@ module HighMethodOps = struct (* {{{ *)
         name_index = name_idx;
         descriptor_index = desc_idx;
         attributes_count = U.u2 (List.length attrs);
-        attributes_array = U.map_list_to_array (HAO.encode_method m pool)
+        attributes_array = U.map_list_to_array (HAO.encode_method c_name m pool)
           (attrs :> T.method_attribute list); }
     in
     if log_se then printf "@]@\n}";
@@ -3218,17 +3224,18 @@ let decode cf =
   CP.check_version version pool;
   let flags = AF.check_class_flags (AF.from_u2 false cf.CF.access_flags) in
   let class_name = CP.get_class_name pool in
+  let this_class_name = class_name cf.CF.this_class in
   let extends =
     if cf.CF.super_class = U.u2 0
     then None
     else Some (class_name cf.ClassFile.super_class) in
   let is_interface = List.mem `Interface flags in
   let field_decode = HF.decode is_interface pool in
-  let method_decode = HMO.decode is_interface pool in
+  let method_decode = HMO.decode this_class_name is_interface pool in
   let attribute_decode = HAO.decode_class pool in
   let hc = check_version_high version
     { T.c_flags = flags
-    ; c_name = class_name cf.CF.this_class
+    ; c_name = this_class_name
     ; c_extends = extends
     ; c_implements = List.map class_name (Array.to_list cf.CF.interfaces)
     ; c_fields = List.map field_decode (Array.to_list cf.CF.fields)
@@ -3250,7 +3257,7 @@ let encode (cd, version) =
     | None -> no_super_class in
   let itfs = U.map_list_to_array (fun s -> CP.add_class pool s) cd.T.c_implements in
   let flds = U.map_list_to_array (HF.encode pool) cd.T.c_fields in
-  let mths = U.map_list_to_array (HMO.encode pool) cd.T.c_methods in
+  let mths = U.map_list_to_array (HMO.encode cd.T.c_name pool) cd.T.c_methods in
   let atts = U.map_list_to_array (HAO.encode_class pool) cd.T.c_attributes in
   let cpool = CP.to_pool pool in
   let checked_number s sz =
