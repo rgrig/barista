@@ -1,16 +1,12 @@
 module Main where
 
--- TODO: At the end delete the unused ones.
 import Control.Monad
 import Data.Char
-import Data.Maybe
-import Data.Typeable
 import Data.Word
 import OMap (OMap)
 import Prelude hiding ((.))
 import System.Environment
 import System.IO
-import System.IO.Unsafe -- TODO: remove
 import Text.Printf
 import qualified Data.ByteString as B
 import qualified OMap
@@ -458,6 +454,10 @@ arrayG element field size ts bs =
   let sz = size (resolve ts) in
   let r = struct' (map element $ map show [0..sz-1]) ts bs in
   makeParseResult field r
+
+arrayCP element field size ts bs =
+  let sz = size (resolve ts) in
+  error "todo"
 
 array :: (String -> Parser) -> String -> Parser
 array element field = arrayG element field (\v -> asInteger(v(lengthName field)))
