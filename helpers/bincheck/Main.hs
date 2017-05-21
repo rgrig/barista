@@ -37,8 +37,7 @@ class_file = struct
   , u2 "minor_version"
   , u2 "major_version"
   , u2 "constant_pool_count"
-  -- FIXME: Long and Double constant pool entries 'use' 2 entries in the array
-  , arrayG cp_info "constant_pool" (\v-> asInteger(v"constant_pool_count") - 1)
+  , arrayCP "constant_pool" (\v->asInteger(v"constant_pool_count"))
   , u2 "access_flags"
   , u2 "this_class" ~~> constant_pool
   , u2 "super_class" ~~> constant_pool
@@ -51,7 +50,7 @@ class_file = struct
   , u2 "attributes_count"
   , array attribute_info "attributes" ]
 
-constant_pool v = v"constant_pool" ! (asInteger(v"") - 1)
+constant_pool v = v"constant_pool" ! asInteger(v"")
 
 cp_info = union
   [ constant_Class_info "constant_Class_info"
@@ -322,7 +321,8 @@ data Ast = Ast Value [Follower]
 -- are |Just []| bytes remaining; when parsing fails there is |Nothing|
 -- remaining.
 
-type Parser = [Ast] -> [Word8] -> (String, Ast, Maybe [Word8])
+type FieldName = String
+type Parser = [Ast] -> [Word8] -> (FieldName, Ast, Maybe [Word8])
 
 u' :: Int -> [Word8] -> (Ast, Maybe [Word8])
 u' n bs
@@ -330,7 +330,7 @@ u' n bs
     | otherwise       = (Ast (Base cs) [], Just ds)
   where (cs, ds) = splitAt n bs
 
-u :: Int -> String -> Parser
+u :: Int -> FieldName -> Parser
 u n field _ bs = makeParseResult field (u' n bs)
 
 u1 = u 1
@@ -425,8 +425,7 @@ struct' ps ts bs =
 -- succeeds.   Parsing fails only if all alternatives fail.  In that case, we
 -- keep the one with the biggest Ast.
 
--- TODO: assert that ps isn't empty
-union :: [Parser] -> String -> Parser
+union :: [Parser] -> FieldName -> Parser
 union [] _ _ _ = badGrammar "empty union"
 union ps field ts bs =
   let { pick r1 r2 = case (r1, r2) of
@@ -449,18 +448,41 @@ sizeOfAst (Ast (Struct m) _) = OMap.fold (\_ t sz -> sz + sizeOfAst t) 0 m
 -- the array length, based on the content of the Ast so far.  The specialized
 -- version |array| covers common cases.
 
-arrayG :: (String -> Parser) -> String -> (Resolver -> Integer) -> Parser
+arrayG :: (FieldName -> Parser) -> FieldName -> (Resolver -> Integer) -> Parser
 arrayG element field size ts bs =
   let sz = size (resolve ts) in
   let r = struct' (map element $ map show [0..sz-1]) ts bs in
   makeParseResult field r
 
-arrayCP element field size ts bs =
-  let sz = size (resolve ts) in
-  error "todo"
 
 array :: (String -> Parser) -> String -> Parser
 array element field = arrayG element field (\v -> asInteger(v(lengthName field)))
+
+-- The constant pool is a funny array:
+-- a) It starts from index 1.
+-- b) Its elements do not have constant sizes: longs and doubles have size 2.
+
+arrayCP field size ts bs = loop (OMap.empty, 1, Just bs)
+  where
+    loop (m, i, Nothing) = wrap m Nothing
+    loop (m, i, Just bs)
+      | i > sz = error "Mismatch in constant pool size"
+      | i == sz = wrap m (Just bs)
+      | i < sz = loop (step (m, i, bs))
+    sz = size (resolve ts)
+    step (m, i, bs) = (m', i', mbs')
+      where
+        (_, t, mbs') = cp_info "DUMMY-ttset" ts bs
+        m' = OMap.insert (show i) t m
+        i' = i + size_of_cp_info t
+    wrap m mbs = makeParseResult field (Ast (Struct m) [], mbs)
+
+size_of_cp_info (Ast (Struct m) _) = OMap.fold f 0 m
+  where
+    f "constant_Long_info" _ n = n + 2
+    f "constant_Double_info" _ n = n + 2
+    f _ _ n = n + 1
+size_of_cp_info _ = error "INTERNAL(vcpiz): size_of_cp_info on non-cp_info looking data."
 
 -- The operators |(.)|, |(.?)|, and |(!)| navigte the Ast.  There are two
 -- failure modes: a bad input is signaled by |Nothing|, and a bad grammar is
