@@ -120,7 +120,6 @@ let locals_of_method c_name m = match m with
       if List.mem `Static rm_flags then
         l
       else
-(*         (T.Object java_lang_Object) :: l *)
         (T.Object (`Class_or_interface c_name)) :: l
   | T.InitMethod { T.im_descriptor = l ; _ } ->
       let l = List.map bt_of_descriptor l in
@@ -1198,7 +1197,7 @@ module SymbExe = struct  (* {{{ *)
   type 'a stepper = 'a -> T.instruction -> T.label -> 'a * T.label list
   type 'a executor =
     'a stepper -> ('a -> 'a) -> ('a -> 'a -> 'a) -> ('a -> 'a -> bool) -> 'a
-    -> T.code_value -> 'a T.LabelHash.t
+    -> T.code_value -> 'a H.t
 
   type t = {
     locals : locals;
@@ -1210,10 +1209,10 @@ module SymbExe = struct  (* {{{ *)
 
   let pp_map_t f m =
     let l = ref [] in
-    T.LabelHash.iter (fun k v -> l := (k, v) :: !l) m;
+    H.iter (fun k v -> l := (k, v) :: !l) m;
     let l = List.sort compare !l in
     let pb (l, t) = fprintf f "@\n@[%Ld -> %a@]" l pp_t t in
-    fprintf f "@\n@[<2>(symbolic execution state %d" (T.LabelHash.length m);
+    fprintf f "@\n@[<2>(symbolic execution state %d" (H.length m);
     List.iter pb l;
     fprintf f "@\n)@]@\n"
 
@@ -1336,7 +1335,7 @@ module SymbExe = struct  (* {{{ *)
           (graph, state)
 
   (* was StackState.update *)
-  let step st (lbl, i) next_lbl =
+  let step c_name st (lbl, i) next_lbl =
     let continue locals stack = ({stack; locals}, [next_lbl]) in
     let jump locals stack jump_lbls = ({stack; locals}, jump_lbls) in
     let jump2 locals stack jump_lbl = ({stack; locals}, [jump_lbl; next_lbl]) in
@@ -1852,12 +1851,13 @@ module SymbExe = struct  (* {{{ *)
             match topv with
               | T.Uninitialized lbl ->
 		let f = function
-		  | T.Uninitialized lbl' when lbl = lbl' ->
-		    T.Object cn
+		  | T.Uninitialized lbl' when lbl = lbl' -> T.Object cn
 		  | x -> x in
 		U.IntMap.map f locals, List.map f stack
               | T.Uninitialized_this ->
-		let f = function T.Uninitialized_this -> T.Object cn | x -> x in
+		let f = function
+                  | T.Uninitialized_this -> T.Object (`Class_or_interface c_name)
+                  | x -> x in
 		U.IntMap.map f locals, List.map f stack
               | _ -> locals, stack
           else
@@ -2230,6 +2230,7 @@ module SymbExe = struct  (* {{{ *)
 
   (* public *) (* {{{ *)
   let compute_max_stack_locals c_name m c =
+    let step = step c_name in
     let init = { locals = of_list (locals_of_method c_name m); stack = [] } in
     let exec_throw s = { s with stack = [T.Object java_lang_Object] } in
     (* TODO(rlp) is this the correct unification? *)
@@ -2244,10 +2245,10 @@ module SymbExe = struct  (* {{{ *)
     let live_labels = ref LS.empty in
     let f l s (ms, ml) =
       let count = count_incoming l in
-      if l = first_label || count > 1 then H.add stripped_smfs l s;
+      if l = first_label || true(*count > 1*) then H.add stripped_smfs l s;
       if l = first_label || count > 0 then live_labels := LS.add l !live_labels;
       (max ms (stack_size s), max ml (locals_size s)) in
-    let max_stack, max_locals = T.LabelHash.fold f smfs (0, 0) in
+    let max_stack, max_locals = H.fold f smfs (0, 0) in
     let cv_code = List.filter (fun (l,_) -> LS.mem l !live_labels) c.T.cv_code in
     let cv_exception_table =
       adjust_exception_table (fun l -> LS.mem l !live_labels) c in
@@ -2762,7 +2763,7 @@ module HighAttributeOps = struct (* {{{ *)
       let smt = List.sort compare smt in
       let write_smf previous (o, locals, stack) =
         let write_bt = function
-          | T.Reference -> failwith "INTERNAL: type should be more specific"
+          | T.Reference -> failwith "INTERNAL(unego): type should be more specific"
           | T.Top -> OS.write_u1 enc.en_st (U.u1 0)
           | T.Return_address _ (* TODO(rgrig): check whether this is OK. *)
           | T.Integer -> OS.write_u1 enc.en_st (U.u1 1)
