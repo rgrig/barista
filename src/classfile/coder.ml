@@ -61,7 +61,10 @@ let checked_length_u1 s l =
 
 let fresh_label = U.fresh ()
 
-let size_of_bt = function T.Double | T.Long -> 2 | _ -> 1
+let size_of_bt = function
+  | T.Double | T.Long -> 2
+  | T.Top -> assert false
+  | _ -> 1
 
 let pp_label_set pe f = T.LabelSet.iter (fun e -> fprintf f "@ %a" pe e)
 
@@ -1092,7 +1095,10 @@ module SymbExe = struct  (* {{{ *)
 
   let push v s =
     if log_se then printf "+";
-    v :: s
+    let s = v :: s in
+    (match v with
+    | T.Double | T.Long -> T.Top :: s
+    | _ -> s)
 
   let push_return_value x s = match x with
     | `Void -> s
@@ -1108,24 +1114,34 @@ module SymbExe = struct  (* {{{ *)
     | _ :: tl -> if log_se then printf "-"; tl
     | [] -> fail T.SE_empty_stack
 
-  let pop_if v s =
+  let rec pop_if v s =
+    printf "@[POP_IF V %a SZ %d@]@." pp_bt v (List.length s);
+    (match s with
+    | a :: b :: _ ->
+      printf "@[STACK2 %a %a@]@." pp_bt a pp_bt b
+    | a :: _ ->
+      printf "@[STACK1 %a@]@." pp_bt a
+    | [] -> ());
+    let s = (match v with | T.Double | T.Long -> pop_if T.Top s | _ -> s) in
     let v' = top s in
     let popable = match v with
-      | T.Object _ -> true
+      | T.Object _ -> true (* TODO(rg): Is this OK? *)
       | _ -> equal_verification_type_info v v' in
     if popable then
       pop s
     else
       fail (report_invalid_stack_top (v, v'))
 
-  let pop_if_size s =
-    assert (s = 1 || s = 2);
-    function
-    | hd :: tl ->
-        if size_of_bt hd = 1
-        then (if log_se then printf "-"; (hd, tl))
-        else fail (report_unexpected_size s hd)
-    | [] -> fail T.SE_empty_stack
+  let pop_if_size s xs =
+    let chk s x xs =
+      if size_of_bt x = s
+      then (if log_se then printf "-"; (x, xs))
+      else assert false (* XXX fail (report_unexpected_size s x) *) in
+    (match s, xs with
+    | 2, T.Top :: x :: xs -> chk 2 x xs
+    | 1, x :: xs -> chk 1 x xs
+    | _, [] -> fail T.SE_empty_stack
+    | _, x :: _ -> assert false)
 
   (* }}} *)
   (* symbolic locals {{{ *)
@@ -1167,7 +1183,7 @@ module SymbExe = struct  (* {{{ *)
         r := (try U.IntMap.find i m with Not_found -> T.Top) :: !r
       done;
       let rec f acc = function
-        | T.Top :: l :: ls when size_of_bt l = 2 -> f (l :: acc) ls
+        | T.Top :: l :: ls -> f (l :: acc) ls
         | l :: ls -> f (l :: acc) ls
         | [] -> acc in
       List.rev (f !r [])
@@ -1504,22 +1520,14 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push v stack in
 	continue locals stack
       | T.DUP2 ->
-	let v1 = top stack in
-	let stack = pop stack in
-	let stack =
-          if size_of_bt v1 = 1 then
-            let v2, stack = pop_if_size 1 stack in
-            let stack = push v2 stack in
-            let stack = push v1 stack in
-            let stack = push v2 stack in
-            push v1 stack
-          else
-            push v1 (push v1 stack) in
+        let stack = (match stack with
+          | a :: b :: _ -> a :: b :: stack
+          | _ -> assert false (*XXX*) ) in
 	continue locals stack
       | T.DUP2_X1 ->
 	let v1 = top stack in
 	let stack =
-          if size_of_bt v1 = 1 then
+          if v1 <> T.Top then
             let stack = pop stack in
             let v2, stack = pop_if_size 1 stack in
             let v3, stack = pop_if_size 1 stack in
@@ -1538,11 +1546,11 @@ module SymbExe = struct  (* {{{ *)
       | T.DUP2_X2 ->
 	let v1 = top stack in
 	let stack =
-          if size_of_bt v1 = 1 then begin
+          if v1 <> T.Top then begin
             let stack = pop stack in
             let v2, stack = pop_if_size 1 stack in
             let v3 = top stack in
-            if size_of_bt v3 = 1 then begin
+            if v3 <> T.Top then begin
               let stack = pop stack in
               let v4 = top stack in
               let stack = pop stack in
@@ -1563,7 +1571,7 @@ module SymbExe = struct  (* {{{ *)
           end else begin
             let stack = pop stack in
             let v2 = top stack in
-            if size_of_bt v2 = 1 then begin
+            if v2 <> T.Top then begin
               let stack = pop stack in
               let v3, stack = pop_if_size 1 stack in
               let stack = push v1 stack in
@@ -1589,7 +1597,7 @@ module SymbExe = struct  (* {{{ *)
 	let v1, stack = pop_if_size 1 stack in
 	let v2 = top stack in
 	let stack =
-          if size_of_bt v2 = 1 then
+          if v2 <> T.Top then
             let v2, stack = pop_if_size 1 stack in
             let v3, stack = pop_if_size 1 stack in
             let stack = push v1 stack in
@@ -2066,10 +2074,10 @@ module SymbExe = struct  (* {{{ *)
       | T.POP2 ->
 	let v1 = top stack in
 	let stack =
-          if size_of_bt v1 = 1 then
+          if v1 <> T.Top then
             snd (pop_if_size 1 (snd (pop_if_size 1 stack)))
           else
-            pop stack in
+            snd (pop_if_size 2 stack) in
 	continue locals stack
       | T.PUTFIELD (`Fieldref (_, _, desc)) ->
 	let stack = pop_if (bt_of_descriptor desc) stack in
@@ -2193,6 +2201,9 @@ module SymbExe = struct  (* {{{ *)
         | None, None -> None)
         st1.locals st2.locals in
       let stack = List.map2 unify_elements st1.stack st2.stack in
+      (* XXX
+      printf "@[S1 %a@\nS2 %a@\nSu %a@]@."
+        pp_stack st1.stack pp_stack st2.stack pp_stack stack; *)
       { locals; stack }
     end else
       fail (T.SE_different_stack_sizes (sz1, sz2))
