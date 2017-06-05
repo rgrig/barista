@@ -31,12 +31,12 @@ type error =
   | SE_array_expected of string
   | SE_different_stack_sizes of (int * int)
   | SE_double_new
-  | SE_empty_stack
   | SE_invalid_label
   | SE_invalid_local_contents of (int * string * string)
   | SE_invalid_stack_top of (string * string)
   | SE_missing_return
   | SE_reference_expected of string
+  | SE_stack_too_small of int
   | SE_unexpected_size of (int * string)
   | SE_uninitialized_register of (int * int)
   | Too_many of string

@@ -31,16 +31,16 @@ let string_of_error = function
   | T.Invalid_stack_map_table -> "invalid stack map table"
   | T.Misplaced_attribute (a, e) -> "attribute " ^ a ^ " appears on " ^ e
   | T.SE_array_expected s -> "SE: found " ^ s ^ " where an array was expected"
-  | T.SE_unexpected_size (s, x) -> "SE: found " ^ x ^ " where a value of size " ^  (string_of_int s) ^ " was expected"
   | T.SE_different_stack_sizes (s, s') -> "SE: saw a stack with size " ^ (string_of_int s) ^ " but expected one with size " ^ (string_of_int s')
   | T.SE_double_new -> "SE: NEW instruction executed again without an interposing <init>"
-  | T.SE_empty_stack -> "SE: pop from empty stack during symbolic execution"
   | T.SE_invalid_label -> "SE: jump to inexistent label"
   | T.SE_invalid_local_contents (i, s, s') -> "SE: index " ^ (string_of_int i) ^ " contains " ^ s' ^ " but " ^ s ^ " was expected"
-  | T.SE_uninitialized_register (i, len) -> "SE: requesting uninitialized register " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
   | T.SE_invalid_stack_top (s, s') -> "SE: top of stack is " ^ s' ^ " but " ^ s ^ " was expected"
   | T.SE_missing_return -> "SE: no return at end of method"
   | T.SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
+  | T.SE_stack_too_small i -> sprintf "SE: expected stack of size >= %d" i
+  | T.SE_unexpected_size (s, x) -> "SE: found " ^ x ^ " where a value of size " ^  (string_of_int s) ^ " was expected"
+  | T.SE_uninitialized_register (i, len) -> "SE: requesting uninitialized register " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
   | T.Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
   | T.Unsupported s -> "unsupported " ^ s
   | _ -> "undescribed error (todo)"
@@ -1107,12 +1107,12 @@ module SymbExe = struct  (* {{{ *)
 
   let top = function
     | hd :: _ -> hd
-    | [] -> fail T.SE_empty_stack
+    | [] -> fail (T.SE_stack_too_small 1)
 
   let pop =
   function
     | _ :: tl -> if log_se then printf "-"; tl
-    | [] -> fail T.SE_empty_stack
+    | [] -> fail (T.SE_stack_too_small 1)
 
   let rec pop_if v s =
     printf "@[POP_IF V %a SZ %d@]@." pp_bt v (List.length s);
@@ -1140,7 +1140,7 @@ module SymbExe = struct  (* {{{ *)
     (match s, xs with
     | 2, T.Top :: x :: xs -> chk 2 x xs
     | 1, x :: xs -> chk 1 x xs
-    | _, [] -> fail T.SE_empty_stack
+    | _, [] -> fail (T.SE_stack_too_small 1)
     | _, x :: _ -> assert false)
 
   (* }}} *)
@@ -1515,100 +1515,34 @@ module SymbExe = struct  (* {{{ *)
 	let stack = push T.Double stack in
 	continue locals stack
       | T.DUP ->
-	let v, stack = pop_if_size 1 stack in
-	let stack = push v stack in
-	let stack = push v stack in
+        let stack = (match stack with
+          | a :: xs -> a :: a :: xs
+          | _ -> fail (T.SE_stack_too_small 1) ) in
 	continue locals stack
       | T.DUP2 ->
         let stack = (match stack with
-          | a :: b :: _ -> a :: b :: stack
-          | _ -> assert false (*XXX*) ) in
+          | a :: b :: xs -> a :: b :: a :: b :: xs
+          | _ -> fail (T.SE_stack_too_small 2) ) in
 	continue locals stack
       | T.DUP2_X1 ->
-	let v1 = top stack in
-	let stack =
-          if v1 <> T.Top then
-            let stack = pop stack in
-            let v2, stack = pop_if_size 1 stack in
-            let v3, stack = pop_if_size 1 stack in
-            let stack = push v2 stack in
-            let stack = push v1 stack in
-            let stack = push v3 stack in
-            let stack = push v2 stack in
-            push v1 stack
-          else
-            let stack = pop stack in
-            let v2, stack = pop_if_size 1 stack in
-            let stack = push v1 stack in
-            let stack = push v2 stack in
-            push v1 stack in
+        let stack = (match stack with
+          | a :: b :: c :: xs -> a :: b :: c :: a :: b :: xs
+          | _ -> fail (T.SE_stack_too_small 3) ) in
 	continue locals stack
       | T.DUP2_X2 ->
-	let v1 = top stack in
-	let stack =
-          if v1 <> T.Top then begin
-            let stack = pop stack in
-            let v2, stack = pop_if_size 1 stack in
-            let v3 = top stack in
-            if v3 <> T.Top then begin
-              let stack = pop stack in
-              let v4 = top stack in
-              let stack = pop stack in
-              let stack = push v2 stack in
-              let stack = push v1 stack in
-              let stack = push v4 stack in
-              let stack = push v3 stack in
-              let stack = push v2 stack in
-              push v1 stack
-            end else begin
-              let stack = pop stack in
-              let stack = push v2 stack in
-              let stack = push v1 stack in
-              let stack = push v3 stack in
-              let stack = push v2 stack in
-              push v1 stack
-            end
-          end else begin
-            let stack = pop stack in
-            let v2 = top stack in
-            if v2 <> T.Top then begin
-              let stack = pop stack in
-              let v3, stack = pop_if_size 1 stack in
-              let stack = push v1 stack in
-              let stack = push v3 stack in
-              let stack = push v2 stack in
-              push v1 stack
-            end else begin
-              let stack = pop stack in
-              let stack = push v1 stack in
-              let stack = push v2 stack in
-              push v1 stack
-            end
-          end in
+        let stack = (match stack with
+          | a :: b :: c :: d :: xs -> a :: b :: c :: d :: a :: b :: xs
+          | _ -> fail (T.SE_stack_too_small 4) ) in
 	continue locals stack
       | T.DUP_X1 ->
-	let v1, stack = pop_if_size 1 stack in
-	let v2, stack = pop_if_size 1 stack in
-	let stack = push v1 stack in
-	let stack = push v2 stack in
-	let stack = push v1 stack in
+        let stack = (match stack with
+          | a :: b :: xs -> a :: b :: a :: xs
+          | _ -> fail (T.SE_stack_too_small 2) ) in
 	continue locals stack
       | T.DUP_X2 ->
-	let v1, stack = pop_if_size 1 stack in
-	let v2 = top stack in
-	let stack =
-          if v2 <> T.Top then
-            let v2, stack = pop_if_size 1 stack in
-            let v3, stack = pop_if_size 1 stack in
-            let stack = push v1 stack in
-            let stack = push v3 stack in
-            let stack = push v2 stack in
-            push v1 stack
-          else
-            let v2, stack = pop_if_size 2 stack in
-            let stack = push v1 stack in
-            let stack = push v2 stack in
-            push v1 stack in
+        let stack = (match stack with
+          | a :: b :: c :: xs -> a :: b :: c :: a :: xs
+          | _ -> fail (T.SE_stack_too_small 3) ) in
 	continue locals stack
       | T.F2D ->
 	let stack = pop_if T.Float stack in
