@@ -1115,13 +1115,13 @@ module SymbExe = struct  (* {{{ *)
     | [] -> fail (T.SE_stack_too_small 1)
 
   let rec pop_if v s =
-    printf "@[POP_IF V %a SZ %d@]@." pp_bt v (List.length s);
-    (match s with
-    | a :: b :: _ ->
-      printf "@[STACK2 %a %a@]@." pp_bt a pp_bt b
-    | a :: _ ->
-      printf "@[STACK1 %a@]@." pp_bt a
-    | [] -> ());
+    if log_se_full then begin
+      printf "@[POP_IF V %a SZ %d@]@." pp_bt v (List.length s);
+      (match s with
+      | a :: b :: _ -> printf "@[STACK2 %a %a@]@." pp_bt a pp_bt b
+      | a :: _ -> printf "@[STACK1 %a@]@." pp_bt a
+      | [] -> ())
+    end;
     let s = (match v with | T.Double | T.Long -> pop_if T.Top s | _ -> s) in
     let v' = top s in
     let popable = match v with
@@ -1136,7 +1136,7 @@ module SymbExe = struct  (* {{{ *)
     let chk s x xs =
       if size_of_bt x = s
       then (if log_se then printf "-"; (x, xs))
-      else assert false (* XXX fail (report_unexpected_size s x) *) in
+      else fail (report_unexpected_size s x)  in
     (match s, xs with
     | 2, T.Top :: x :: xs -> chk 2 x xs
     | 1, x :: xs -> chk 1 x xs
@@ -2135,16 +2135,14 @@ module SymbExe = struct  (* {{{ *)
         | None, None -> None)
         st1.locals st2.locals in
       let stack = List.map2 unify_elements st1.stack st2.stack in
-      (* XXX
-      printf "@[S1 %a@\nS2 %a@\nSu %a@]@."
-        pp_stack st1.stack pp_stack st2.stack pp_stack stack; *)
+      if log_se_full then
+        printf "@[S1 %a@\nS2 %a@\nSu %a@]@."
+          pp_stack st1.stack pp_stack st2.stack pp_stack stack;
       { locals; stack }
     end else
       fail (T.SE_different_stack_sizes (sz1, sz2))
   (* }}} *)
 
-  (* TODO(rlp): it appears he pads the stack for big values *)
-  (* our symbolic execution should be size agnostic and not need that *)
   let of_list l =
     let l =
       List.map
@@ -2697,13 +2695,22 @@ module HighAttributeOps = struct (* {{{ *)
 
   (* PRE: ool is injective *)
   let encode_attr_stackmaptable (ool : T.label -> int) pool m : A.info =
+    let remove_top zs =
+      let rec f xs = function
+        | T.Long :: x :: ys -> assert (x = T.Top); f (T.Long :: xs) ys
+        | T.Double :: x :: ys -> assert (x = T.Top); f (T.Double :: xs) ys
+        | x :: ys -> f (x :: xs) ys
+        | [] -> List.rev xs in
+      let us = f [] zs in
+      if log_se then
+        printf "@[WITH-TOP %a@\nWITHOUT-TOP %a@]@." SE.pp_stack zs SE.pp_stack us;
+      us in
     try
       let enc = make_encoder pool 16 in
       let full_frame l s acc =
-        ( ool l
-        , SE.encode_locals s.SE.locals
-        , List.rev s.SE.stack )
-        :: acc in
+        let locals = remove_top (SE.encode_locals s.SE.locals) in
+        let stack = remove_top (List.rev s.SE.stack) in
+        ( ool l, locals, stack ) :: acc in
       let smt = T.LabelHash.fold full_frame m [] in
       let smt = List.sort compare smt in
       let write_smf previous (o, locals, stack) =
