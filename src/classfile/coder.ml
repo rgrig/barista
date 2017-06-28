@@ -2645,9 +2645,10 @@ module HighAttributeOps = struct (* {{{ *)
     | `Unknown _ ->
         Version.make_bounds "'Unknown' attribute" Version.Java_1_0 None
 
-  type encoder = { en_pool : CP.extendable
-		 ; en_buffer : Buffer.t
-		 ; en_st : OS.t }
+  type encoder =
+    { en_pool : CP.extendable
+    ; en_buffer : Buffer.t
+    ; en_st : OS.t }
 
   let make_encoder pool n =
     let buffer = Buffer.create n in
@@ -2657,9 +2658,10 @@ module HighAttributeOps = struct (* {{{ *)
   let enc_return enc n =
     let name_idx = CP.add_utf8 enc.en_pool n in
     let content = Buffer.contents enc.en_buffer in
-    { A.name_index = name_idx;
-      length = U.u4 (Int64.of_int (String.length content));
-      data = content; }
+    A.
+    { name_index = name_idx
+    ; length = U.u4 (Int64.of_int (String.length content))
+    ; data = content }
 
   let write_annotations enc l =
     OS.write_elements
@@ -2880,11 +2882,21 @@ module HighAttributeOps = struct (* {{{ *)
     let len = U.u2 (succ (len : U.u2 :> int)) in
     OS.write_u2 enc.en_st len;
     let sub_enc = make_encoder enc.en_pool 16 in
-    List.iter
-      (fun a ->
-        let res = encode env sub_enc.en_pool (a :> T.attribute) in
-        A.write_info sub_enc.en_st res)
-      c.T.cv_attributes;
+    let update_lnt = function
+      | `LineNumberTable h ->
+          let r = T.LabelHash.create (T.LabelHash.length h) in
+          let f label ln =
+            let offset = Int64.of_int (label_to_ofs label) in
+            assert (not (T.LabelHash.mem r offset));
+            T.LabelHash.add r offset ln in
+          T.LabelHash.iter f h;
+          `LineNumberTable r
+      | x -> x in
+    let enc_ca a =
+      let res = encode env sub_enc.en_pool (a :> T.attribute) in
+      A.write_info sub_enc.en_st res in
+    let cv_attributes = List.map update_lnt c.T.cv_attributes in
+    List.iter enc_ca cv_attributes;
     let res = encode_attr_stackmaptable label_to_ofs enc.en_pool stackmap in
     A.write_info sub_enc.en_st res;
     OS.close sub_enc.en_st;
@@ -2956,9 +2968,16 @@ module HighAttributeOps = struct (* {{{ *)
       [];
     enc_return enc attr
 
-  (* TODO(rgrig): Implement. *)
-  let encode_attr_line_number_table =
-    write_empty_list "line numbers" attr_line_number_table
+  let encode_attr_line_number_table enc lnt =
+    let f o ln xs = (o, ln) :: xs in
+    let xs = T.LabelHash.fold f lnt [] in
+    let xs = List.sort compare xs in
+    let c = checked_length "line number entries" in
+    let w st (o, ln) =
+      OS.write_u2 st (U.u2 (Int64.to_int o));
+      OS.write_u2 st (U.u2 ln) in
+    OS.write_elements c enc.en_st w xs;
+    enc_return enc attr_line_number_table
 
   let encode_attr_local_variable_table =
     write_empty_list "local variables" attr_local_variable_table
@@ -3029,7 +3048,7 @@ module HighAttributeOps = struct (* {{{ *)
     | `FieldSignature s -> encode_attr_field_signature encoder s
     | `IgnoredAttribute -> encode_attr_ignored encoder
     | `InnerClasses l -> encode_attr_inner_classes encoder l
-    | `LineNumberTable _ -> encode_attr_line_number_table encoder
+    | `LineNumberTable lnt -> encode_attr_line_number_table encoder lnt
     | `MethodSignature s -> encode_attr_method_signature encoder s
     | `Module _ -> encode_attr_module ()
     | `RuntimeInvisibleAnnotations l -> encode_attr_runtime_invisible_annotations encoder l
