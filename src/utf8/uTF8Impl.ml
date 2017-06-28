@@ -319,8 +319,6 @@ let split c s =
     res := last :: !res;
   List.rev !res
 
-external is_printable : char -> bool = "caml_is_printable"
-
 let double_quote = UCharImpl.of_char '"'
 
 let simple_quote = UCharImpl.of_char '\''
@@ -337,55 +335,11 @@ let new_line = UChar.of_char '\n'
 
 let tabulation = UChar.of_char '\t'
 
-let escape_delim delim s =
-  let res = UTF8.Buf.create ((UTF8.length s) * 2) in
-  let add_char x =
-    UTF8.Buf.add_char res (UCharImpl.to_camomile x) in
-  let add_string x =
-    UTF8.Buf.add_string res (of_string x) in
-  add_char delim;
-  UTF8.iter
-    (fun c ->
-      let code = UChar.uint_code c in
-      if code > 0x7F || code < 0 then
-        let code'1 = code land 0x0000FFFF in (* from Camomile's UPervasives module *)
-        let code'2 = code lsr 16 in
-        if code'2 = 0 then
-          add_string (Printf.sprintf "\\u%04X" code'1)
-        else
-          add_string (Printf.sprintf "\\U%04X%04X" code'2 code'1)
-      else
-        (* from stdlib's Char/String modules *)
-        match UCharImpl.to_char (UCharImpl.of_camomile c) with
-        | '"' ->
-            add_char back_slash;
-            add_char double_quote
-        | '\\' ->
-            add_char back_slash;
-            add_char back_slash
-        | '\n' ->
-            add_char back_slash;
-            add_char lowercase_n
-        | '\t' ->
-            add_char back_slash;
-            add_char lowercase_t
-        | ch ->
-            if is_printable ch then
-              add_char (UCharImpl.of_char ch)
-            else
-              let cc = Char.code ch in
-              add_char back_slash;
-              add_char (UCharImpl.of_char (Char.chr (48 + cc / 100)));
-              add_char (UCharImpl.of_char (Char.chr (48 + (cc / 10) mod 10)));
-              add_char (UCharImpl.of_char (Char.chr (48 + cc mod 10))))
-    s;
-  add_char delim;
-  UTF8.Buf.contents res
-
-let escape = escape_delim double_quote
+let escape s =
+  Printf.sprintf "\"%s\"" (UPervasives.escaped_utf8 s)
 
 let escape_char c =
-  escape_delim simple_quote (of_uchar c)
+  Printf.sprintf "\'%s\'" (UPervasives.escaped_uchar (UCharImpl.to_camomile c))
 
 let unescape s =
   let len = UTF8.length s in
