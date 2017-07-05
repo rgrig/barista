@@ -32,7 +32,7 @@ let () =
     if List.exists (Pathname.check_extension filename) ok_extensions then begin
           let modulename = Pathname.remove_extension filename in
           let modulename = Pathname.basename modulename in
-          let modulename = String.capitalize modulename in
+          let modulename = String.capitalize_ascii modulename in
           if not (List.mem modulename !excluded_modules) then begin
             excluded_modules := modulename :: !excluded_modules;
             output_string odocl_chan modulename;
@@ -106,7 +106,7 @@ let () =
                 (fun filename ->
                   if Filename.check_suffix filename ".mli" then begin
                     let basename = Filename.basename filename in
-                    let module_name = String.capitalize (Filename.chop_suffix basename ".mli") in
+                    let module_name = String.capitalize_ascii (Filename.chop_suffix basename ".mli") in
                     Printf.fprintf channel "  (module %s : Command.T);\n" module_name;
                   end)
                 filenames in

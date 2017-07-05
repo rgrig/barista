@@ -357,7 +357,7 @@ let unescape s =
       if UTF8.compare_index s !idx last >= 0 then
         fail (Invalid_escaped_string s)
       else
-        let d = Char.uppercase (UCharImpl.to_char (UCharImpl.of_camomile (UTF8.look s !idx))) in
+        let d = Char.uppercase_ascii (UCharImpl.to_char (UCharImpl.of_camomile (UTF8.look s !idx))) in
         if (d >= '0' && d <= '9') then
           (Char.code d) - (Char.code '0')
         else if (hex && (d >= 'A' && d <= 'F')) then

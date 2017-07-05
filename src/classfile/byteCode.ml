@@ -747,9 +747,6 @@ let write st o l =
     | WIDE_RET p1 -> write_u1' 0xC4; write_u1' 0xA9; write_u2 p1
   in List.iter write_instruction l
 
-(*
-let size_of _ _ = failwith "todo"
-*)
 let size_of ofs = function
   | AALOAD -> 1
   | AASTORE -> 1

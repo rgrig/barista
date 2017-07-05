@@ -4,7 +4,6 @@
   - no instruction variants whose goal is to save speed/memory
     (such as ICONST/ICONST_0, LDC/LDC_W)
   - no constant pool
-  - agnostic of value sizes (so a long takes one register, not two)
 
 There is no mli file on purpose: It would be a verbatim copy of this file.
 
@@ -63,8 +62,37 @@ type constant_typeref =
 type constant_fieldref =
   [ `Fieldref of Name.for_class * Name.for_field * Descriptor.for_field ]
 
+(* Also used for CONSTANT_InterfaceMethodRef. *)
 type constant_methodref =
   [ `Methodref of constant_typeref * Name.for_method * Descriptor.for_method ]
+
+type constant_methodhandle =
+  [ `MethodHandle_getField of constant_fieldref
+  | `MethodHandle_getStatic of constant_fieldref
+  | `MethodHandle_putField of constant_fieldref
+  | `MethodHandle_putStatic of constant_fieldref
+  | `MethodHandle_invokeVirtual of constant_methodref
+  | `MethodHandle_newInvokeSpecial of constant_methodref
+  | `MethodHandle_invokeStatic of constant_methodref
+  | `MethodHandle_invokeSpecial of constant_methodref
+  | `MethodHandle_invokeInterface of constant_methodref ]
+
+type constant_methodtype =
+  [ `MethodType of Descriptor.for_method ]
+
+type bootstrap_argument =
+  [ constant_classref
+  | constant_methodhandle
+  | constant_methodtype
+  | constant_primitive ]
+
+type bootstrap_method =
+  { bm_ref : constant_methodhandle
+  ; bm_arguments : bootstrap_argument list }
+
+type constant_invokedynamic =
+  [ `InvokeDynamic of
+      bootstrap_method * Name.for_method * Descriptor.for_method ]
 
 type constant_stack =
   [ constant_primitive | constant_typeref ]
@@ -190,6 +218,7 @@ type instruction =
   | IMUL
   | INEG
   | INSTANCEOF of constant_typeref
+  | INVOKEDYNAMIC of constant_invokedynamic
   | INVOKEINTERFACE of constant_methodref
   | INVOKESPECIAL of constant_methodref
   | INVOKESTATIC of constant_methodref

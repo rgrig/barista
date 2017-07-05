@@ -798,6 +798,7 @@ module HighInstruction = struct (* {{{ *)
     | T.IMUL -> Version.make_bounds "'IMUL' instruction" Version.Java_1_0 None
     | T.INEG -> Version.make_bounds "'INEG' instruction" Version.Java_1_0 None
     | T.INSTANCEOF _ -> Version.make_bounds "'INSTANCEOF' instruction" Version.Java_1_0 None
+    | T.INVOKEDYNAMIC _ -> Version.make_bounds "'INVOKEDYNAMIC' instruction" Version.Java_1_7 None
     | T.INVOKEINTERFACE _ -> Version.make_bounds "'INVOKEINTERFACE' instruction" Version.Java_1_0 None
     | T.INVOKESPECIAL _ -> Version.make_bounds "'INVOKESPECIAL' instruction" Version.Java_1_0 None
     | T.INVOKESTATIC _ -> Version.make_bounds "'INVOKESTATIC' instruction" Version.Java_1_0 None
@@ -3205,15 +3206,16 @@ let decode cf =
   let field_decode = HF.decode is_interface pool in
   let method_decode = HMO.decode this_class_name is_interface pool in
   let attribute_decode = HAO.decode_class pool in
+  let map f xs = List.map f (Array.to_list xs) in
   let hc = check_version_high version
-    { T.c_flags = flags
+    HighTypes.
+    { c_flags = flags
     ; c_name = this_class_name
     ; c_extends = extends
-    ; c_implements = List.map class_name (Array.to_list cf.CF.interfaces)
-    ; c_fields = List.map field_decode (Array.to_list cf.CF.fields)
-    ; c_methods = List.map method_decode (Array.to_list cf.CF.methods)
-    ; c_attributes =
-      List.map attribute_decode (Array.to_list cf.CF.attributes) } in
+    ; c_implements = map class_name CF.(cf.interfaces)
+    ; c_fields = map field_decode CF.(cf.fields)
+    ; c_methods = map method_decode CF.(cf.methods)
+    ; c_attributes = map attribute_decode CF.(cf.attributes) } in
   (hc, version)
 
 (* TODO should this be in consts? *)
