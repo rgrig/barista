@@ -39,6 +39,7 @@ let string_of_error = function
   | T.SE_missing_return -> "SE: no return at end of method"
   | T.SE_reference_expected s -> "SE: found " ^ s ^ " where a reference was expected"
   | T.SE_stack_too_small i -> sprintf "SE: expected stack of size >= %d" i
+  | T.SE_throwable_expected s -> "SE: found " ^ s ^ " where a Throwable was expected"
   | T.SE_unexpected_size (s, x) -> "SE: found " ^ x ^ " where a value of size " ^  (string_of_int s) ^ " was expected"
   | T.SE_uninitialized_register (i, len) -> "SE: requesting uninitialized register " ^ (string_of_int i) ^ " in a pool of size " ^ (string_of_int len)
   | T.Too_many s -> "number of " ^ s ^ " exceeds " ^ (string_of_int (U.max_u2 :> int))
@@ -113,7 +114,9 @@ let fuzzy_bt = function
 
 let java_lang_Class = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Class")
 let java_lang_Object_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Object")
+let java_lang_Throwable_name = Name.make_for_class_from_external (U.UTF8.of_string "java.lang.Throwable")
 let java_lang_Object = `Class_or_interface java_lang_Object_name
+let java_lang_Throwable = `Class_or_interface java_lang_Throwable_name
 
 
 let locals_of_method c_name m = match m with
@@ -1077,6 +1080,8 @@ module SymbExe = struct  (* {{{ *)
 
   let report_reference_expected x = T.SE_reference_expected (string_of_bt x)
 
+  let report_throwable_expected x = T.SE_throwable_expected (string_of_bt x)
+
   let report_array_expected x = T.SE_array_expected (string_of_bt x)
 
   let report_invalid_local_contents (i, v, v') =
@@ -1191,23 +1196,26 @@ module SymbExe = struct  (* {{{ *)
     with Not_found -> []
   (* }}} *)
   (* checks {{{ *)
-  let check_reference x =
-    match x with
-      | T.Integer
-      | T.Float
-      | T.Long
-      | T.Double
-      | T.Return_address _
-      | T.Top -> fail (report_reference_expected x)
-      | T.Null
-      | T.Uninitialized_this
-      | T.Object _
-      | T.Reference
-      | T.Uninitialized _ -> ()
+  let check_reference = function
+    | T.Integer
+    | T.Float
+    | T.Long
+    | T.Double
+    | T.Return_address _
+    | T.Top -> fail (report_reference_expected T.Top)
+    | T.Null
+    | T.Uninitialized_this
+    | T.Object _
+    | T.Reference
+    | T.Uninitialized _ -> ()
 
   let check_reference_or_return x =
     if not (equal_verification_type_info x (T.Return_address LS.empty))
     then check_reference x
+
+  let check_throwable _ =
+    (* TODO: throw SE_throwable_expected if not a subtype of java.lang.Throwable *)
+    ()
   (* }}} *)
   (* symbolic execution {{{ *)
 
@@ -1266,6 +1274,7 @@ module SymbExe = struct  (* {{{ *)
         c     instruction
         s t   state
         e     exception handler (or label of)
+        et    type for handled exceptions
    *)
   let execute_method step exec_throw unify eq init code =
     match code.T.cv_code with
@@ -1282,7 +1291,7 @@ module SymbExe = struct  (* {{{ *)
             let get l = try H.find h l with Not_found -> [] in
             let add l e = H.replace h l (e :: (get l)) in
             let rec f e l m = add m e; if l <> m then f e l (next_label m) in
-            let g e = f e.T.catch e.T.try_end e.T.try_start in
+            let g e = f (e.T.catch, e.T.caught) e.T.try_end e.T.try_start in
             List.iter g code.T.cv_exception_table; get in
           let state = H.create 13 in
           let graph = H.create 13 in
@@ -1309,8 +1318,8 @@ module SymbExe = struct  (* {{{ *)
 	      if log_se_full then pp_map_t std_formatter state;
               let t, ls = step' s (instruction_at l) (next_label l) in
               List.iter (fun l -> exec' ("black", step, t, l)) ls;
-              let t = exec_throw t in
-              List.iter (fun l -> exec' ("red", step, t, l)) (handlers_at l)
+              let do_handler (l, et) = exec' ("red", step, exec_throw et t, l) in
+              List.iter do_handler (handlers_at l)
             end in
           let log_collisions =
             let eq (s, l) (t, m) = l = m && eq s t in
@@ -2176,7 +2185,11 @@ module SymbExe = struct  (* {{{ *)
   let compute_max_stack_locals c_name m c =
     let step = step c_name in
     let init = { locals = of_list (locals_of_method c_name m); stack = [] } in
-    let exec_throw s = { s with stack = [T.Object java_lang_Object] } in
+    let exec_throw et s =
+      let t = match et with
+        | None -> T.Object java_lang_Throwable
+        | Some c -> T.Object (`Class_or_interface c) in
+      { s with stack = [t] } in
     (* TODO(rlp) is this the correct unification? *)
     let unify_states = unify unify_to_java_lang_Object in
     let cfg, smfs =

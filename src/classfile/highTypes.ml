@@ -36,6 +36,7 @@ type error =
   | SE_missing_return
   | SE_reference_expected of string
   | SE_stack_too_small of int
+  | SE_throwable_expected of string
   | SE_unexpected_size of (int * string)
   | SE_uninitialized_register of (int * int)
   | Too_many of string

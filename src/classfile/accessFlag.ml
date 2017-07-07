@@ -380,6 +380,12 @@ let check_field_flags interface fl =
 let check_method_flags interface fl =
   let ( =/> ) = implies_not fl in
   check_visibility false fl;
+  List.map
+    (function
+      | #for_method as x -> x
+      | y -> fail (Invalid_method_flags (Some y)))
+    fl
+  (* TODO: Implement S4.6 of jvm8 spec
   if ((not interface)
         || (((List.mem `Public fl) || (List.mem `Module fl))
               && (List.mem `Abstract fl)
@@ -403,6 +409,7 @@ let check_method_flags interface fl =
       fl
   else
     fail (Invalid_method_flags None)
+*)
 
 let check_constructor_flags fl =
   check_visibility false fl;
