@@ -75,7 +75,7 @@ let make_of_channel ch =
   let write_u1 x =
     try output_byte ch x with _ -> fail Unable_to_write_data in
   let write_bytes_from s pos len =
-    try output ch s pos len with _ -> fail Unable_to_write_data in
+    try output_substring ch s pos len with _ -> fail Unable_to_write_data in
   let flush () =
     try flush ch with _ -> fail Unable_to_write_data in
   let close () =

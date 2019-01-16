@@ -115,12 +115,13 @@ let rec lookup cp s =
   | [] -> fail (Class_not_found s)
 
 let search_stream cp s =
+  let b = Bytes.of_string s in
   let rec search () =
     try
-      lookup cp s
+      lookup cp (Bytes.to_string b)
     with _ ->
       try
-        Bytes.set s (String.rindex s '/') '$';
+        Bytes.set b (Bytes.rindex b '/') '$';
         search ()
       with _ -> fail (Class_not_found s) in
   search ()

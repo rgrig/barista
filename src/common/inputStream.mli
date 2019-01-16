@@ -92,13 +92,7 @@ val read_bytes : t -> int -> string
 (** [read_bytes st nb] reads [nb] bytes from [st] returning them as a string.
     Raises [Exception] if end of stream is encountered or an i/o error occurs. *)
 
-val read_bytes_into : t -> int -> string -> int -> unit
-(** [read_bytes_into st nb dst idx] reads [nb] bytes from [st] and stores them
-    into [dst], starting at index [idx].
-    Raises [Exception] if end of stream is encountered or an i/o error occurs.
-    Raises [Exception] if read data does not fit into [dst]. *)
-
-val read_available_bytes : t -> int -> string -> int -> int
+val read_available_bytes : t -> int -> bytes -> int -> int
 (** [read_available_bytes st nb dst idx] is similar to [read_bytes_into],
     except that is does not raise [Exception] if end of file is reached
     but rather returns the number of bytes actually read. *)

@@ -27,7 +27,7 @@ type t = UTF8Line.output_line
 class output_channel os = object
 
   method output b ofs len =
-    OutputStream.write_bytes_from os b ofs len;
+    OutputStream.write_bytes_from os (Bytes.to_string b) ofs len;
     len
 
   method flush () =

@@ -5,3 +5,6 @@ val decode : ClassFile.t -> (HighTypes.class_ * Version.t)
 val encode : (HighTypes.class_ * Version.t) -> ClassFile.t
 
 val fresh_label : unit -> HighTypes.label
+
+(* TODO: This should be hidden, once we hide the size of primitives completely. *)
+val size_of_bt : HighTypes.bytecode_type -> int

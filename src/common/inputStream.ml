@@ -22,8 +22,7 @@
 type t = {
     read_u1 : unit -> int;
     read_bytes : int -> string;
-    read_bytes_into : int -> string -> int -> unit;
-    read_available_bytes : int -> string -> int -> int;
+    read_available_bytes : int -> bytes -> int -> int;
     close : unit -> unit;
   }
 
@@ -74,12 +73,6 @@ let make_of_string str =
       ptr := tmp + nb;
       res
     with Invalid_argument _ -> fail End_of_input_stream in
-  let read_bytes_into nb dst idx =
-    try
-      let tmp = !ptr in
-      String.blit str tmp dst idx nb;
-      ptr := tmp + nb
-    with Invalid_argument _ -> fail End_of_input_stream in
   let read_available_bytes nb dst idx =
     try
       let tmp = !ptr in
@@ -93,7 +86,6 @@ let make_of_string str =
     ptr := String.length str in
   { read_u1 = read_u1;
     read_bytes = read_bytes;
-    read_bytes_into = read_bytes_into;
     read_available_bytes = read_available_bytes;
     close = close; }
 
@@ -114,13 +106,6 @@ let make_of_buffer buf =
       ptr := tmp + nb;
       res
     with Invalid_argument _ -> fail End_of_input_stream in
-  let read_bytes_into nb dst idx =
-    try
-      let tmp = !ptr in
-      let res = Buffer.sub buf tmp nb in
-      String.blit res 0 dst idx nb;
-      ptr := tmp + nb
-    with Invalid_argument _ -> fail End_of_input_stream in
   let read_available_bytes nb dst idx =
     try
       let tmp = !ptr in
@@ -135,7 +120,6 @@ let make_of_buffer buf =
     ptr := Buffer.length buf in
   { read_u1 = read_u1;
     read_bytes = read_bytes;
-    read_bytes_into = read_bytes_into;
     read_available_bytes = read_available_bytes;
     close = close; }
 
@@ -149,16 +133,7 @@ let make_of_channel ch =
     | _ -> fail Unable_to_read_data in
   let read_bytes nb =
     try
-      let res = Bytes.create nb in
-      really_input ch res 0 nb;
-      res
-    with
-    | Invalid_argument _ -> fail End_of_input_stream
-    | End_of_file -> fail End_of_input_stream
-    | _ -> fail Unable_to_read_data in
-  let read_bytes_into nb dst idx =
-    try
-      really_input ch dst idx nb
+      really_input_string ch nb
     with
     | Invalid_argument _ -> fail End_of_input_stream
     | End_of_file -> fail End_of_input_stream
@@ -171,7 +146,6 @@ let make_of_channel ch =
     try close_in ch with _ -> fail Unable_to_close_stream in
   { read_u1 = read_u1;
     read_bytes = read_bytes;
-    read_bytes_into = read_bytes_into;
     read_available_bytes = read_available_bytes;
     close = close; }
 
@@ -248,9 +222,6 @@ let read_s8 st =
 
 let read_bytes st nb =
   st.read_bytes nb
-
-let read_bytes_into st nb dst idx =
-  st.read_bytes_into nb dst idx
 
 let read_available_bytes st nb dst idx =
   st.read_available_bytes nb dst idx
