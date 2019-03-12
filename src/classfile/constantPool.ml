@@ -514,13 +514,13 @@ let version_bounds = function
   | UTF8 _ ->
       Version.make_bounds "'UTF8' constant pool element" Version.Java_1_0 None
   | MethodHandle _ ->
-      Version.make_bounds "'MethodHandle' constant pool element" Version.Java_1_7 None
+      Version.make_bounds "'MethodHandle' constant pool element" Version.Java_7 None
   | MethodType _ ->
-      Version.make_bounds "'MethodType' constant pool element" Version.Java_1_7 None
+      Version.make_bounds "'MethodType' constant pool element" Version.Java_7 None
   | InvokeDynamic _ ->
-      Version.make_bounds "'InvokeDynamic' constant pool element" Version.Java_1_7 None
+      Version.make_bounds "'InvokeDynamic' constant pool element" Version.Java_7 None
   | ModuleId _ ->
-      Version.make_bounds "'ModuleId' constant pool element" Version.Java_1_8 None
+      Version.make_bounds "'ModuleId' constant pool element" Version.Java_8 None
 
 let check_version v pool =
   for i = 1 to pred (Array.length pool) do

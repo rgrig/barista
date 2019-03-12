@@ -27,10 +27,13 @@ type t =
   | Java_1_2
   | Java_1_3
   | Java_1_4
-  | Java_1_5
-  | Java_1_6
-  | Java_1_7
-  | Java_1_8
+  | Java_5
+  | Java_6
+  | Java_7
+  | Java_8
+  | Java_9
+  | Java_10
+  | Java_11
 
 let all = [
   Java_1_0 ;
@@ -38,13 +41,16 @@ let all = [
   Java_1_2 ;
   Java_1_3 ;
   Java_1_4 ;
-  Java_1_5 ;
-  Java_1_6 ;
-  Java_1_7 ;
-  Java_1_8
+  Java_5 ;
+  Java_6 ;
+  Java_7 ;
+  Java_8 ;
+  Java_9 ;
+  Java_10 ;
+  Java_11 ;
 ]
 
-let default = Java_1_6
+let default = Java_10
 
 let to_string = function
   | Java_1_0 -> "1.0"
@@ -52,10 +58,13 @@ let to_string = function
   | Java_1_2 -> "1.2"
   | Java_1_3 -> "1.3"
   | Java_1_4 -> "1.4"
-  | Java_1_5 -> "1.5"
-  | Java_1_6 -> "1.6"
-  | Java_1_7 -> "1.7"
-  | Java_1_8 -> "1.8"
+  | Java_5 -> "5.0"
+  | Java_6 -> "6"
+  | Java_7 -> "7"
+  | Java_8 -> "8"
+  | Java_9 -> "9"
+  | Java_10 -> "10"
+  | Java_11 -> "11"
 
 type bound = {
     bound_version : t;
@@ -109,7 +118,7 @@ let () =
 
 let min_supported = u2 45, u2 0
 
-let max_supported = u2 52, u2 0
+let max_supported = u2 55, u2 0
 
 
 (* Conversion functions *)
@@ -120,10 +129,13 @@ let major_minor_of_version = function
   | Java_1_2 -> u2 46, u2 0
   | Java_1_3 -> u2 47, u2 0
   | Java_1_4 -> u2 48, u2 0
-  | Java_1_5 -> u2 49, u2 0
-  | Java_1_6 -> u2 50, u2 0
-  | Java_1_7 -> u2 51, u2 0
-  | Java_1_8 -> u2 52, u2 0
+  | Java_5 -> u2 49, u2 0
+  | Java_6 -> u2 50, u2 0
+  | Java_7 -> u2 51, u2 0
+  | Java_8 -> u2 52, u2 0
+  | Java_9 -> u2 53, u2 0
+  | Java_10 -> u2 54, u2 0
+  | Java_11 -> u2 55, u2 0
 
 let version_of_major_minor (x, y) =
   match (x : u2 :> int), (y : u2 :> int) with
@@ -131,10 +143,13 @@ let version_of_major_minor (x, y) =
   | 46, 0 -> Java_1_2
   | 46, _ | 47, 0 -> Java_1_3
   | 47, _ | 48, 0 -> Java_1_4
-  | 48, _ | 49, 0 -> Java_1_5
-  | 49, _ | 50, 0 -> Java_1_6
-  | 50, _ | 51, 0 -> Java_1_7
-  | 51, _ | 52, 0 -> Java_1_8
+  | 48, _ | 49, 0 -> Java_5
+  | 49, _ | 50, 0 -> Java_6
+  | 50, _ | 51, 0 -> Java_7
+  | 51, _ | 52, 0 -> Java_8
+  | 52, _ | 53, 0 -> Java_9
+  | 53, _ | 54, 0 -> Java_10
+  | 54, _ | 55, 0 -> Java_11
   | _ -> fail Invalid_version
 
 

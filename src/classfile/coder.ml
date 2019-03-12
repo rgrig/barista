@@ -707,6 +707,7 @@ module HighInstruction = struct (* {{{ *)
     | T.SIPUSH p1 -> BC.SIPUSH (U.s2 p1)
     | T.SWAP -> BC.SWAP
     | T.TABLESWITCH x -> bc_TABLESWITCH x
+    | _ -> fail (T.Unsupported "incomplete Code (KNGq).")
 
   let version_bounds (_, inst) = match inst with
     | T.AALOAD -> Version.make_bounds "'AALOAD' instruction" Version.Java_1_0 None
@@ -801,7 +802,7 @@ module HighInstruction = struct (* {{{ *)
     | T.IMUL -> Version.make_bounds "'IMUL' instruction" Version.Java_1_0 None
     | T.INEG -> Version.make_bounds "'INEG' instruction" Version.Java_1_0 None
     | T.INSTANCEOF _ -> Version.make_bounds "'INSTANCEOF' instruction" Version.Java_1_0 None
-    | T.INVOKEDYNAMIC _ -> Version.make_bounds "'INVOKEDYNAMIC' instruction" Version.Java_1_7 None
+    | T.INVOKEDYNAMIC _ -> Version.make_bounds "'INVOKEDYNAMIC' instruction" Version.Java_7 None
     | T.INVOKEINTERFACE _ -> Version.make_bounds "'INVOKEINTERFACE' instruction" Version.Java_1_0 None
     | T.INVOKESPECIAL _ -> Version.make_bounds "'INVOKESPECIAL' instruction" Version.Java_1_0 None
     | T.INVOKESTATIC _ -> Version.make_bounds "'INVOKESTATIC' instruction" Version.Java_1_0 None
@@ -815,7 +816,7 @@ module HighInstruction = struct (* {{{ *)
     | T.ISUB -> Version.make_bounds "'ISUB' instruction" Version.Java_1_0 None
     | T.IUSHR -> Version.make_bounds "'IUSHR' instruction" Version.Java_1_0 None
     | T.IXOR -> Version.make_bounds "'IXOR' instruction" Version.Java_1_0 None
-    | T.JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_1_6)
+    | T.JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_6)
     | T.L2D -> Version.make_bounds "'L2D' instruction" Version.Java_1_0 None
     | T.L2F -> Version.make_bounds "'L2F' instruction" Version.Java_1_0 None
     | T.L2I -> Version.make_bounds "'L2I' instruction" Version.Java_1_0 None
@@ -826,7 +827,7 @@ module HighInstruction = struct (* {{{ *)
     | T.LCMP -> Version.make_bounds "'LCMP' instruction" Version.Java_1_0 None
     | T.LCONST_0 -> Version.make_bounds "'LCONST_0' instruction" Version.Java_1_0 None
     | T.LCONST_1 -> Version.make_bounds "'LCONST_1' instruction" Version.Java_1_0 None
-    | T.LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ -> Version.Java_1_5 | _ -> Version.Java_1_0) None
+    | T.LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ -> Version.Java_5 | _ -> Version.Java_1_0) None
     | T.LDIV -> Version.make_bounds "'LDIV' instruction" Version.Java_1_0 None
     | T.LLOAD _ -> Version.make_bounds "'LLOAD' instruction" Version.Java_1_0 None
     | T.LMUL -> Version.make_bounds "'LMUL' instruction" Version.Java_1_0 None
@@ -851,7 +852,7 @@ module HighInstruction = struct (* {{{ *)
     | T.POP2 -> Version.make_bounds "'POP2' instruction" Version.Java_1_0 None
     | T.PUTFIELD _ -> Version.make_bounds "'PUTFIELD' instruction" Version.Java_1_0 None
     | T.PUTSTATIC _ -> Version.make_bounds "'PUTSTATIC' instruction" Version.Java_1_0 None
-    | T.RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_1_6)
+    | T.RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_6)
     | T.RETURN -> Version.make_bounds "'RETURN' instruction" Version.Java_1_0 None
     | T.SALOAD -> Version.make_bounds "'SALOAD' instruction" Version.Java_1_0 None
     | T.SASTORE -> Version.make_bounds "'SASTORE' instruction" Version.Java_1_0 None
@@ -1008,6 +1009,7 @@ module HighInstruction = struct (* {{{ *)
     | T.SIPUSH _ -> "SIPUSH"
     | T.SWAP -> "SWAP"
     | T.TABLESWITCH _ -> "TABLESWITCH"
+    | _ -> fail (T.Unsupported "Incomplete Coder (afTL)")
 end (* }}} *)
 module HI = HighInstruction
 module HighMethod = struct (* {{{ *)
@@ -1772,7 +1774,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop stack in
 	let stack = push T.Integer stack in
 	continue locals stack
-  (*
+  (* TODO
     | T.INVOKEDYNAMIC (_, _, (params, ret)) ->
     let infos = List.rev_map bt_of_descriptor params in
     let stack = List.fold_left (fun acc elem -> pop_if elem acc) stack infos in
@@ -2063,6 +2065,7 @@ module SymbExe = struct  (* {{{ *)
 	let stack = pop_if T.Integer stack in
         let targets = ts_def :: ts_ofss in
 	jump locals stack targets
+      | _ -> fail (T.Unsupported "Incomplete coder (IacT)")
   (* }}} *)
   (* unification {{{ *)
   type 'a unifier = 'a -> 'a -> 'a
@@ -2609,11 +2612,11 @@ module HighAttributeOps = struct (* {{{ *)
 
   let rec version_bounds : T.attribute -> Version.bounds = function
     | `AnnotationDefault _ ->
-        Version.make_bounds "'AnnotationDefault' attribute" Version.Java_1_5 None
+        Version.make_bounds "'AnnotationDefault' attribute" Version.Java_5 None
     | `BootstrapMethods _ ->
-        Version.make_bounds "'BootstrapMethods' attribute" Version.Java_1_7 None
+        Version.make_bounds "'BootstrapMethods' attribute" Version.Java_7 None
     | `ClassSignature _ ->
-        Version.make_bounds "'ClassSignature' attribute" Version.Java_1_5 None
+        Version.make_bounds "'ClassSignature' attribute" Version.Java_5 None
     | `Code cv ->
         let instrs_bounds = List.map HI.version_bounds cv.T.cv_code in
         let attrs_bounds = List.map version_bounds (cv.T.cv_attributes :> T.attribute list) in
@@ -2623,11 +2626,11 @@ module HighAttributeOps = struct (* {{{ *)
     | `Deprecated ->
         Version.make_bounds "'Deprecated' attribute" Version.Java_1_1 None
     | `EnclosingMethod _ ->
-        Version.make_bounds "'EnclosingMethod' attribute" Version.Java_1_5 None
+        Version.make_bounds "'EnclosingMethod' attribute" Version.Java_5 None
     | `Exceptions _ ->
         Version.make_bounds "'Exceptions' attribute" Version.Java_1_0 None
     | `FieldSignature _ ->
-        Version.make_bounds "'Signature' attribute" Version.Java_1_5 None
+        Version.make_bounds "'Signature' attribute" Version.Java_5 None
     | `IgnoredAttribute ->
         Version.make_bounds "ignored attribute" Version.Java_1_0 None
     | `InnerClasses _ ->
@@ -2635,23 +2638,23 @@ module HighAttributeOps = struct (* {{{ *)
     | `LineNumberTable _ ->
         Version.make_bounds "'LineNumberTable' attribute" Version.Java_1_0 None
     | `MethodSignature _ ->
-        Version.make_bounds "'MethodSignature' attribute" Version.Java_1_5 None
+        Version.make_bounds "'MethodSignature' attribute" Version.Java_5 None
     | `Module _ ->
-        Version.make_bounds "'Module' attribute" Version.Java_1_8 None
+        Version.make_bounds "'Module' attribute" Version.Java_8 None
     | `RuntimeInvisibleAnnotations _ ->
-        Version.make_bounds "'RuntimeInvisibleAnnotations' attribute" Version.Java_1_5 None
+        Version.make_bounds "'RuntimeInvisibleAnnotations' attribute" Version.Java_5 None
     | `RuntimeInvisibleParameterAnnotations _ ->
-        Version.make_bounds "'RuntimeInvisibleParameterAnnotations' attribute" Version.Java_1_5 None
+        Version.make_bounds "'RuntimeInvisibleParameterAnnotations' attribute" Version.Java_5 None
     | `RuntimeInvisibleTypeAnnotations _ ->
-        Version.make_bounds "'RuntimeInvisibleTypeAnnotations' attribute" Version.Java_1_7 None
+        Version.make_bounds "'RuntimeInvisibleTypeAnnotations' attribute" Version.Java_7 None
     | `RuntimeVisibleAnnotations _ ->
-        Version.make_bounds "'RuntimeVisibleAnnotations' attribute" Version.Java_1_5 None
+        Version.make_bounds "'RuntimeVisibleAnnotations' attribute" Version.Java_5 None
     | `RuntimeVisibleParameterAnnotations _ ->
-        Version.make_bounds "'RuntimeVisibleParameterAnnotations' attribute" Version.Java_1_5 None
+        Version.make_bounds "'RuntimeVisibleParameterAnnotations' attribute" Version.Java_5 None
     | `RuntimeVisibleTypeAnnotations _ ->
-        Version.make_bounds "'RuntimeVisibleTypeAnnotations' attribute" Version.Java_1_7 None
+        Version.make_bounds "'RuntimeVisibleTypeAnnotations' attribute" Version.Java_7 None
     | `SourceDebugExtension _ ->
-        Version.make_bounds "'SourceDebugExtension' attribute" Version.Java_1_5 None
+        Version.make_bounds "'SourceDebugExtension' attribute" Version.Java_5 None
     | `SourceFile _ ->
         Version.make_bounds "'SourceFile' attribute" Version.Java_1_0 None
     | `Synthetic ->
@@ -3095,6 +3098,11 @@ module HighMethodOps = struct (* {{{ *)
     T.InitMethod { T.im_flags; im_descriptor; im_attributes = [] }
 
   let make_RegularMethod i rm_name rm_descriptor flags _ =
+    (* XXX
+    let n = Utils.UTF8.to_string (Name.utf8_for_method rm_name) in
+    let fs = Utils.UTF8.to_string (AccessFlag.list_to_utf8 flags) in
+    printf "@[XXX make_method name(%s) flags(%s)@]@." n fs;
+    *)
     let rm_flags = AccessFlag.check_method_flags i flags in
     T.RegularMethod { T.rm_flags; rm_name; rm_descriptor; rm_attributes = [] }
 

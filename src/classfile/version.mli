@@ -27,10 +27,13 @@ type t =
   | Java_1_2 (** J2SE 1.2 (circa 1998). *)
   | Java_1_3 (** J2SE 1.3 (circa 2000). *)
   | Java_1_4 (** J2SE 1.4 (circa 2002). *)
-  | Java_1_5 (** J2SE 5.0 (circa 2004). *)
-  | Java_1_6 (** Java SE 6 (circa 2006). *)
-  | Java_1_7 (** Java SE 7 (in DP - circa 2011?). *)
-  | Java_1_8 (** Java SE 8 (to be released). *)
+  | Java_5 (** J2SE 5.0 (circa 2004). *)
+  | Java_6 (** Java SE 6 (circa 2006). *)
+  | Java_7
+  | Java_8
+  | Java_9
+  | Java_10
+  | Java_11
 (* The type representing the various Java versions. *)
 
 val all : t list

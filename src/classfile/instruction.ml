@@ -1927,7 +1927,7 @@ let version_bounds = function
   | IMUL -> Version.make_bounds "'IMUL' instruction" Version.Java_1_0 None
   | INEG -> Version.make_bounds "'INEG' instruction" Version.Java_1_0 None
   | INSTANCEOF _ -> Version.make_bounds "'INSTANCEOF' instruction" Version.Java_1_0 None
-  | INVOKEDYNAMIC _ -> Version.make_bounds "'INVOKEDYNAMIC' instruction" Version.Java_1_7 None
+  | INVOKEDYNAMIC _ -> Version.make_bounds "'INVOKEDYNAMIC' instruction" Version.Java_7 None
   | INVOKEINTERFACE _ -> Version.make_bounds "'INVOKEINTERFACE' instruction" Version.Java_1_0 None
   | INVOKESPECIAL _ -> Version.make_bounds "'INVOKESPECIAL' instruction" Version.Java_1_0 None
   | INVOKESTATIC _ -> Version.make_bounds "'INVOKESTATIC' instruction" Version.Java_1_0 None
@@ -1945,8 +1945,8 @@ let version_bounds = function
   | ISUB -> Version.make_bounds "'ISUB' instruction" Version.Java_1_0 None
   | IUSHR -> Version.make_bounds "'IUSHR' instruction" Version.Java_1_0 None
   | IXOR -> Version.make_bounds "'IXOR' instruction" Version.Java_1_0 None
-  | JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_1_5)
-  | JSR_W _ -> Version.make_bounds "'JSR_W' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+  | JSR _ -> Version.make_bounds "'JSR' instruction" Version.Java_1_0 (Some Version.Java_5)
+  | JSR_W _ -> Version.make_bounds "'JSR_W' instruction" Version.Java_1_0 (Some Version.Java_5)
   | L2D -> Version.make_bounds "'L2D' instruction" Version.Java_1_0 None
   | L2F -> Version.make_bounds "'L2F' instruction" Version.Java_1_0 None
   | L2I -> Version.make_bounds "'L2I' instruction" Version.Java_1_0 None
@@ -1957,9 +1957,9 @@ let version_bounds = function
   | LCMP -> Version.make_bounds "'LCMP' instruction" Version.Java_1_0 None
   | LCONST_0 -> Version.make_bounds "'LCONST_0' instruction" Version.Java_1_0 None
   | LCONST_1 -> Version.make_bounds "'LCONST_1' instruction" Version.Java_1_0 None
-  | LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_1_5 | `Method_type _ -> Version.Java_1_7 | `Method_handle _ -> Version.Java_1_7 | _ -> Version.Java_1_0) None
+  | LDC x -> Version.make_bounds "'LDC' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_5 | `Method_type _ -> Version.Java_7 | `Method_handle _ -> Version.Java_7 | _ -> Version.Java_1_0) None
   | LDC2_W _ -> Version.make_bounds "'LDC2_W' instruction" Version.Java_1_0 None
-  | LDC_W x -> Version.make_bounds "'LDC_W' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_1_5 | `Method_type _ -> Version.Java_1_7 | `Method_handle _ -> Version.Java_1_7 | _ -> Version.Java_1_0) None
+  | LDC_W x -> Version.make_bounds "'LDC_W' instruction" (match x with `Class_or_interface _ | `Array_type _ -> Version.Java_5 | `Method_type _ -> Version.Java_7 | `Method_handle _ -> Version.Java_7 | _ -> Version.Java_1_0) None
   | LDIV -> Version.make_bounds "'LDIV' instruction" Version.Java_1_0 None
   | LLOAD _ -> Version.make_bounds "'LLOAD' instruction" Version.Java_1_0 None
   | LLOAD_0 -> Version.make_bounds "'LLOAD_0' instruction" Version.Java_1_0 None
@@ -1992,7 +1992,7 @@ let version_bounds = function
   | POP2 -> Version.make_bounds "'POP2' instruction" Version.Java_1_0 None
   | PUTFIELD _ -> Version.make_bounds "'PUTFIELD' instruction" Version.Java_1_0 None
   | PUTSTATIC _ -> Version.make_bounds "'PUTSTATIC' instruction" Version.Java_1_0 None
-  | RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+  | RET _ -> Version.make_bounds "'RET' instruction" Version.Java_1_0 (Some Version.Java_5)
   | RETURN -> Version.make_bounds "'RETURN' instruction" Version.Java_1_0 None
   | SALOAD -> Version.make_bounds "'SALOAD' instruction" Version.Java_1_0 None
   | SASTORE -> Version.make_bounds "'SASTORE' instruction" Version.Java_1_0 None
@@ -2010,4 +2010,4 @@ let version_bounds = function
   | WIDE_ISTORE _ -> Version.make_bounds "'WIDE_ISTORE' instruction" Version.Java_1_0 None
   | WIDE_LLOAD _ -> Version.make_bounds "'WIDE_LLOAD' instruction" Version.Java_1_0 None
   | WIDE_LSTORE _ -> Version.make_bounds "'WIDE_LSTORE' instruction" Version.Java_1_0 None
-  | WIDE_RET _ -> Version.make_bounds "'WIDE_RET' instruction" Version.Java_1_0 (Some Version.Java_1_5)
+  | WIDE_RET _ -> Version.make_bounds "'WIDE_RET' instruction" Version.Java_1_0 (Some Version.Java_5)

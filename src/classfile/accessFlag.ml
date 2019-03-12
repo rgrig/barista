@@ -378,7 +378,7 @@ let check_field_flags interface fl =
     fail (Invalid_field_flags None)
 
 let check_method_flags interface fl =
-  let ( =/> ) = implies_not fl in
+  (* let ( =/> ) = implies_not fl in *)
   check_visibility false fl;
   List.map
     (function
@@ -491,13 +491,13 @@ let version_bounds = function
   | `Synchronized ->
       Version.make_bounds "'synchronized' flag" Version.Java_1_0 None
   | `Bridge ->
-      Version.make_bounds "'bridge' flag" Version.Java_1_5 None
+      Version.make_bounds "'bridge' flag" Version.Java_5 None
   | `Volatile ->
       Version.make_bounds "'volatile' flag" Version.Java_1_0 None
   | `Transient ->
       Version.make_bounds "'transient' flag" Version.Java_1_0 None
   | `Varargs ->
-      Version.make_bounds "'varargs' flag" Version.Java_1_5 None
+      Version.make_bounds "'varargs' flag" Version.Java_5 None
   | `Native ->
       Version.make_bounds "'native' flag" Version.Java_1_0 None
   | `Interface ->
@@ -507,13 +507,13 @@ let version_bounds = function
   | `Strict ->
       Version.make_bounds "'strict' flag" Version.Java_1_1 None
   | `Synthetic ->
-      Version.make_bounds "'synthetic' flag" Version.Java_1_5 None
+      Version.make_bounds "'synthetic' flag" Version.Java_5 None
   | `Annotation ->
-      Version.make_bounds "'annotation' flag" Version.Java_1_5 None
+      Version.make_bounds "'annotation' flag" Version.Java_5 None
   | `Enum ->
-      Version.make_bounds "'enum' flag" Version.Java_1_5 None
+      Version.make_bounds "'enum' flag" Version.Java_5 None
   | `Module ->
-      Version.make_bounds "'module' flag" Version.Java_1_8 None
+      Version.make_bounds "'module' flag" Version.Java_8 None
 
 let list_to_utf8 = function
   | (_ :: _) as l ->
